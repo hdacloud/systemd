@@ -1,0 +1,91 @@
+From a76f607703911f314fea41148ef7c23fac20029d Mon Sep 17 00:00:00 2001
+From: Harald Hoyer <harald@redhat.com>
+Date: Wed, 30 Oct 2013 18:22:49 +0100
+Subject: [PATCH] remove user@.service
+
+fixes rhbz#1019738
+---
+ Makefile.am             |  2 --
+ src/login/logind-user.c | 42 ------------------------------------------
+ 2 files changed, 44 deletions(-)
+
+diff --git a/Makefile.am b/Makefile.am
+index f4867d9..df63275 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -437,7 +437,6 @@ nodist_systemunit_DATA = \
+ 	units/systemd-sysctl.service \
+ 	units/emergency.service \
+ 	units/rescue.service \
+-	units/user@.service \
+ 	units/systemd-hibernate.service \
+ 	units/systemd-hybrid-sleep.service \
+ 	units/systemd-suspend.service \
+@@ -486,7 +485,6 @@ EXTRA_DIST += \
+ 	units/user/systemd-exit.service.in \
+ 	units/systemd-fsck@.service.in \
+ 	units/systemd-fsck-root.service.in \
+-	units/user@.service.in \
+ 	units/systemd-udevd.service \
+ 	units/systemd-udev-trigger.service \
+ 	units/systemd-udev-settle.service \
+diff --git a/src/login/logind-user.c b/src/login/logind-user.c
+index b87311c..8e7256b 100644
+--- a/src/login/logind-user.c
++++ b/src/login/logind-user.c
+@@ -365,43 +365,6 @@ static int user_start_slice(User *u) {
+         return 0;
+ }
+ 
+-static int user_start_service(User *u) {
+-        DBusError error;
+-        char *job;
+-        int r;
+-
+-        assert(u);
+-
+-        dbus_error_init(&error);
+-
+-        if (!u->service) {
+-                char lu[DECIMAL_STR_MAX(unsigned long) + 1], *service;
+-                sprintf(lu, "%lu", (unsigned long) u->uid);
+-
+-                service = unit_name_build("user", lu, ".service");
+-                if (!service)
+-                        return log_oom();
+-
+-                r = manager_start_unit(u->manager, service, &error, &job);
+-                if (r < 0) {
+-                        log_error("Failed to start user service: %s", bus_error(&error, r));
+-                        dbus_error_free(&error);
+-
+-                        free(service);
+-                } else {
+-                        u->service = service;
+-
+-                        free(u->service_job);
+-                        u->service_job = job;
+-                }
+-        }
+-
+-        if (u->service)
+-                hashmap_put(u->manager->user_units, u->service, u);
+-
+-        return 0;
+-}
+-
+ int user_start(User *u) {
+         int r;
+ 
+@@ -422,11 +385,6 @@ int user_start(User *u) {
+         if (r < 0)
+                 return r;
+ 
+-        /* Spawn user systemd */
+-        r = user_start_service(u);
+-        if (r < 0)
+-                return r;
+-
+         if (!dual_timestamp_is_set(&u->timestamp))
+                 dual_timestamp_get(&u->timestamp);
+ 

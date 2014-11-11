@@ -1,0 +1,24 @@
+From cd31a2a77cccee55836ae77ac9f436c3764baf88 Mon Sep 17 00:00:00 2001
+From: Lukas Nykryn <lnykryn@redhat.com>
+Date: Thu, 30 Jan 2014 14:37:23 +0100
+Subject: [PATCH] utmp: make sure we don't write the utmp reboot record twice
+ on each boot
+
+---
+ src/update-utmp/update-utmp.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/src/update-utmp/update-utmp.c b/src/update-utmp/update-utmp.c
+index 202aa98..3606d17 100644
+--- a/src/update-utmp/update-utmp.c
++++ b/src/update-utmp/update-utmp.c
+@@ -268,9 +268,6 @@ static int on_runlevel(Context *c) {
+                         return q;
+                 }
+ 
+-                /* Hmm, we didn't find any runlevel, that means we
+-                 * have been rebooted */
+-                r = on_reboot(c);
+                 previous = 0;
+         }
+ 

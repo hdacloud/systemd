@@ -1,0 +1,159 @@
+From 281100560056e06f69d2cdb4dcc854bd3717734f Mon Sep 17 00:00:00 2001
+From: Michal Sekletar <msekleta@redhat.com>
+Date: Mon, 10 Feb 2014 17:41:32 +0100
+Subject: [PATCH] pam: do not set XDG_RUNTIME_DIR unconditionally
+
+If the session's original user is not the same as the newly logged in one we
+will not set XDG_RUNTIME_DIR.
+
+Patch based on upstream commit baae0358f349870544884e405e82e4be7d8add9f
+---
+ src/login/logind-dbus.c         |  2 ++
+ src/login/logind-session-dbus.c |  1 +
+ src/login/pam-module.c          | 52 ++++++++++++++++++++---------------------
+ 3 files changed, 29 insertions(+), 26 deletions(-)
+
+diff --git a/src/login/logind-dbus.c b/src/login/logind-dbus.c
+index bb85c7d..69e94aa 100644
+--- a/src/login/logind-dbus.c
++++ b/src/login/logind-dbus.c
+@@ -90,6 +90,7 @@
+         "   <arg name=\"path\" type=\"o\" direction=\"out\"/>\n"        \
+         "   <arg name=\"runtime_path\" type=\"o\" direction=\"out\"/>\n" \
+         "   <arg name=\"fd\" type=\"h\" direction=\"out\"/>\n"          \
++        "   <arg name=\"uid\" type=\"u\" direction=\"out\"/>\n"         \
+         "   <arg name=\"seat\" type=\"s\" direction=\"out\"/>\n"        \
+         "   <arg name=\"vtnr\" type=\"u\" direction=\"out\"/>\n"        \
+         "   <arg name=\"existing\" type=\"b\" direction=\"out\"/>\n"    \
+@@ -523,6 +524,7 @@ static int bus_manager_create_session(Manager *m, DBusMessage *message) {
+                                 DBUS_TYPE_OBJECT_PATH, &path,
+                                 DBUS_TYPE_STRING, &session->user->runtime_path,
+                                 DBUS_TYPE_UNIX_FD, &fifo_fd,
++                                DBUS_TYPE_UINT32, &session->user->uid,
+                                 DBUS_TYPE_STRING, &cseat,
+                                 DBUS_TYPE_UINT32, &vtnr,
+                                 DBUS_TYPE_BOOLEAN, &exists,
+diff --git a/src/login/logind-session-dbus.c b/src/login/logind-session-dbus.c
+index be4e01c..86b0746 100644
+--- a/src/login/logind-session-dbus.c
++++ b/src/login/logind-session-dbus.c
+@@ -755,6 +755,7 @@ int session_send_create_reply(Session *s, DBusError *error) {
+                                     DBUS_TYPE_OBJECT_PATH, &path,
+                                     DBUS_TYPE_STRING, &s->user->runtime_path,
+                                     DBUS_TYPE_UNIX_FD, &fifo_fd,
++                                    DBUS_TYPE_UINT32, &s->user->uid,
+                                     DBUS_TYPE_STRING, &cseat,
+                                     DBUS_TYPE_UINT32, &vtnr,
+                                     DBUS_TYPE_BOOLEAN, &exists,
+diff --git a/src/login/pam-module.c b/src/login/pam-module.c
+index 02f1618..22d9733 100644
+--- a/src/login/pam-module.c
++++ b/src/login/pam-module.c
+@@ -86,31 +86,24 @@ static int get_user_data(
+ 
+         const char *username = NULL;
+         struct passwd *pw = NULL;
+-        uid_t uid;
+         int r;
+ 
+         assert(handle);
+         assert(ret_username);
+         assert(ret_pw);
+ 
+-        r = audit_loginuid_from_pid(0, &uid);
+-        if (r >= 0)
+-                pw = pam_modutil_getpwuid(handle, uid);
+-        else {
+-                r = pam_get_user(handle, &username, NULL);
+-                if (r != PAM_SUCCESS) {
+-                        pam_syslog(handle, LOG_ERR, "Failed to get user name.");
+-                        return r;
+-                }
+-
+-                if (isempty(username)) {
+-                        pam_syslog(handle, LOG_ERR, "User name not valid.");
+-                        return PAM_AUTH_ERR;
+-                }
++        r = pam_get_user(handle, &username, NULL);
++        if (r != PAM_SUCCESS) {
++                pam_syslog(handle, LOG_ERR, "Failed to get user name.");
++                return r;
++        }
+ 
+-                pw = pam_modutil_getpwnam(handle, username);
++        if (isempty(username)) {
++                pam_syslog(handle, LOG_ERR, "User name not valid.");
++                return PAM_AUTH_ERR;
+         }
+ 
++        pw = pam_modutil_getpwnam(handle, username);
+         if (!pw) {
+                 pam_syslog(handle, LOG_ERR, "Failed to get user data.");
+                 return PAM_USER_UNKNOWN;
+@@ -123,16 +116,14 @@ static int get_user_data(
+ }
+ 
+ static int get_seat_from_display(const char *display, const char **seat, uint32_t *vtnr) {
+-        _cleanup_free_ char *p = NULL;
+-        int r;
++        _cleanup_free_ char *p = NULL, *tty=NULL;
+         _cleanup_close_ int fd = -1;
+         union sockaddr_union sa = {
+                 .un.sun_family = AF_UNIX,
+         };
+         struct ucred ucred;
+         socklen_t l;
+-        _cleanup_free_ char *tty = NULL;
+-        int v;
++        int v, r;
+ 
+         assert(display);
+         assert(vtnr);
+@@ -186,14 +177,14 @@ _public_ PAM_EXTERN int pam_sm_open_session(
+         bool debug = false;
+         const char *username, *id, *object_path, *runtime_path, *service = NULL, *tty = NULL, *display = NULL, *remote_user = NULL, *remote_host = NULL, *seat = NULL, *type = NULL, *class = NULL, *class_pam = NULL, *cvtnr = NULL;
+         DBusError error;
+-        uint32_t uid, pid;
+         DBusMessageIter iter;
+         int session_fd = -1;
+         DBusConnection *bus = NULL;
+         DBusMessage *m = NULL, *reply = NULL;
+         dbus_bool_t remote, existing;
+         int r;
+-        uint32_t vtnr = 0;
++        uint32_t uid, pid, vtnr = 0;
++        uid_t original_uid;
+ 
+         assert(handle);
+ 
+@@ -389,6 +380,7 @@ _public_ PAM_EXTERN int pam_sm_open_session(
+                                    DBUS_TYPE_OBJECT_PATH, &object_path,
+                                    DBUS_TYPE_STRING, &runtime_path,
+                                    DBUS_TYPE_UNIX_FD, &session_fd,
++                                   DBUS_TYPE_UINT32, &original_uid,
+                                    DBUS_TYPE_STRING, &seat,
+                                    DBUS_TYPE_UINT32, &vtnr,
+                                    DBUS_TYPE_BOOLEAN, &existing,
+@@ -409,10 +401,18 @@ _public_ PAM_EXTERN int pam_sm_open_session(
+                 goto finish;
+         }
+ 
+-        r = pam_misc_setenv(handle, "XDG_RUNTIME_DIR", runtime_path, 0);
+-        if (r != PAM_SUCCESS) {
+-                pam_syslog(handle, LOG_ERR, "Failed to set runtime dir.");
+-                goto finish;
++        if (original_uid == pw->pw_uid) {
++               /* Don't set $XDG_RUNTIME_DIR if the user we now
++                * authenticated for does not match the original user
++                * of the session. We do this in order not to result
++                * in privileged apps clobbering the runtime directory
++                * unnecessarily. */
++
++                r = pam_misc_setenv(handle, "XDG_RUNTIME_DIR", runtime_path, 0);
++                if (r != PAM_SUCCESS) {
++                        pam_syslog(handle, LOG_ERR, "Failed to set runtime dir.");
++                        return r;
++                }
+         }
+ 
+         if (!isempty(seat)) {

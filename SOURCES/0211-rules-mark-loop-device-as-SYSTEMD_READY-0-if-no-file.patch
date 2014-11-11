@@ -1,0 +1,28 @@
+From 4c3ce66158917f3fff65e25b5dde622bff3ec6f8 Mon Sep 17 00:00:00 2001
+From: Peter Rajnoha <prajnoha@redhat.com>
+Date: Thu, 6 Mar 2014 15:49:55 +0100
+Subject: [PATCH] rules: mark loop device as SYSTEMD_READY=0 if no file is
+ attached
+
+Check existence of loop/backing_file in sysfs and mark loop
+devices with SYSTEMD_READY if missing. Such loop files is
+uninitialized and it's not ready for use yet (there's no file
+attached).
+---
+ rules/99-systemd.rules.in | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/rules/99-systemd.rules.in b/rules/99-systemd.rules.in
+index 0e0a567..0471719 100644
+--- a/rules/99-systemd.rules.in
++++ b/rules/99-systemd.rules.in
+@@ -25,6 +25,9 @@ SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", KERNEL=="md*", ATTR{md/array_state}=="
+ # Ignore nbd devices in the "add" event, with "change" the nbd is ready
+ ACTION=="add", SUBSYSTEM=="block", KERNEL=="nbd*", ENV{SYSTEMD_READY}="0"
+ 
++# Ignore loop devices that don't have any file attached
++ACTION=="add|change", KERNEL=="loop[0-9]*", TEST!="loop/backing_file", ENV{SYSTEMD_READY}="0"
++
+ # We need a hardware independent way to identify network devices. We
+ # use the /sys/subsystem path for this. Current vanilla kernels don't
+ # actually support that hierarchy right now, however upcoming kernels

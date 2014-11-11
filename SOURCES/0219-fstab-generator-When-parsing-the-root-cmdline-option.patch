@@ -1,0 +1,26 @@
+From 42f30a9750ca939f1e805d5fb7790cd8dd3dee62 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Thomas=20B=C3=A4chler?= <thomas@archlinux.org>
+Date: Mon, 30 Sep 2013 00:32:33 +0200
+Subject: [PATCH] fstab-generator: When parsing the root= cmdline option, set
+ FsckPassNo to 1
+
+[tomegun: without this we would never fsck the rootfs if it was directly
+mounted 'rw' from the initrd. We now risk fsck'ing it twice in the case it
+is mounted 'ro', so that should be addressed in a separate patch.]
+---
+ src/fstab-generator/fstab-generator.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/fstab-generator/fstab-generator.c b/src/fstab-generator/fstab-generator.c
+index 9efccb9..6cecb4e 100644
+--- a/src/fstab-generator/fstab-generator.c
++++ b/src/fstab-generator/fstab-generator.c
+@@ -449,7 +449,7 @@ static int parse_new_root_from_proc_cmdline(void) {
+         }
+ 
+         log_debug("Found entry what=%s where=/sysroot type=%s", what, type);
+-        r = add_mount(what, "/sysroot", type, opts, 0, noauto, nofail, false,
++        r = add_mount(what, "/sysroot", type, opts, 1, noauto, nofail, false,
+                       SPECIAL_INITRD_ROOT_FS_TARGET, "/proc/cmdline");
+ 
+         return (r < 0) ? r : 0;

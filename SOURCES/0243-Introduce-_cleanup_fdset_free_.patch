@@ -1,0 +1,127 @@
+From 735583e63b9c109e3aaa7aecbce8d7a477988ef6 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Zbigniew=20J=C4=99drzejewski-Szmek?= <zbyszek@in.waw.pl>
+Date: Fri, 11 Oct 2013 19:33:48 -0400
+Subject: [PATCH] Introduce _cleanup_fdset_free_
+
+(cherry picked from commit 51d122af23533b0b8318911c4fc8b128ad8eafb7)
+
+Related: #1098310
+---
+ src/core/manager.c  | 22 +++++++---------------
+ src/nspawn/nspawn.c |  4 +---
+ src/shared/fdset.h  |  7 +++++++
+ 3 files changed, 15 insertions(+), 18 deletions(-)
+
+diff --git a/src/core/manager.c b/src/core/manager.c
+index 2829c95..57a88b0 100644
+--- a/src/core/manager.c
++++ b/src/core/manager.c
+@@ -236,7 +236,7 @@ static void draw_cylon(char buffer[], size_t buflen, unsigned width, unsigned po
+                 *p++ = '*';
+                 if (pos < width-1)
+                         p = mempset(p, ' ', width-1-pos);
+-                p = stpcpy(p, ANSI_HIGHLIGHT_OFF);
++                strcpy(p, ANSI_HIGHLIGHT_OFF);
+         }
+ }
+ 
+@@ -257,6 +257,7 @@ static void manager_print_jobs_in_progress(Manager *m) {
+         /* m->n_running_jobs must be consistent with the contents of m->jobs,
+          * so the above loop must have succeeded in finding j. */
+         assert(counter == print_nr + 1);
++        assert(j);
+ 
+         cylon_pos = m->jobs_in_progress_iteration % 14;
+         if (cylon_pos >= 8)
+@@ -2343,8 +2344,8 @@ int manager_distribute_fds(Manager *m, FDSet *fds) {
+ 
+ int manager_reload(Manager *m) {
+         int r, q;
+-        FILE *f;
+-        FDSet *fds;
++        _cleanup_fclose_ FILE *f = NULL;
++        _cleanup_fdset_free_ FDSet *fds = NULL;
+ 
+         assert(m);
+ 
+@@ -2358,20 +2359,18 @@ int manager_reload(Manager *m) {
+         fds = fdset_new();
+         if (!fds) {
+                 m->n_reloading --;
+-                r = -ENOMEM;
+-                goto finish;
++                return -ENOMEM;
+         }
+ 
+         r = manager_serialize(m, f, fds, false);
+         if (r < 0) {
+                 m->n_reloading --;
+-                goto finish;
++                return r;
+         }
+ 
+         if (fseeko(f, 0, SEEK_SET) < 0) {
+                 m->n_reloading --;
+-                r = -errno;
+-                goto finish;
++                return -errno;
+         }
+ 
+         /* From here on there is no way back. */
+@@ -2415,13 +2414,6 @@ int manager_reload(Manager *m) {
+ 
+         m->send_reloading_done = true;
+ 
+-finish:
+-        if (f)
+-                fclose(f);
+-
+-        if (fds)
+-                fdset_free(fds);
+-
+         return r;
+ }
+ 
+diff --git a/src/nspawn/nspawn.c b/src/nspawn/nspawn.c
+index f326f99..1cf67d0 100644
+--- a/src/nspawn/nspawn.c
++++ b/src/nspawn/nspawn.c
+@@ -1305,7 +1305,7 @@ int main(int argc, char *argv[]) {
+         bool saved_attr_valid = false;
+         struct winsize ws;
+         int kmsg_socket_pair[2] = { -1, -1 };
+-        FDSet *fds = NULL;
++        _cleanup_fdset_free_ FDSet *fds = NULL;
+ 
+         log_parse_environment();
+         log_open();
+@@ -1813,7 +1813,5 @@ finish:
+         free(arg_directory);
+         free(arg_machine);
+ 
+-        fdset_free(fds);
+-
+         return r;
+ }
+diff --git a/src/shared/fdset.h b/src/shared/fdset.h
+index a7bd5e2..1a26005 100644
+--- a/src/shared/fdset.h
++++ b/src/shared/fdset.h
+@@ -22,6 +22,7 @@
+ ***/
+ 
+ #include "set.h"
++#include "util.h"
+ 
+ typedef struct FDSet FDSet;
+ 
+@@ -47,3 +48,9 @@ int fdset_iterate(FDSet *s, Iterator *i);
+ 
+ #define FDSET_FOREACH(fd, fds, i) \
+         for ((i) = ITERATOR_FIRST, (fd) = fdset_iterate((fds), &(i)); (fd) >= 0; (fd) = fdset_iterate((fds), &(i)))
++
++static inline void fdset_freep(FDSet **fds) {
++        if (*fds)
++                fdset_free(*fds);
++}
++#define _cleanup_fdset_free_ _cleanup_(fdset_freep)

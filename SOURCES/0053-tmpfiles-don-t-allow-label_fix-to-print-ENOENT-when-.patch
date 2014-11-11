@@ -1,0 +1,33 @@
+From 5d27397f97e26c9b1e9f01f041c2e68cbfb41eb3 Mon Sep 17 00:00:00 2001
+From: Lukas Nykryn <lnykryn@redhat.com>
+Date: Thu, 9 Jan 2014 18:00:50 +0100
+Subject: [PATCH] tmpfiles: don't allow label_fix to print ENOENT when we want
+ to ignore it
+
+---
+ src/tmpfiles/tmpfiles.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/src/tmpfiles/tmpfiles.c b/src/tmpfiles/tmpfiles.c
+index 239e56b..9a397af 100644
+--- a/src/tmpfiles/tmpfiles.c
++++ b/src/tmpfiles/tmpfiles.c
+@@ -434,8 +434,6 @@ finish:
+ }
+ 
+ static int item_set_perms_full(Item *i, const char *path, bool ignore_enoent) {
+-        int r;
+-
+         /* not using i->path directly because it may be a glob */
+         if (i->mode_set)
+                 if (chmod(path, i->mode) < 0) {
+@@ -456,8 +454,7 @@ static int item_set_perms_full(Item *i, const char *path, bool ignore_enoent) {
+                         }
+                 }
+ 
+-        r = label_fix(path, false, false);
+-        return r == -ENOENT && ignore_enoent ? 0 : r;
++        return label_fix(path, ignore_enoent, false);
+ }
+ 
+ static int item_set_perms(Item *i, const char *path) {

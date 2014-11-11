@@ -1,0 +1,30 @@
+From 5078832417b89cfe92ad87133ecb4179a995db31 Mon Sep 17 00:00:00 2001
+From: Lennart Poettering <lennart@poettering.net>
+Date: Mon, 7 Jul 2014 17:33:46 +0200
+Subject: [PATCH] service: flush status text and errno values each time a
+ service is started
+
+We shouldn't show status texts from previous service starts
+
+(cherry picked from commit 8cfdb077b8e3da1c47fc1d735d051f21f33144c1)
+
+Related: #1106457
+---
+ src/core/service.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/core/service.c b/src/core/service.c
+index 814019d..a6d046c 100644
+--- a/src/core/service.c
++++ b/src/core/service.c
+@@ -2579,6 +2579,10 @@ static int service_start(Unit *u) {
+         s->main_pid_alien = false;
+         s->forbid_restart = false;
+ 
++        free(s->status_text);
++        s->status_text = NULL;
++        s->status_errno = 0;
++
+         service_enter_start_pre(s);
+         return 0;
+ }

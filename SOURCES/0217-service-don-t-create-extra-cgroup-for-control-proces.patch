@@ -1,0 +1,46 @@
+From d09b7328c7757cebdc2fb0032361c086733bd3f7 Mon Sep 17 00:00:00 2001
+From: Lukas Nykryn <lnykryn@redhat.com>
+Date: Mon, 10 Mar 2014 15:11:29 +0100
+Subject: [PATCH] service: don't create extra cgroup for control process when
+ reloading SysV service
+
+Unfortunately common practice in initscripts is to have reload as an
+alias for restart (https://fedoraproject.org/wiki/Packaging:SysVInitScript).
+In that case the newly started process will be killed immediately after
+the reload process ends and its cgroup is destroyed.
+---
+ src/core/service.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/src/core/service.c b/src/core/service.c
+index 41e5cb5..dff5286 100644
+--- a/src/core/service.c
++++ b/src/core/service.c
+@@ -2353,7 +2353,15 @@ static void service_enter_reload(Service *s) {
+                                   !s->root_directory_start_only,
+                                   false,
+                                   false,
++#ifdef HAVE_SYSV_COMPAT
++                                  /* Don't create extra cgroup for SysV services.
++                                   * Unfortunately common practice was to have reload as an alias
++                                   * for restart and we are killing the new main process, when destroying
++                                   * cgroup for the control process*/
++                                  !s->is_sysv,
++#else
+                                   true,
++#endif
+                                   &s->control_pid);
+                 if (r < 0)
+                         goto fail;
+@@ -3174,7 +3182,10 @@ static void service_sigchld_event(Unit *u, pid_t pid, int code, int status) {
+                 /* Immediately get rid of the cgroup, so that the
+                  * kernel doesn't delay the cgroup empty messages for
+                  * the service cgroup any longer than necessary */
+-                service_kill_control_processes(s);
++#ifdef HAVE_SYSV_COMPAT
++                if (!s->is_sysv)
++#endif
++                        service_kill_control_processes(s);
+ 
+                 if (s->control_command &&
+                     s->control_command->command_next &&

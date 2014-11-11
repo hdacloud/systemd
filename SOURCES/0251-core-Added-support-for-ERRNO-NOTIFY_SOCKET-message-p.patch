@@ -1,0 +1,126 @@
+From 4323a5406bb40c76076814fd998e09c58b433e7d Mon Sep 17 00:00:00 2001
+From: Miguel Angel Ajo <mangelajo@redhat.com>
+Date: Mon, 7 Jul 2014 14:20:36 +0200
+Subject: [PATCH] core: Added support for ERRNO NOTIFY_SOCKET  message parsing
+
+Added StatusErrno dbus property along StatusText to allow notification of
+numeric status condition while degraded service operation or any other special
+situation.
+
+(cherry picked from commit 4774e357268e4a1e9fa82adb0563a538932a4c8e)
+
+Resolves: #1106457
+---
+ src/core/dbus-service.c |  3 +++
+ src/core/service.c      | 33 +++++++++++++++++++++++++++++----
+ src/core/service.h      |  1 +
+ 3 files changed, 33 insertions(+), 4 deletions(-)
+
+diff --git a/src/core/dbus-service.c b/src/core/dbus-service.c
+index 696c446..edfc7ff 100644
+--- a/src/core/dbus-service.c
++++ b/src/core/dbus-service.c
+@@ -64,6 +64,7 @@
+         "  <property name=\"ControlPID\" type=\"u\" access=\"read\"/>\n" \
+         "  <property name=\"BusName\" type=\"s\" access=\"read\"/>\n"   \
+         "  <property name=\"StatusText\" type=\"s\" access=\"read\"/>\n" \
++        "  <property name=\"StatusErrno\" type=\"i\" access=\"read\"/>\n" \
+         "  <property name=\"Result\" type=\"s\" access=\"read\"/>\n"    \
+        " </interface>\n"
+ 
+@@ -96,6 +97,7 @@ const char bus_service_invalidating_properties[] =
+         "MainPID\0"
+         "ControlPID\0"
+         "StatusText\0"
++        "StatusErrno\0"
+         "Result\0";
+ 
+ static DEFINE_BUS_PROPERTY_APPEND_ENUM(bus_service_append_type, service_type, ServiceType);
+@@ -144,6 +146,7 @@ static const BusProperty bus_service_properties[] = {
+         { "ControlPID",             bus_property_append_pid,          "u", offsetof(Service, control_pid)                  },
+         { "BusName",                bus_property_append_string,       "s", offsetof(Service, bus_name),               true },
+         { "StatusText",             bus_property_append_string,       "s", offsetof(Service, status_text),            true },
++        { "StatusErrno",            bus_property_append_int,          "i", offsetof(Service, status_errno)                 },
+         { "Result",                 bus_service_append_service_result,"s", offsetof(Service, result)                       },
+         {}
+ };
+diff --git a/src/core/service.c b/src/core/service.c
+index f6fdbbc..3f6c8ac 100644
+--- a/src/core/service.c
++++ b/src/core/service.c
+@@ -3443,6 +3443,7 @@ static void service_timer_event(Unit *u, uint64_t elapsed, Watch* w) {
+ static void service_notify_message(Unit *u, pid_t pid, char **tags) {
+         Service *s = SERVICE(u);
+         const char *e;
++        bool notify_dbus = false;
+ 
+         assert(u);
+ 
+@@ -3478,6 +3479,7 @@ static void service_notify_message(Unit *u, pid_t pid, char **tags) {
+                                        "%s: got %s", u->id, e);
+                         service_set_main_pid(s, pid);
+                         unit_watch_pid(UNIT(s), pid);
++                        notify_dbus = true;
+                 }
+         }
+ 
+@@ -3516,12 +3518,34 @@ static void service_notify_message(Unit *u, pid_t pid, char **tags) {
+ 
+                         free(s->status_text);
+                         s->status_text = t;
+-                } else {
++                } else
++                        t = NULL;
++
++                if (!streq_ptr(s->status_text, t)) {
+                         free(s->status_text);
+-                        s->status_text = NULL;
+-                }
++                        s->status_text = t;
++                        notify_dbus = true;
++                } else
++                        free(t);
++        }
++
++        /* Interpret ERRNO= */
++        e = strv_find_prefix(tags, "ERRNO=");
++        if (e) {
++                int status_errno;
+ 
++                if (safe_atoi(e + 6, &status_errno) < 0)
++                        log_warning_unit(u->id, "Failed to parse ERRNO= field in notification message: %s", e);
++                else {
++                        log_debug_unit(u->id, "%s: got %s", u->id, e);
++
++                        if (s->status_errno != status_errno) {
++                                s->status_errno = status_errno;
++                                notify_dbus = true;
++                        }
++                }
+         }
++
+         if (strv_find(tags, "WATCHDOG=1")) {
+                 log_debug_unit(u->id,
+                                "%s: got WATCHDOG=1", u->id);
+@@ -3530,7 +3554,8 @@ static void service_notify_message(Unit *u, pid_t pid, char **tags) {
+         }
+ 
+         /* Notify clients about changed status or main pid */
+-        unit_add_to_dbus_queue(u);
++        if (notify_dbus)
++                unit_add_to_dbus_queue(u);
+ }
+ 
+ #ifdef HAVE_SYSV_COMPAT
+diff --git a/src/core/service.h b/src/core/service.h
+index ce5b5e0..fa4ef2b 100644
+--- a/src/core/service.h
++++ b/src/core/service.h
+@@ -187,6 +187,7 @@ struct Service {
+         char *bus_name;
+ 
+         char *status_text;
++        int status_errno;
+ 
+         RateLimit start_limit;
+         StartLimitAction start_limit_action;

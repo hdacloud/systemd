@@ -1,0 +1,25 @@
+From 865e6e46f235bc9c58e61024696fff216e7a2182 Mon Sep 17 00:00:00 2001
+From: Lennart Poettering <lennart@poettering.net>
+Date: Mon, 7 Jul 2014 17:32:44 +0200
+Subject: [PATCH] service: don't accept negative ERRNO= notification messages
+
+(cherry picked from commit 2040ccf171404b709acb0ecf1d1f17b87c5d05f0)
+
+Related: #1106457
+---
+ src/core/service.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/core/service.c b/src/core/service.c
+index 3f6c8ac..814019d 100644
+--- a/src/core/service.c
++++ b/src/core/service.c
+@@ -3534,7 +3534,7 @@ static void service_notify_message(Unit *u, pid_t pid, char **tags) {
+         if (e) {
+                 int status_errno;
+ 
+-                if (safe_atoi(e + 6, &status_errno) < 0)
++                if (safe_atoi(e + 6, &status_errno) < 0 || status_errno < 0)
+                         log_warning_unit(u->id, "Failed to parse ERRNO= field in notification message: %s", e);
+                 else {
+                         log_debug_unit(u->id, "%s: got %s", u->id, e);

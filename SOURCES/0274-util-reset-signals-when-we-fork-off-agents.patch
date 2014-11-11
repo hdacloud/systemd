@@ -1,0 +1,70 @@
+From 72be8870f1ab5d8753d966ee6c81f88734053a95 Mon Sep 17 00:00:00 2001
+From: Lennart Poettering <lennart@poettering.net>
+Date: Tue, 26 Aug 2014 21:04:21 +0200
+Subject: [PATCH] util: reset signals when we fork off agents
+
+If we invoke agents, we should make sure we actually can kill them
+again. I mean, it's probably not our job to cleanup the signals if our
+tools are invoked in weird contexts, but at least we should make sure,
+that the subprocesses we invoke and intend to control work as intended.
+
+Also see:
+
+http://lists.freedesktop.org/archives/systemd-devel/2014-August/022460.html
+
+(cherry picked from commit 8a7c93d858c342744adf481565d8bb03b9713dcf)
+
+Resolves: #1134818
+---
+ src/shared/util.c | 18 ++++++++++++++++++
+ src/shared/util.h |  1 +
+ 2 files changed, 19 insertions(+)
+
+diff --git a/src/shared/util.c b/src/shared/util.c
+index fc1f765..e4448ff 100644
+--- a/src/shared/util.c
++++ b/src/shared/util.c
+@@ -935,6 +935,18 @@ int reset_all_signal_handlers(void) {
+         return 0;
+ }
+ 
++int reset_signal_mask(void) {
++        sigset_t ss;
++
++        if (sigemptyset(&ss) < 0)
++                return -errno;
++
++        if (sigprocmask(SIG_SETMASK, &ss, NULL) < 0)
++                return -errno;
++
++        return 0;
++}
++
+ char *strstrip(char *s) {
+         char *e;
+ 
+@@ -5028,6 +5040,12 @@ int fork_agent(pid_t *pid, const int except[], unsigned n_except, const char *pa
+         /* Don't leak fds to the agent */
+         close_all_fds(except, n_except);
+ 
++        /* Make sure we actually can kill the agent, if we need to, in
++         * case somebody invoked us from a shell script that trapped
++         * SIGTERM or so... */
++        reset_all_signal_handlers();
++        reset_signal_mask();
++
+         stdout_is_tty = isatty(STDOUT_FILENO);
+         stderr_is_tty = isatty(STDERR_FILENO);
+ 
+diff --git a/src/shared/util.h b/src/shared/util.h
+index ec18d2c..5a9bc99 100644
+--- a/src/shared/util.h
++++ b/src/shared/util.h
+@@ -207,6 +207,7 @@ int readlink_and_make_absolute(const char *p, char **r);
+ int readlink_and_canonicalize(const char *p, char **r);
+ 
+ int reset_all_signal_handlers(void);
++int reset_signal_mask(void);
+ 
+ char *strstrip(char *s);
+ char *delete_chars(char *s, const char *bad);
