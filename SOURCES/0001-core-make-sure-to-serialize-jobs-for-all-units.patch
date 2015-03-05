@@ -1,0 +1,111 @@
+From 45422dd99a43700b159effe5e234b9013d850738 Mon Sep 17 00:00:00 2001
+From: Lennart Poettering <lennart@poettering.net>
+Date: Fri, 16 May 2014 01:15:03 +0200
+Subject: [PATCH] core: make sure to serialize jobs for all units
+
+Previously we wouldn't serialize jobs for units that themselves have
+nothing to serialize.
+
+http://lists.freedesktop.org/archives/systemd-devel/2014-May/019051.html
+
+Conflicts:
+	src/core/unit.c
+---
+ src/core/manager.c |  3 ---
+ src/core/unit.c    | 45 +++++++++++++++++++++------------------------
+ 2 files changed, 21 insertions(+), 27 deletions(-)
+
+diff --git a/src/core/manager.c b/src/core/manager.c
+index a2810b4..4ad26e1 100644
+--- a/src/core/manager.c
++++ b/src/core/manager.c
+@@ -2169,9 +2169,6 @@ int manager_serialize(Manager *m, FILE *f, FDSet *fds, bool switching_root) {
+                 if (u->id != t)
+                         continue;
+ 
+-                if (!unit_can_serialize(u))
+-                        continue;
+-
+                 /* Start marker */
+                 fputs(u->id, f);
+                 fputc('\n', f);
+diff --git a/src/core/unit.c b/src/core/unit.c
+index 17792d1..855e135 100644
+--- a/src/core/unit.c
++++ b/src/core/unit.c
+@@ -2296,24 +2296,10 @@ int unit_serialize(Unit *u, FILE *f, FDSet *fds, bool serialize_jobs) {
+         assert(f);
+         assert(fds);
+ 
+-        if (!unit_can_serialize(u))
+-                return 0;
+-
+-        r = UNIT_VTABLE(u)->serialize(u, f, fds);
+-        if (r < 0)
+-                return r;
+-
+-
+-        if (serialize_jobs) {
+-                if (u->job) {
+-                        fprintf(f, "job\n");
+-                        job_serialize(u->job, f, fds);
+-                }
+-
+-                if (u->nop_job) {
+-                        fprintf(f, "job\n");
+-                        job_serialize(u->nop_job, f, fds);
+-                }
++        if (unit_can_serialize(u)) {
++                r = UNIT_VTABLE(u)->serialize(u, f, fds);
++                if (r < 0)
++                        return r;
+         }
+ 
+         dual_timestamp_serialize(f, "inactive-exit-timestamp", &u->inactive_exit_timestamp);
+@@ -2330,6 +2316,18 @@ int unit_serialize(Unit *u, FILE *f, FDSet *fds, bool serialize_jobs) {
+         if (u->cgroup_path)
+                 unit_serialize_item(u, f, "cgroup", u->cgroup_path);
+ 
++        if (serialize_jobs) {
++                if (u->job) {
++                        fprintf(f, "job\n");
++                        job_serialize(u->job, f, fds);
++                }
++
++                if (u->nop_job) {
++                        fprintf(f, "job\n");
++                        job_serialize(u->nop_job, f, fds);
++                }
++        }
++
+         /* End marker */
+         fputc('\n', f);
+         return 0;
+@@ -2369,9 +2367,6 @@ int unit_deserialize(Unit *u, FILE *f, FDSet *fds) {
+         assert(f);
+         assert(fds);
+ 
+-        if (!unit_can_serialize(u))
+-                return 0;
+-
+         for (;;) {
+                 char line[LINE_MAX], *l, *v;
+                 size_t k;
+@@ -2484,9 +2479,11 @@ int unit_deserialize(Unit *u, FILE *f, FDSet *fds) {
+                         continue;
+                 }
+ 
+-                r = UNIT_VTABLE(u)->deserialize_item(u, l, v, fds);
+-                if (r < 0)
+-                        return r;
++                if (unit_can_serialize(u)) {
++                        r = UNIT_VTABLE(u)->deserialize_item(u, l, v, fds);
++                        if (r < 0)
++                                return r;
++                }
+         }
+ }
+ 
+-- 
+1.8.3.1
+

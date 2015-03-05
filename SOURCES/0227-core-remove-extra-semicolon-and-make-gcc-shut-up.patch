@@ -1,0 +1,22 @@
+From dce7f7c81bebf628623aad4a666fef6449294a8e Mon Sep 17 00:00:00 2001
+From: Michal Sekletar <msekleta@redhat.com>
+Date: Thu, 13 Mar 2014 11:25:45 +0100
+Subject: [PATCH] core: remove extra semicolon and make gcc shut up
+
+---
+ src/core/mount.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/core/mount.c b/src/core/mount.c
+index 62ec7fe..3672338 100644
+--- a/src/core/mount.c
++++ b/src/core/mount.c
+@@ -1414,7 +1414,7 @@ static int mount_add_one(
+                 bool set_flags) {
+         int r;
+         Unit *u;
+-        bool delete, changed = false;;
++        bool delete, changed = false;
+         char *e, *w = NULL, *o = NULL, *f = NULL;
+         MountParameters *p;
+         bool load_extras = false;

@@ -1,0 +1,40 @@
+From 736a7f8c5d6c711ece23b0f347d3b89ac7464b08 Mon Sep 17 00:00:00 2001
+From: Lukas Nykryn <lnykryn@redhat.com>
+Date: Tue, 26 Aug 2014 13:33:08 +0200
+Subject: [PATCH] systemctl: fix broken list-unit-files with --root
+
+(cherry picked from commit 81fc054dc7c365545bca86d78bf36a12658cedb3)
+
+Related: #1111199
+
+Conflicts:
+	src/shared/install.c
+---
+ src/shared/install.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/src/shared/install.c b/src/shared/install.c
+index 598323a..2c8f907 100644
+--- a/src/shared/install.c
++++ b/src/shared/install.c
+@@ -1973,6 +1973,7 @@ int unit_file_get_list(
+                         union dirent_storage buffer;
+                         UnitFileList __attribute__((cleanup(unitfilelist_free)))
+                                 *f = NULL;
++                        _cleanup_free_ char *path = NULL;
+ 
+                         r = readdir_r(d, &buffer.de, &de);
+                         if (r != 0)
+@@ -2027,7 +2028,11 @@ int unit_file_get_list(
+                                 goto found;
+                         }
+ 
+-                        r = unit_file_can_install(&paths, root_dir, f->path, true);
++                        path = path_make_absolute(de->d_name, *i);
++                        if (!path)
++                                return -ENOMEM;
++
++                        r = unit_file_can_install(&paths, root_dir, path, true);
+                         if (r == -EINVAL ||  /* Invalid setting? */
+                             r == -EBADMSG || /* Invalid format? */
+                             r == -ENOENT     /* Included file not found? */)

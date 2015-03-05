@@ -1,0 +1,42 @@
+From d6be31a099e36738c48a322466f080701a39d1a9 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Zbigniew=20J=C4=99drzejewski-Szmek?= <zbyszek@in.waw.pl>
+Date: Mon, 16 Dec 2013 23:40:00 -0500
+Subject: [PATCH] man: describe journalctl --show-cursor
+
+---
+ man/journalctl.xml | 22 +++++++++++++++++-----
+ 1 file changed, 17 insertions(+), 5 deletions(-)
+
+diff --git a/man/journalctl.xml b/man/journalctl.xml
+index b5a0c53..dd8cb18 100644
+--- a/man/journalctl.xml
++++ b/man/journalctl.xml
+@@ -565,11 +565,23 @@
+                         <varlistentry>
+                                 <term><option>--after-cursor=</option></term>
+ 
+-                                <listitem><para>Start showing entries from the
+-                                location in the journal
+-                                <emphasis>after</emphasis> the location
+-                                specified by the this cursor.
+-                                </para></listitem>
++                                <listitem><para>Start showing entries
++                                from the location in the journal
++                                <emphasis>after</emphasis> the
++                                location specified by the this cursor.
++                                The cursor is shown when the
++                                <option>--show-cursor</option> option
++                                is used.</para></listitem>
++                        </varlistentry>
++
++                        <varlistentry>
++                                <term><option>--show-cursor</option></term>
++
++                                <listitem><para>The cursor is shown after the last
++                                entry after two dashes:</para>
++                                <programlisting>-- cursor: s=0639...</programlisting>
++                                <para>The format of this the cursor is private
++                                and subject ot change.</para></listitem>
+                         </varlistentry>
+ 
+                         <varlistentry>

@@ -1,0 +1,24 @@
+From cbd7e523d1bccde7fc1ad2ca18c74b8ee00f2940 Mon Sep 17 00:00:00 2001
+From: Thomas Hindoe Paaboel Andersen <phomes@gmail.com>
+Date: Tue, 17 Dec 2013 20:15:45 +0100
+Subject: [PATCH] journal-file.c: remove redundant assignment of variable
+
+we also do 'last_index = (uint64_t) -1;' at the end of the while
+loop so there is no reason to also do it here.
+---
+ src/journal/journal-file.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/src/journal/journal-file.c b/src/journal/journal-file.c
+index 2c0fd0c..9f04c58 100644
+--- a/src/journal/journal-file.c
++++ b/src/journal/journal-file.c
+@@ -1628,8 +1628,6 @@ static int generic_array_bisect(
+                                         else
+                                                 left = y + 1;
+                                 }
+-
+-                                last_index = (uint64_t) -1;
+                         }
+ 
+                         for (;;) {

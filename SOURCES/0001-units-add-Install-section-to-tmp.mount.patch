@@ -1,0 +1,23 @@
+From b4aeab33ff172b608930daf77a6f7af47bf2fdc9 Mon Sep 17 00:00:00 2001
+From: Michal Schmidt <mschmidt@redhat.com>
+Date: Fri, 15 Feb 2013 09:07:57 +0100
+Subject: [PATCH] units: add [Install] section to tmp.mount
+
+Change-Id: I2e6d129de00a9afaf7558006c886866f64394c29
+Related: #908253
+---
+ units/tmp.mount | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/units/tmp.mount b/units/tmp.mount
+index 99a3ba3..9e4803a 100644
+--- a/units/tmp.mount
++++ b/units/tmp.mount
+@@ -18,3 +18,7 @@ What=tmpfs
+ Where=/tmp
+ Type=tmpfs
+ Options=mode=1777,strictatime
++
++# Make 'systemctl enable tmp.mount' work:
++[Install]
++WantedBy=local-fs.target

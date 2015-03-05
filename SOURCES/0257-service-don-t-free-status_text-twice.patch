@@ -1,0 +1,24 @@
+From 3b6a01f5fc0a4770d9c55a1c7fb1addc231f3021 Mon Sep 17 00:00:00 2001
+From: Michal Sekletar <msekleta@redhat.com>
+Date: Mon, 18 Aug 2014 16:12:45 +0200
+Subject: [PATCH] service: don't free status_text twice
+
+Related: #1106457
+---
+ src/core/service.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/src/core/service.c b/src/core/service.c
+index a6d046c..4366e1b 100644
+--- a/src/core/service.c
++++ b/src/core/service.c
+@@ -3519,9 +3519,6 @@ static void service_notify_message(Unit *u, pid_t pid, char **tags) {
+ 
+                         log_debug_unit(u->id,
+                                        "%s: got %s", u->id, e);
+-
+-                        free(s->status_text);
+-                        s->status_text = t;
+                 } else
+                         t = NULL;
+ 
