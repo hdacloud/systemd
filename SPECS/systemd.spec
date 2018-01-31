@@ -7,7 +7,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        219
-Release:        42%{?dist}.6
+Release:        42%{?dist}.7
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        A System and Service Manager
@@ -545,6 +545,7 @@ Patch0503: 0503-unmount-Pass-in-mount-options-when-remounting-read-o.patch
 Patch0504: 0504-shutdown-don-t-remount-ro-network-filesystems.-6588.patch
 Patch0505: 0505-shutdown-fix-incorrect-fscanf-result-check-6806.patch
 Patch0506: 0506-manager-fix-connecting-to-bus-when-dbus-is-actually-.patch
+Patch0507: 0507-automount-ack-automount-requests-even-when-already-m.patch
 
 %global num_patches %{lua: c=0; for i,p in ipairs(patches) do c=c+1; end; print(c);}
 
@@ -1513,6 +1514,9 @@ fi
 %{_mandir}/man8/systemd-resolved.*
 
 %changelog
+* Wed Jan 17 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-42.7
+- automount: ack automount requests even when already mounted (#1535135)
+
 * Tue Jan 09 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-42.6
 - manager: fix connecting to bus when dbus is actually around (#7205) (#1465737)
 
