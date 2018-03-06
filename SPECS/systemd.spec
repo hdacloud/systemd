@@ -7,7 +7,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        219
-Release:        42%{?dist}.7
+Release:        42%{?dist}.10
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        A System and Service Manager
@@ -546,6 +546,16 @@ Patch0504: 0504-shutdown-don-t-remount-ro-network-filesystems.-6588.patch
 Patch0505: 0505-shutdown-fix-incorrect-fscanf-result-check-6806.patch
 Patch0506: 0506-manager-fix-connecting-to-bus-when-dbus-is-actually-.patch
 Patch0507: 0507-automount-ack-automount-requests-even-when-already-m.patch
+Patch0508: 0508-shared-cgroup-utils-_CGROUP_CONTROLLER_MASK_ALL-does.patch
+Patch0509: 0509-core-execute-fix-fork-fail-handling-in-exec_spawn.patch
+Patch0510: 0510-journal-remove-error-check-that-never-happens.patch
+Patch0511: 0511-sd-journal-various-clean-ups-and-modernizations.patch
+Patch0512: 0512-journalctl-continue-operation-even-if-we-run-into-an.patch
+Patch0513: 0513-journalctl-when-we-fail-to-open-a-journal-file-print.patch
+Patch0514: 0514-sd-journal-properly-handle-inotify-queue-overflow.patch
+Patch0515: 0515-sd-journal-make-sure-it-s-safe-to-call-sd_journal_pr.patch
+Patch0516: 0516-sd-journal-when-picking-up-a-new-file-compare-inode-.patch
+Patch0517: 0517-journalctl-Periodically-call-sd_journal_process-in-j.patch
 
 %global num_patches %{lua: c=0; for i,p in ipairs(patches) do c=c+1; end; print(c);}
 
@@ -1514,6 +1524,22 @@ fi
 %{_mandir}/man8/systemd-resolved.*
 
 %changelog
+* Wed Feb 21 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-42.10
+- journal: remove error check that never happens (#1465759)
+- sd-journal: various clean-ups and modernizations (#1465759)
+- journalctl: continue operation, even if we run into an invalid file (#1465759)
+- journalctl: when we fail to open a journal file, print why (#1465759)
+- sd-journal: properly handle inotify queue overflow (#1540538)
+- sd-journal: make sure it's safe to call sd_journal_process() before the first sd_journal_wait() (#1540538)
+- sd-journal: when picking up a new file, compare inode/device info with previous open file by same name (#1540538)
+- journalctl: Periodically call sd_journal_process in journalctl (#1540538)
+
+* Mon Feb 19 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-42.9
+- core:execute: fix fork() fail handling in exec_spawn() (#1437114)
+
+* Tue Feb 13 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-42.8
+- shared/cgroup-utils: _CGROUP_CONTROLLER_MASK_ALL does not cover CGROUP_PIDS (#1532586)
+
 * Wed Jan 17 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-42.7
 - automount: ack automount requests even when already mounted (#1535135)
 
