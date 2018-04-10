@@ -4,5 +4,6 @@ SUBSYSTEM!="net", GOTO="phys_port_name_end"
 
 DRIVERS=="mlxsw*", ATTR{phys_port_name}=="?*", IMPORT{program}="/usr/lib/udev/phys-port-name-gen %k"
 DRIVERS=="rocker", ATTR{phys_port_name}=="?*", IMPORT{program}="/usr/lib/udev/phys-port-name-gen %k"
+DRIVERS=="nfp*", ATTR{phys_port_name}=="?*", IMPORT{program}="/usr/lib/udev/phys-port-name-gen %k"
 
 LABEL="phys_port_name_end"

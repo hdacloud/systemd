@@ -7,7 +7,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        219
-Release:        42%{?dist}.10
+Release:        57%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        A System and Service Manager
@@ -537,25 +537,121 @@ Patch0495: 0495-systemd-notify-Always-pass-a-valid-pid-to-sd_pid_not.patch
 Patch0496: 0496-sd_pid_notify_with_fds-fix-computing-msg_controllen.patch
 Patch0497: 0497-rules-move-cpu-hotplug-rule-to-separate-file.patch
 Patch0498: 0498-Revert-rules-move-cpu-hotplug-rule-to-separate-file.patch
-Patch0499: 0499-Revert-udev-net_id-add-support-for-phys_port_name-at.patch
-Patch0500: 0500-sysctl-fix-uninitialized-variable.patch
-Patch0501: 0501-udev-ignore-SIGCHLD-from-unexpected-processes-130653.patch
-Patch0502: 0502-manager-when-reexecuting-try-to-connect-to-bus-only-.patch
-Patch0503: 0503-unmount-Pass-in-mount-options-when-remounting-read-o.patch
-Patch0504: 0504-shutdown-don-t-remount-ro-network-filesystems.-6588.patch
-Patch0505: 0505-shutdown-fix-incorrect-fscanf-result-check-6806.patch
-Patch0506: 0506-manager-fix-connecting-to-bus-when-dbus-is-actually-.patch
-Patch0507: 0507-automount-ack-automount-requests-even-when-already-m.patch
-Patch0508: 0508-shared-cgroup-utils-_CGROUP_CONTROLLER_MASK_ALL-does.patch
-Patch0509: 0509-core-execute-fix-fork-fail-handling-in-exec_spawn.patch
-Patch0510: 0510-journal-remove-error-check-that-never-happens.patch
-Patch0511: 0511-sd-journal-various-clean-ups-and-modernizations.patch
-Patch0512: 0512-journalctl-continue-operation-even-if-we-run-into-an.patch
-Patch0513: 0513-journalctl-when-we-fail-to-open-a-journal-file-print.patch
-Patch0514: 0514-sd-journal-properly-handle-inotify-queue-overflow.patch
-Patch0515: 0515-sd-journal-make-sure-it-s-safe-to-call-sd_journal_pr.patch
-Patch0516: 0516-sd-journal-when-picking-up-a-new-file-compare-inode-.patch
-Patch0517: 0517-journalctl-Periodically-call-sd_journal_process-in-j.patch
+Patch0499: 0499-tests-use-XFS-as-root-filesystem-for-system-tests.patch
+Patch0500: 0500-tests-use-fdisk-instead-of-sfdisk.patch
+Patch0501: 0501-Revert-udev-net_id-add-support-for-phys_port_name-at.patch
+Patch0502: 0502-core-unset-sysfs-path-after-transition-to-dead-state.patch
+Patch0503: 0503-sysctl-fix-uninitialized-variable.patch
+Patch0504: 0504-udev-ignore-SIGCHLD-from-unexpected-processes-130653.patch
+Patch0505: 0505-compile-with-Werror.patch
+Patch0506: 0506-myhostname-don-t-return-any-ipv6-entries-when-ipv6-i.patch
+Patch0507: 0507-core-execute-fix-fork-fail-handling-in-exec_spawn.patch
+Patch0508: 0508-fix-compilation-after-commit-382877acc6c029e59e359a0.patch
+Patch0509: 0509-Redefine-32bit-time_t-format-to-signed.patch
+Patch0510: 0510-sd-bus-bus-kernel.c-fix-format-errors-on-ppc64le.patch
+Patch0511: 0511-tmpfiles-with-e-don-t-attempt-to-set-permissions-whe.patch
+Patch0512: 0512-units-introduce-getty-pre.target-6667.patch
+Patch0513: 0513-units-order-container-and-console-getty-units-after-.patch
+Patch0514: 0514-log-never-log-into-foreign-fd-2-in-PID-1-or-its-pre-.patch
+Patch0515: 0515-nspawn-new-option-to-start-as-PID2.patch
+Patch0516: 0516-journal-implicitly-flush-to-var-on-recovery-4028.patch
+Patch0517: 0517-journal-add-use-flushed_flag_is_set-helper-4041.patch
+Patch0518: 0518-journald-don-t-flush-to-var-log-journal-before-we-ge.patch
+Patch0519: 0519-path-util-make-use-of-mnt_id-field-exported-in-proc-.patch
+Patch0520: 0520-Revert-Revert-journald-allow-restarting-journald-wit.patch
+Patch0521: 0521-journald-make-sure-we-retain-all-stream-fds-across-r.patch
+Patch0522: 0522-Allow-systemd-tmpfiles-to-set-the-file-directory-att.patch
+Patch0523: 0523-tmpfiles-rework-file-attribute-code.patch
+Patch0524: 0524-tmpfiles-warn-if-we-get-an-argument-on-lines-that-do.patch
+Patch0525: 0525-tmpfiles-substitute-specifiers-in-arguments-for-writ.patch
+Patch0526: 0526-btrfs-util-introduce-btrfs_is_filesystem-and-make-us.patch
+Patch0527: 0527-journal-don-t-force-FS_NOCOW_FL-on-new-journal-files.patch
+Patch0528: 0528-tmpfiles-Add-C-attrib-to-the-journal-files-directori.patch
+Patch0529: 0529-Revert-path-util-make-use-of-mnt_id-field-exported-i.patch
+Patch0530: 0530-device-make-sure-to-remove-all-device-units-sharing-.patch
+Patch0531: 0531-manager-when-reexecuting-try-to-connect-to-bus-only-.patch
+Patch0532: 0532-doc-document-service-exit-codes.patch
+Patch0533: 0533-units-order-cryptsetup-pre.target-before-cryptsetup..patch
+Patch0534: 0534-man-add-an-explicit-description-of-_netdev-to-system.patch
+Patch0535: 0535-units-add-remote-cryptsetup.target-and-remote-crypts.patch
+Patch0536: 0536-cryptsetup-generator-use-remote-cryptsetup.target-wh.patch
+Patch0537: 0537-Support-rdma-as-a-ListenNetlink-argument-6626.patch
+Patch0538: 0538-core-namespace-Protect-usr-instead-of-home-with-Prot.patch
+Patch0539: 0539-udev-Use-parent-bus-id-for-virtio-disk-builtin-path-.patch
+Patch0540: 0540-socket-util-socket_address_parse-should-not-log-erro.patch
+Patch0541: 0541-test-fix-failing-test-socket-util-when-running-with-.patch
+Patch0542: 0542-scsi_id-add-missing-options-to-getopt_long-6501.patch
+Patch0543: 0543-unmount-Pass-in-mount-options-when-remounting-read-o.patch
+Patch0544: 0544-shutdown-don-t-remount-ro-network-filesystems.-6588.patch
+Patch0545: 0545-shutdown-fix-incorrect-fscanf-result-check-6806.patch
+Patch0546: 0546-path-util-make-use-of-mnt_id-field-exported-in-proc-.patch
+Patch0547: 0547-support-ranges-when-parsing-CPUAffinity.patch
+Patch0548: 0548-man-Update-man-page-documentation-for-CPUAffinity.patch
+Patch0549: 0549-test-path-util-force-rm_rf.patch
+Patch0550: 0550-Export-NVMe-WWID-udev-attribute-5348.patch
+Patch0551: 0551-mount-make-sure-we-unmount-tmpfs-mounts-before-we-de.patch
+Patch0552: 0552-journald-never-accept-fds-from-file-systems-with-man.patch
+Patch0553: 0553-udev-builtin-keyboard-move-fetching-the-device-node-.patch
+Patch0554: 0554-udev-builtin-keyboard-immediately-EVIOCSKEYCODE-when.patch
+Patch0555: 0555-udev-builtin-keyboard-move-actual-key-mapping-to-a-h.patch
+Patch0556: 0556-udev-builtin-keyboard-invert-a-condition.patch
+Patch0557: 0557-udev-builtin-keyboard-add-support-for-EVDEV_ABS_.patch
+Patch0558: 0558-hwdb-sync-60-evdev.hwdb-from-systemd-v235.patch
+Patch0559: 0559-journal-ensure-open-journals-from-find_journal-3973.patch
+Patch0560: 0560-journal-only-check-available-space-when-journal-is-o.patch
+Patch0561: 0561-automount-if-an-automount-unit-is-masked-don-t-react.patch
+Patch0562: 0562-units-add-Install-section-to-remote-cryptsetup.targe.patch
+Patch0563: 0563-units-replace-remote-cryptsetup-pre.target-with-remo.patch
+Patch0564: 0564-man-add-a-note-about-_netdev-usage.patch
+Patch0565: 0565-units-make-remote-cryptsetup.target-also-after-crypt.patch
+Patch0566: 0566-cryptsetup-generator-use-after-free.patch
+Patch0567: 0567-manager-fix-connecting-to-bus-when-dbus-is-actually-.patch
+Patch0568: 0568-journal-remote-make-url-option-support-arbitrary-url.patch
+Patch0569: 0569-journald-make-maximum-size-of-stream-log-lines-confi.patch
+Patch0570: 0570-service-serialize-information-about-currently-execut.patch
+Patch0571: 0571-tests-add-new-test-for-issue-518.patch
+Patch0572: 0572-tests-in-RHEL-7-we-don-t-have-python3-by-default.patch
+Patch0573: 0573-service-attempt-to-execute-next-main-command-only-fo.patch
+Patch0574: 0574-timedatectl-stop-using-xstrftime.patch
+Patch0575: 0575-Add-support-to-read-lz4-compressed-journals.patch
+Patch0576: 0576-journald-never-block-when-sending-messages-on-NOTIFY.patch
+Patch0577: 0577-journal-restore-watchdog-support.patch
+Patch0578: 0578-cgroup-resource-property-setting-ignored-if-einval.patch
+Patch0579: 0579-fileio-add-new-helper-call-read_line-as-bounded-getl.patch
+Patch0580: 0580-def-add-new-constant-LONG_LINE_MAX.patch
+Patch0581: 0581-fileio-rework-read_one_line_file-on-top-of-read_line.patch
+Patch0582: 0582-cgroup-util-replace-one-use-of-fgets-by-read_line.patch
+Patch0583: 0583-conf-parse-remove-4K-line-length-limit.patch
+Patch0584: 0584-test-conf-parser-add-tests-for-config-parser.patch
+Patch0585: 0585-fileio-use-_cleanup_-for-FILE-unlocking.patch
+Patch0586: 0586-test-fileio-also-test-read_line-with-actual-files.patch
+Patch0587: 0587-fileio-return-0-from-read_one_line_file-on-success.patch
+Patch0588: 0588-man-fix-description-of-force-in-halt-8-7392.patch
+Patch0589: 0589-journal-return-better-error-for-empty-files.patch
+Patch0590: 0590-journalctl-continue-operation-even-if-we-run-into-an.patch
+Patch0591: 0591-journal-remove-error-check-that-never-happens.patch
+Patch0592: 0592-sd-journal-various-clean-ups-and-modernizations.patch
+Patch0593: 0593-journalctl-when-we-fail-to-open-a-journal-file-print.patch
+Patch0594: 0594-journald-fix-accuracy-of-watchdog-timer-event.patch
+Patch0595: 0595-core-fix-the-reversed-sanity-check-when-setting-Star.patch
+Patch0596: 0596-shared-dropin-ignore-ENAMETOOLONG-when-checking-drop.patch
+Patch0597: 0597-cryptsetup-when-unlocking-always-put-path-to-the-obj.patch
+Patch0598: 0598-cryptsetup-use-more-descriptive-name-for-the-variabl.patch
+Patch0599: 0599-cryptsetup-generator-do-not-bind-to-the-decrypted-de.patch
+Patch0600: 0600-shared-cgroup-utils-_CGROUP_CONTROLLER_MASK_ALL-does.patch
+Patch0601: 0601-automount-ack-automount-requests-even-when-already-m.patch
+Patch0602: 0602-udev-net_id-add-support-for-platform-bus-ACPI-mostly.patch
+Patch0603: 0603-journald-native-Fix-typo-in-MANDLOCK-message.patch
+Patch0604: 0604-process-util-make-our-freeze-routine-do-something-us.patch
+Patch0605: 0605-dbus-propagate-errors-from-bus_init_system-and-bus_i.patch
+Patch0606: 0606-bus-util.c-fix-TasksMax-property-assignment.patch
+Patch0607: 0607-sparse-avoid-clash-with-__bitwise-and-__force-from-4.patch
+Patch0608: 0608-core-Let-two-more-booleans-survive-a-daemon-reload.patch
+Patch0609: 0609-core-don-t-choke-if-a-unit-another-unit-triggers-van.patch
+Patch0610: 0610-sd-journal-properly-handle-inotify-queue-overflow.patch
+Patch0611: 0611-sd-journal-make-sure-it-s-safe-to-call-sd_journal_pr.patch
+Patch0612: 0612-journalctl-Periodically-call-sd_journal_process-in-j.patch
+Patch0613: 0613-sd-journal-when-picking-up-a-new-file-compare-inode-.patch
 
 %global num_patches %{lua: c=0; for i,p in ipairs(patches) do c=c+1; end; print(c);}
 
@@ -574,6 +670,7 @@ BuildRequires:  libblkid-devel
 BuildRequires:  xz-devel
 BuildRequires:  zlib-devel
 BuildRequires:  bzip2-devel
+BuildRequires:  lz4-devel
 BuildRequires:  libidn-devel
 BuildRequires:  libcurl-devel
 BuildRequires:  kmod-devel
@@ -615,7 +712,7 @@ Provides:       /sbin/shutdown
 Provides:       syslog
 Provides:       systemd-units = %{version}-%{release}
 
-Conflicts:      dracut < 033-499
+Conflicts:      dracut < 033-243
 Conflicts:      initscripts < 9.49.28-1
 
 #Obsolete packages when we are migrating from rhel6
@@ -764,6 +861,7 @@ CONFIGURE_OPTS=(
     --enable-compat-libs
     --disable-sysusers
     --disable-ldconfig
+    --enable-lz4
 %ifarch s390 s390x ppc %{power64} aarch64
     --disable-lto
 %endif
@@ -869,6 +967,8 @@ mkdir -p %{buildroot}%{_localstatedir}/lib/systemd/coredump
 mkdir -p %{buildroot}%{_localstatedir}/lib/systemd/catalog
 mkdir -p %{buildroot}%{_localstatedir}/lib/systemd/backlight
 mkdir -p %{buildroot}%{_localstatedir}/lib/systemd/rfkill
+mkdir -p %{buildroot}%{_localstatedir}/lib/systemd/journal-upload
+
 touch %{buildroot}%{_localstatedir}/lib/systemd/catalog/database
 touch %{buildroot}%{_sysconfdir}/udev/hwdb.bin
 touch %{buildroot}%{_localstatedir}/lib/systemd/random-seed
@@ -1108,7 +1208,7 @@ if [ -z "$preferred" ]; then
         preferred=kdm
     fi
 fi
-if [ -n "$preferred" -a -r "/usr/lib/systemd/system/$preferred.service" ]; then
+if [ $1 -eq 1 -a -n "$preferred" -a -r "/usr/lib/systemd/system/$preferred.service" ]; then
     # This is supposed to fail when the symlink already exists
     ln -s "/usr/lib/systemd/system/$preferred.service" /etc/systemd/system/display-manager.service >/dev/null 2>&1 || :
 fi
@@ -1490,6 +1590,7 @@ fi
 %{_prefix}/lib/systemd/systemd-journal-upload
 %{_prefix}/lib/systemd/systemd-journal-remote
 %{_prefix}/lib/tmpfiles.d/systemd-remote.conf
+%dir %attr(0755,systemd-journal-upload,systemd-journal-upload) %{_localstatedir}/lib/systemd/journal-upload
 %{_mandir}/man8/systemd-journal-gatewayd.*
 %{_mandir}/man8/systemd-journal-remote.*
 %{_datadir}/systemd/gatewayd
@@ -1524,43 +1625,154 @@ fi
 %{_mandir}/man8/systemd-resolved.*
 
 %changelog
-* Wed Feb 21 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-42.10
-- journal: remove error check that never happens (#1465759)
-- sd-journal: various clean-ups and modernizations (#1465759)
-- journalctl: continue operation, even if we run into an invalid file (#1465759)
-- journalctl: when we fail to open a journal file, print why (#1465759)
+* Tue Feb 20 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-57
 - sd-journal: properly handle inotify queue overflow (#1540538)
 - sd-journal: make sure it's safe to call sd_journal_process() before the first sd_journal_wait() (#1540538)
-- sd-journal: when picking up a new file, compare inode/device info with previous open file by same name (#1540538)
 - journalctl: Periodically call sd_journal_process in journalctl (#1540538)
+- sd-journal: when picking up a new file, compare inode/device info with previous open file by same name (#1540538)
 
-* Mon Feb 19 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-42.9
-- core:execute: fix fork() fail handling in exec_spawn() (#1437114)
+* Mon Feb 19 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-56
+- core: don't choke if a unit another unit triggers vanishes during reload (#1545676)
 
-* Tue Feb 13 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-42.8
+* Wed Feb 07 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-55
+- sparse: avoid clash with __bitwise and __force from 4.10 linux/types.h (#5061) (#1447937)
+- core: Let two more booleans survive a daemon-reload (#1542391)
+
+* Tue Feb 06 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-54
+- automount: ack automount requests even when already mounted (#1535135)
+- udev: net_id add support for platform bus (ACPI, mostly arm64) devices (#1529633)
+- journald-native: Fix typo in MANDLOCK message (#1501017)
+- process-util: make our freeze() routine do something useful (#1540941)
+- dbus: propagate errors from bus_init_system() and bus_init_api() (#1541061)
+- bus-util.c: fix TasksMax= property assignment (#1537147)
+
+* Tue Jan 09 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-53
 - shared/cgroup-utils: _CGROUP_CONTROLLER_MASK_ALL does not cover CGROUP_PIDS (#1532586)
 
-* Wed Jan 17 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-42.7
-- automount: ack automount requests even when already mounted (#1535135)
+* Thu Dec 14 2017 Lukas Nykryn <lnykryn@redhat.com> - 219-52
+- cryptsetup: when unlocking always put path to the object into Id (#1511043)
+- cryptsetup: use more descriptive name for the variable and drop redundant function (#1511043)
+- cryptsetup-generator: do not bind to the decrypted device unit (#6538) (#1511043)
+- introduce naming based on phys_port_name for nfp via udev rule (#1516283)
 
-* Tue Jan 09 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-42.6
+* Tue Dec 05 2017 Lukáš Nykrýn <lnykryn@redhat.com> - 219-51
+- revert substitute PACKAGE_STRING with the actual package NVR (#1453153)
+
+* Mon Dec 04 2017 Lukas Nykryn <lnykryn@redhat.com> - 219-50
+- core: fix the reversed sanity check when setting StartupBlockIOWeight over dbus (#1302305)
+- shared/dropin: ignore ENAMETOOLONG when checking drop-in directories (#7525) (#1489095)
+- enable display manager only on systemd installation (#1464893)
+- remove unnecessary dependency on dracut (#1466676)
+- substitute PACKAGE_STRING with the actual package NVR (#1453153)
+
+* Fri Nov 24 2017 Lukas Nykryn <lnykryn@redhat.com> - 219-49
+- journald: fix accuracy of watchdog timer event (#1511565)
+
+* Thu Nov 23 2017 Lukas Nykryn <lnykryn@redhat.com> - 219-48
+- journald: never block when sending messages on NOTIFY_SOCKET socket (#1511565)
+- journal: restore watchdog support (#1511565)
+- cgroup resource property setting ignored if einval (rhbz#1302305)
+- fileio: add new helper call read_line() as bounded getline() replacement (#1503106)
+- def: add new constant LONG_LINE_MAX (#1503106)
+- fileio: rework read_one_line_file() on top of read_line() (#1503106)
+- cgroup-util: replace one use of fgets() by read_line() (#1503106)
+- conf-parse: remove 4K line length limit (#1503106)
+- test-conf-parser: add tests for config parser (#1503106)
+- fileio: use _cleanup_ for FILE unlocking (#1503106)
+- test-fileio: also test read_line() with actual files (#1503106)
+- fileio: return 0 from read_one_line_file on success (#1503106)
+- man: fix description of --force in halt(8) (#7392) (#1515130)
+- journal: return better error for empty files (#1465759)
+- journalctl: continue operation, even if we run into an invalid file (#1465759)
+- journal: remove error check that never happens (#1465759)
+- sd-journal: various clean-ups and modernizations (#1465759)
+- journalctl: when we fail to open a journal file, print why (#1465759)
+
+* Thu Nov 16 2017 Lukas Nykryn <lnykryn@redhat.com> - 219-47
+- cryptsetup-generator: use after free (#1477757)
 - manager: fix connecting to bus when dbus is actually around (#7205) (#1465737)
+- journal-remote: make --url option support arbitrary url (#1505385)
+- journald: make maximum size of stream log lines configurable and bump it to 48K (#6838) (#1442262)
+- service: serialize information about currently executing command (#1404657,#1471230)
+- tests: add new test for issue #518 (#1404657,)
+- tests: in RHEL-7 we don't have python3 by default (#1404657,)
+- service: attempt to execute next main command only for oneshot services (#6619) (#1404657,)
+- timedatectl: stop using xstrftime (#1503942)
+- Add support to read lz4 compressed journals (rhbz#1431687)
 
-* Thu Dec 07 2017 Lukas Nykryn <lnykryn@redhat.com> - 219-42.5
+* Tue Oct 31 2017 Lukas Nykryn <lnykryn@redhat.com> - 219-46
+- Support 'rdma' as a ListenNetlink= argument (#6626) (#1494610)
+- core/namespace: Protect /usr instead of /home with ProtectSystem=yes (#1493047)
+- udev: Use parent bus id for virtio disk builtin path-id (#5500) (#1496697)
+- socket-util: socket_address_parse() should not log errors on its own (#1497639)
+- test: fix failing test-socket-util when running with ipv6.disable=1 kernel param (#1497639)
+- scsi_id: add missing options to getopt_long() (#6501) (#1476910)
 - unmount: Pass in mount options when remounting read-only (#1312002)
 - shutdown: don't remount,ro network filesystems. (#6588) (#1312002)
 - shutdown: fix incorrect fscanf() result check (#6806) (#1312002)
+- path-util: make use of "mnt_id" field exported in /proc/self/fdinfo/<fd> (#1472439)
+- support ranges when parsing CPUAffinity (#1493976)
+- man: Update man page documentation for CPUAffinity (#1493976)
+- test-path-util: force rm_rf (#1472439)
+- Export NVMe WWID udev attribute (#5348) (#1503253)
+- mount: make sure we unmount tmpfs mounts before we deactivate swaps (#7076) (#1437518)
+- journald: never accept fds from file systems with mandatory locking enabled (#1501017)
+- udev: builtin-keyboard: move fetching the device node up (#1500119)
+- udev: builtin-keyboard: immediately EVIOCSKEYCODE when we have a pair (#1500119)
+- udev: builtin-keyboard: move actual key mapping to a helper function (#1500119)
+- udev: builtin-keyboard: invert a condition (#1500119)
+- udev: builtin-keyboard: add support for EVDEV_ABS_* (#1500119)
+- hwdb: sync 60-evdev.hwdb from systemd v235 (rhbz#1500119)
+- journal: ensure open journals from find_journal() (#3973) (#1493846)
+- journal: only check available space when journal is open (#1493846)
+- automount: if an automount unit is masked, don't react to activation anymore (#5445) (#1498318)
+- units: add [Install] section to remote-cryptsetup.target (#1477757)
+- units: replace remote-cryptsetup-pre.target with remote-fs-pre.target (#1477757)
+- man: add a note about _netdev usage (#1477757)
+- units: make remote-cryptsetup.target also after cryptsetup-pre.target (#1477757)
 
-* Fri Sep 29 2017 Lukas Nykryn <lnykryn@redhat.com> - 219-42.4
+* Wed Sep 27 2017 Lukas Nykryn <lnykryn@redhat.com> - 219-45
+- journal: implicitly flush to var on recovery (#4028) (#1364092)
+- journal: add/use flushed_flag_is_set() helper (#4041) (#1364092)
+- journald: don't flush to /var/log/journal before we get asked to (#1364092)
+- path-util: make use of "mnt_id" field exported in /proc/self/fdinfo/<fd> (#1472439)
+- Revert "Revert "journald: allow restarting journald without losing stream connections"" (#1359939)
+- journald: make sure we retain all stream fds across restarts (#6348) (#1359939)
+- Allow systemd-tmpfiles to set the file/directory attributes (#1299714)
+- tmpfiles: rework file attribute code (#1299714)
+- tmpfiles: warn if we get an argument on lines that don't take any (#1299714)
+- tmpfiles: substitute % specifiers in arguments for writing files and xattrs (#1299714)
+- btrfs-util: introduce btrfs_is_filesystem() and make use of it where appropriate (#1299714)
+- journal: don't force FS_NOCOW_FL on new journal files, but warn if it is missing (#1299714)
+- tmpfiles: Add +C attrib to the journal files directories (#1299714)
+- Revert "path-util: make use of "mnt_id" field exported in /proc/self/fdinfo/<fd>" (#1472439)
+- device: make sure to remove all device units sharing the same sysfs path (#6679) (#1408916)
 - manager: when reexecuting try to connect to bus only when dbus.service is around (#6773) (#1465737)
+- doc: document service exit codes (#1178929)
+- units: order cryptsetup-pre.target before cryptsetup.target (#1384014)
+- man: add an explicit description of _netdev to systemd.mount(5) (#1384014)
+- units: add remote-cryptsetup.target and remote-cryptsetup-pre.target (#1384014)
+- cryptsetup-generator: use remote-cryptsetup.target when _netdev is present (#1384014)
 
-* Mon Sep 25 2017 Lukas Nykryn <lnykryn@redhat.com> - 219-42.3
-- udev: ignore SIGCHLD from unexpected processes (#1306539) (#1306539)
-
-* Thu Sep 21 2017 Lukas Nykryn <lnykryn@redhat.com> - 219-42.2
+* Tue Sep 12 2017 Lukas Nykryn <lnykryn@redhat.com> - 219-44
+- core: unset sysfs path after transition to dead state (#1408916)
 - sysctl: fix uninitialized variable (#1485121)
+- udev: ignore SIGCHLD from unexpected processes (#1306539) (#1306539)
+- compile with -Werror (#1447937)
+- myhostname: don't return any ipv6 entries when ipv6 is disabled (#1444824)
+- core:execute: fix fork() fail handling in exec_spawn() (#1437114)
+- fix compilation after commit 382877acc6c029e59e359a076d203ca03b4b9e9e (#1447937)
+- Redefine 32bit time_t format to signed (#1447937)
+- sd-bus/bus-kernel.c: fix format errors on ppc64le (#1447937)
+- tmpfiles: with "e" don't attempt to set permissions when file doesn't exist (#1445732)
+- units: introduce getty-pre.target (#6667) (#1173080)
+- units: order container and console getty units after getty-pre.target (#1173080)
+- log: never log into foreign fd #2 in PID 1 or its pre-execve() children (#1420505)
+- nspawn: new option to start as PID2 (#1417387)
 
-* Tue Aug 15 2017 Lukas Nykryn <lnykryn@redhat.com> - 219-42.1
+* Wed Aug 16 2017 Lukas Nykryn <lnykryn@redhat.com> - 219-43
+- tests: use XFS as root filesystem for system tests (#1475870)
+- tests: use fdisk instead of sfdisk (#1475870)
 - Revert "udev: net_id: add support for phys_port_name attribute (#4506)" (#1477285)
 - reintroduce naming based on phys_port_name for mlxsw and rocker via udev rule
 
