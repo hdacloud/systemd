@@ -7,7 +7,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        219
-Release:        57%{?dist}
+Release:        57%{?dist}.1
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        A System and Service Manager
@@ -652,6 +652,9 @@ Patch0610: 0610-sd-journal-properly-handle-inotify-queue-overflow.patch
 Patch0611: 0611-sd-journal-make-sure-it-s-safe-to-call-sd_journal_pr.patch
 Patch0612: 0612-journalctl-Periodically-call-sd_journal_process-in-j.patch
 Patch0613: 0613-sd-journal-when-picking-up-a-new-file-compare-inode-.patch
+Patch0614: 0614-umount-always-use-MNT_FORCE-in-umount_all-7213.patch
+Patch0615: 0615-core-Implement-timeout-based-umount-remount-limit.patch
+Patch0616: 0616-core-Implement-sync_with_progress.patch
 
 %global num_patches %{lua: c=0; for i,p in ipairs(patches) do c=c+1; end; print(c);}
 
@@ -1625,6 +1628,11 @@ fi
 %{_mandir}/man8/systemd-resolved.*
 
 %changelog
+* Mon Jun 25 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-57.1
+- umount: always use MNT_FORCE in umount_all() (#7213) (#1571098)
+- core: Implement timeout based umount/remount limit (#1571098)
+- core: Implement sync_with_progress() (#1571098)
+
 * Tue Feb 20 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-57
 - sd-journal: properly handle inotify queue overflow (#1540538)
 - sd-journal: make sure it's safe to call sd_journal_process() before the first sd_journal_wait() (#1540538)
