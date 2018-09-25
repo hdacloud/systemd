@@ -7,7 +7,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        219
-Release:        57%{?dist}.1
+Release:        57%{?dist}.3
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        A System and Service Manager
@@ -655,6 +655,7 @@ Patch0613: 0613-sd-journal-when-picking-up-a-new-file-compare-inode-.patch
 Patch0614: 0614-umount-always-use-MNT_FORCE-in-umount_all-7213.patch
 Patch0615: 0615-core-Implement-timeout-based-umount-remount-limit.patch
 Patch0616: 0616-core-Implement-sync_with_progress.patch
+Patch0617: 0617-automount-handle-state-changes-of-the-corresponding-.patch
 
 %global num_patches %{lua: c=0; for i,p in ipairs(patches) do c=c+1; end; print(c);}
 
@@ -1052,6 +1053,9 @@ systemctl stop systemd-udevd-control.socket systemd-udevd-kernel.socket systemd-
 systemd-machine-id-setup >/dev/null 2>&1 || :
 /usr/lib/systemd/systemd-random-seed save >/dev/null 2>&1 || :
 systemctl daemon-reexec >/dev/null 2>&1 || :
+for u in `systemctl show -p Id --state=active \*.automount | cut -d = -f 2`; do
+    systemctl try-restart $u >/dev/null 2>&1 || :
+done
 systemctl start systemd-udevd.service >/dev/null 2>&1 || :
 udevadm hwdb --update >/dev/null 2>&1 || :
 journalctl --update-catalog >/dev/null 2>&1 || :
@@ -1628,6 +1632,12 @@ fi
 %{_mandir}/man8/systemd-resolved.*
 
 %changelog
+* Fri Aug 31 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-57.3
+- restart automounts unit on update (#1596241)
+
+* Mon Jul 30 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-57.2
+- automount: handle state changes of the corresponding mount unit correctly (#1596241)
+
 * Mon Jun 25 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-57.1
 - umount: always use MNT_FORCE in umount_all() (#7213) (#1571098)
 - core: Implement timeout based umount/remount limit (#1571098)
