@@ -7,7 +7,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        219
-Release:        57%{?dist}.3
+Release:        62%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        A System and Service Manager
@@ -652,10 +652,57 @@ Patch0610: 0610-sd-journal-properly-handle-inotify-queue-overflow.patch
 Patch0611: 0611-sd-journal-make-sure-it-s-safe-to-call-sd_journal_pr.patch
 Patch0612: 0612-journalctl-Periodically-call-sd_journal_process-in-j.patch
 Patch0613: 0613-sd-journal-when-picking-up-a-new-file-compare-inode-.patch
-Patch0614: 0614-umount-always-use-MNT_FORCE-in-umount_all-7213.patch
-Patch0615: 0615-core-Implement-timeout-based-umount-remount-limit.patch
-Patch0616: 0616-core-Implement-sync_with_progress.patch
-Patch0617: 0617-automount-handle-state-changes-of-the-corresponding-.patch
+Patch0614: 0614-tmpfiles-don-t-skip-cleanup-of-read-only-root-owned-.patch
+Patch0615: 0615-timer-we-already-got-the-trigger-before-no-need-to-c.patch
+Patch0616: 0616-doc-fix-links-to-binfmt_misc-kernel-documentation.patch
+Patch0617: 0617-man-udevadm-remove-superfluous-version-from-subcomma.patch
+Patch0618: 0618-man-udevadm-correctly-show-the-short-version-of-exit.patch
+Patch0619: 0619-core-timer-downgrade-message-about-random-time-addit.patch
+Patch0620: 0620-fd-util-add-new-acquire_data_fd-API-helper.patch
+Patch0621: 0621-systemd-analyze-make-dump-work-for-large-of-units.patch
+Patch0622: 0622-use-max.-message-size-allowed-by-DBus-spec-8936.patch
+Patch0623: 0623-cryptsetup-support-LUKS2-on-disk-format.patch
+Patch0624: 0624-core-scope-fix-missing-fragment_path.patch
+Patch0625: 0625-units-don-t-put-udev-to-its-own-mount-namespace-with.patch
+Patch0626: 0626-rules-disable-support-for-Lenovo-IR-cameras.patch
+Patch0627: 0627-core-make-sure-systemctl-reload-or-try-restart-is-ac.patch
+Patch0628: 0628-core-fix-confusing-logging-of-instantaneous-jobs.patch
+Patch0629: 0629-core-correct-return-value-from-reload-methods.patch
+Patch0630: 0630-core-always-try-harder-to-get-unit-status-message-fo.patch
+Patch0631: 0631-core-unit_get_status_message_format-never-returns-NU.patch
+Patch0632: 0632-core-try-harder-to-get-job-completion-messages-too.patch
+Patch0633: 0633-core-remove-generic-job-completion-messages-from-uni.patch
+Patch0634: 0634-core-do-not-log-done-failed-condition-jobs-as-if-uni.patch
+Patch0635: 0635-core-log-completion-of-remaining-job-types.patch
+Patch0636: 0636-core-adjust-job-completion-message-log-levels.patch
+Patch0637: 0637-mount-add-new-LazyUnmount-setting-for-mount-units-ma.patch
+Patch0638: 0638-rules-Add-MODEL_ID-for-NVMe-device-7037.patch
+Patch0639: 0639-umount-always-use-MNT_FORCE-in-umount_all-7213.patch
+Patch0640: 0640-core-Implement-timeout-based-umount-remount-limit.patch
+Patch0641: 0641-core-Implement-sync_with_progress.patch
+Patch0642: 0642-journal-fix-HMAC-calculation-when-appending-a-data-o.patch
+Patch0643: 0643-journal-forward-messages-from-dev-log-unmodified-to-.patch
+Patch0644: 0644-tmpfiles-use-safe_glob.patch
+Patch0645: 0645-Fix-SELinux-labels-in-cgroup-filesystem-root-directo.patch
+Patch0646: 0646-core-dont-t-remount-sys-fs-cgroup-for-relabel-if-not.patch
+Patch0647: 0647-fix-race-between-daemon-reload-and-other-commands.patch
+Patch0648: 0648-core-delay-adding-target-dependencies-until-all-unit.patch
+Patch0649: 0649-man-correct-the-meaning-of-TimeoutStopSec.patch
+Patch0650: 0650-rules-mark-hotplugged-memory-as-movable.patch
+Patch0651: 0651-udev-add-ID_INPUT_SWITCH-for-devices-with-switch-cap.patch
+Patch0652: 0652-rules-disable-support-for-Dell-IR-cameras.patch
+Patch0653: 0653-rpm-fix-systemd_user_post-macro.patch
+Patch0654: 0654-rpm-remove-confusing-user-before-global.patch
+Patch0655: 0655-automount-handle-state-changes-of-the-corresponding-.patch
+Patch0656: 0656-man-document-that-SIGCONT-always-follows-SIGTERM.patch
+Patch0657: 0657-rules-add-udev-rule-that-automatically-offline-HW-at.patch
+Patch0658: 0658-Revert-rules-mark-hotplugged-memory-as-movable.patch
+Patch0659: 0659-rules-implement-new-memory-hotplug-policy.patch
+Patch0660: 0660-Revert-rules-add-udev-rule-that-automatically-offlin.patch
+Patch0661: 0661-cryptsetup-generator-introduce-basic-keydev-support.patch
+Patch0662: 0662-cryptsetup-generator-don-t-return-error-if-target-di.patch
+Patch0663: 0663-cryptsetup-generator-allow-whitespace-characters-in-.patch
+Patch0664: 0664-Make-sure-the-mount-units-pulled-by-RequiresMountsFo.patch
 
 %global num_patches %{lua: c=0; for i,p in ipairs(patches) do c=c+1; end; print(c);}
 
@@ -1373,7 +1420,7 @@ fi
 %ghost %dir %{_localstatedir}/lib/systemd/coredump
 %ghost %dir %{_localstatedir}/lib/systemd/backlight
 %ghost %dir %{_localstatedir}/lib/systemd/rfkill
-%ghost %{_localstatedir}/lib/systemd/random-seed
+%ghost %attr(0600, root, root) %{_localstatedir}/lib/systemd/random-seed
 %ghost %{_localstatedir}/lib/systemd/clock
 %ghost %{_localstatedir}/lib/systemd/catalog/database
 %ghost %attr(0664,root,utmp) %{_localstatedir}/run/utmp
@@ -1396,7 +1443,7 @@ fi
 %config(noreplace) %{_sysconfdir}/rsyslog.d/listen.conf
 %config(noreplace) %{_sysconfdir}/yum/protected.d/systemd.conf
 %config(noreplace) %{_sysconfdir}/pam.d/systemd-user
-%ghost %{_sysconfdir}/udev/hwdb.bin
+%ghost %attr(0444, root, root) %{_sysconfdir}/udev/hwdb.bin
 %{_rpmconfigdir}/macros.d/macros.systemd
 %{_sysconfdir}/xdg/systemd
 %{_sysconfdir}/rc.d/init.d/README
@@ -1404,7 +1451,7 @@ fi
 %ghost %config(noreplace) %{_sysconfdir}/localtime
 %ghost %config(noreplace) %{_sysconfdir}/vconsole.conf
 %ghost %config(noreplace) %{_sysconfdir}/locale.conf
-%ghost %config(noreplace) %{_sysconfdir}/machine-id
+%ghost %attr(0444, root, root) %config(noreplace) %{_sysconfdir}/machine-id
 %ghost %config(noreplace) %{_sysconfdir}/machine-info
 %dir %{_sysconfdir}/X11/xorg.conf.d
 %ghost %config(noreplace) %{_sysconfdir}/X11/xorg.conf.d/00-keyboard.conf
@@ -1632,16 +1679,62 @@ fi
 %{_mandir}/man8/systemd-resolved.*
 
 %changelog
-* Fri Aug 31 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-57.3
+* Fri Sep 07 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-62
+- cryptsetup-generator: introduce basic keydev support (#1619743)
+- cryptsetup-generator: don't return error if target directory already exists (#1619743)
+- cryptsetup-generator: allow whitespace characters in keydev specification (#1619743)
+- Make sure the mount units pulled by 'RequiresMountsFor=' are loaded (if they exist) (#1619743)
+
+* Fri Aug 31 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-61
 - restart automounts unit on update (#1596241)
 
-* Mon Jul 30 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-57.2
-- automount: handle state changes of the corresponding mount unit correctly (#1596241)
+* Fri Aug 17 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-60
+- Revert "rules: mark hotplugged memory as movable" (#1614686)
+- rules: implement new memory hotplug policy (#1614686)
+- Revert "rules: add udev rule that automatically offline HW attached to ACPI container" (#1597958)
 
-* Mon Jun 25 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-57.1
+* Wed Jul 25 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-59
+- man: correct the meaning of TimeoutStopSec= (#1305509)
+- rules: mark hotplugged memory as movable (#1563532)
+- udev: add ID_INPUT_SWITCH for devices with switch capability (#5057) (#1597240)
+- rules: disable support for Dell IR cameras (#1591316)
+- rpm: fix %systemd_user_post() macro. (#1582383)
+- rpm: remove confusing --user before --global (#1582383)
+- automount: handle state changes of the corresponding mount unit correctly (#1596241)
+- man: document that SIGCONT always follows SIGTERM (#1601794)
+- rules: add udev rule that automatically offline HW attached to ACPI container (#1597958)
+
+* Thu Jun 21 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-58
+- tmpfiles: don't skip cleanup of read-only root owned files if TMPFILES_AGE_ALL is set (#1533638)
+- timer: we already got the trigger before, no need to call UNIT_TRIGGER again (#1549119)
+- doc: fix links to binfmt_misc kernel documentation (#1572244)
+- man/udevadm: remove superfluous --version from subcommand (#1553076)
+- man/udevadm: correctly show the short version of --exit (#1552712)
+- core/timer: downgrade message about random time addition (#5229) (#1587906)
+- fd-util: add new acquire_data_fd() API helper (#1446095)
+- systemd-analyze: make dump work for large # of units (#1446095)
+- use max. message size allowed by DBus spec (#8936) (#1446095)
+- cryptsetup: support LUKS2 on-disk format (#1573838)
+- units: don't put udev to its own mount namespace with slave propagation (#1432211)
+- rules: disable support for Lenovo IR cameras (#1540418)
+- core: make sure "systemctl reload-or-try-restart is actually a noop if a unit is not running (#1191920)
+- core: fix confusing logging of instantaneous jobs (#1506256)
+- core: correct return value from reload methods (#1506256)
+- core: always try harder to get unit status message format string (#1506256)
+- core: unit_get_status_message_format() never returns NULL (#1506256)
+- core: try harder to get job completion messages too (#1506256)
+- core: remove generic job completion messages from unit vtables (#1506256)
+- core: do not log done failed-condition jobs as if unit started (#1506256)
+- core: log completion of remaining job types (#1506256)
+- core: adjust job completion message log levels (#1506256)
+- mount: add new LazyUnmount= setting for mount units, mapping to umount(8)'s "-l" switch (#3827) (#1497264)
+- rules: Add MODEL_ID for NVMe device (#7037) (#1397264)
 - umount: always use MNT_FORCE in umount_all() (#7213) (#1571098)
 - core: Implement timeout based umount/remount limit (#1571098)
 - core: Implement sync_with_progress() (#1571098)
+- journal: forward messages from /dev/log unmodified to syslog.socket (#1409659)
+- tmpfiles: use safe_glob() (#1436004)
+- core: delay adding target dependencies until all units are loaded and aliases resolved (#8381) (#1368856)
 
 * Tue Feb 20 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-57
 - sd-journal: properly handle inotify queue overflow (#1540538)

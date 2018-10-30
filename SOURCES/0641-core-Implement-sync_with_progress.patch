@@ -1,4 +1,4 @@
-From ddc1464f3b129ea8490d7da3dd000ab1874b3a4d Mon Sep 17 00:00:00 2001
+From db57bf73d3e5e650b261834a0c39c9d368f9eeea Mon Sep 17 00:00:00 2001
 From: Kyle Walker <kwalker@redhat.com>
 Date: Thu, 14 Dec 2017 11:46:03 -0500
 Subject: [PATCH] core: Implement sync_with_progress()

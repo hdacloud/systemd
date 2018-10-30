@@ -1,4 +1,4 @@
-From d9232a652080ac260c78ab647608860269b45d03 Mon Sep 17 00:00:00 2001
+From 5bace483dedc9098da8191f39c823649948a7a3c Mon Sep 17 00:00:00 2001
 From: NeilBrown <neil@brown.name>
 Date: Wed, 8 Nov 2017 19:29:32 +1100
 Subject: [PATCH] umount: always use MNT_FORCE in umount_all() (#7213)

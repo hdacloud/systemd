@@ -1,4 +1,4 @@
-From 6869506c0f4e34163af53decdc08585c25be57ce Mon Sep 17 00:00:00 2001
+From b4f506932592b991363b8be11e40b62f861bd032 Mon Sep 17 00:00:00 2001
 From: Michael Olbrich <m.olbrich@pengutronix.de>
 Date: Fri, 24 Jul 2015 22:25:28 +0200
 Subject: [PATCH] automount: handle state changes of the corresponding mount
@@ -16,7 +16,7 @@ Resolves: #1596241
  1 file changed, 5 insertions(+), 4 deletions(-)
 
 diff --git a/src/core/automount.c b/src/core/automount.c
-index 679fe071e..9046caba3 100644
+index 08519e49c..f57782b9b 100644
 --- a/src/core/automount.c
 +++ b/src/core/automount.c
 @@ -499,6 +499,7 @@ static int automount_send_ready(Automount *a, Set *tokens, int status) {

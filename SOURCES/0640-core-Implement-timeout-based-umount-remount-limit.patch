@@ -1,4 +1,4 @@
-From dd531b196e9dd794f7409f97320814e24f50081b Mon Sep 17 00:00:00 2001
+From 5ccae46f2a192a9347feb604901127c55ce1e039 Mon Sep 17 00:00:00 2001
 From: Kyle Walker <kwalker@redhat.com>
 Date: Wed, 13 Dec 2017 12:49:26 -0500
 Subject: [PATCH] core: Implement timeout based umount/remount limit
@@ -22,8 +22,8 @@ Related: #1571098
  src/shared/def.h          |   2 -
  src/shared/login-shared.c |   1 +
  src/shared/util.c         |  61 +++++++++++++++++++++++++
- src/shared/util.h         |  15 +++++++
- 5 files changed, 167 insertions(+), 24 deletions(-)
+ src/shared/util.h         |  16 +++++++
+ 5 files changed, 168 insertions(+), 24 deletions(-)
 
 diff --git a/src/core/umount.c b/src/core/umount.c
 index 91d67c06c..bd3896612 100644
@@ -204,12 +204,12 @@ index 054c77503..5da0f0583 100644
  bool session_id_valid(const char *id) {
          assert(id);
 diff --git a/src/shared/util.c b/src/shared/util.c
-index af0953273..5e27a41da 100644
+index 982f5e044..3216f004a 100644
 --- a/src/shared/util.c
 +++ b/src/shared/util.c
-@@ -8893,3 +8893,64 @@ uint64_t system_tasks_max_scale(uint64_t v, uint64_t max) {
+@@ -9049,3 +9049,64 @@ try_dev_shm_without_o_tmpfile:
  
-         return m / max;
+         return -EOPNOTSUPP;
  }
 +
 +/*
@@ -273,7 +273,7 @@ index af0953273..5e27a41da 100644
 +        return -EPROTO;
 +}
 diff --git a/src/shared/util.h b/src/shared/util.h
-index 526a6fe84..81aef034e 100644
+index 9c4be0256..998f882bb 100644
 --- a/src/shared/util.h
 +++ b/src/shared/util.h
 @@ -22,6 +22,7 @@
@@ -284,10 +284,10 @@ index 526a6fe84..81aef034e 100644
  #include <fcntl.h>
  #include <inttypes.h>
  #include <time.h>
-@@ -1112,3 +1113,17 @@ int parse_percent(const char *p);
+@@ -1122,3 +1123,18 @@ enum {
+ };
  
- uint64_t system_tasks_max(void);
- uint64_t system_tasks_max_scale(uint64_t v, uint64_t max);
+ int acquire_data_fd(const void *data, size_t size, unsigned flags);
 +
 +int wait_for_terminate_with_timeout(pid_t pid, usec_t timeout);
 +
@@ -302,3 +302,4 @@ index 526a6fe84..81aef034e 100644
 +                assert_se(sigprocmask_many(SIG_BLOCK, __VA_ARGS__, -1) >= 0);      \
 +                _t;                                                                \
 +        })
++
