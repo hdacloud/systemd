@@ -13,8 +13,8 @@ Fixes #2099
 Cherry-picked from: c584ffc0b75d4b9e9229bf1d8edb7d89562be3c1
 Resolves: #1288600
 ---
- src/sysv-generator/sysv-generator.c | 44 ++++++++++---------------------------
- test/sysv-generator-test.py         | 18 +++++++++++++--
+ src/sysv-generator/sysv-generator.c | 44 ++++++++---------------------
+ test/sysv-generator-test.py         | 18 ++++++++++--
  2 files changed, 28 insertions(+), 34 deletions(-)
 
 diff --git a/src/sysv-generator/sysv-generator.c b/src/sysv-generator/sysv-generator.c

@@ -7,7 +7,7 @@ Subject: [PATCH] tmpfiles: don't follow symlinks when adjusting ACLs, fille
 Cherry-picked from: 48b8aaa82724bc2d8440470f414fb0d2416f29c
 Resolves: #1296288
 ---
- src/tmpfiles/tmpfiles.c | 112 ++++++++++++++++++++++++++++++++----------------
+ src/tmpfiles/tmpfiles.c | 112 ++++++++++++++++++++++++++--------------
  1 file changed, 74 insertions(+), 38 deletions(-)
 
 diff --git a/src/tmpfiles/tmpfiles.c b/src/tmpfiles/tmpfiles.c

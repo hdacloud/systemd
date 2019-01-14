@@ -8,9 +8,9 @@ RHEL-only
 
 Resolves: #1409588
 ---
- man/systemd.exec.xml                  |  7 +++-
+ man/systemd.exec.xml                  |  7 ++-
  src/core/load-fragment-gperf.gperf.m4 |  2 +-
- src/core/load-fragment.c              | 72 +++++++++++++++++++++++++++++++++++
+ src/core/load-fragment.c              | 72 +++++++++++++++++++++++++++
  src/core/load-fragment.h              |  1 +
  src/core/main.c                       |  2 +-
  5 files changed, 81 insertions(+), 3 deletions(-)

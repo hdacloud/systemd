@@ -20,7 +20,7 @@ C.f. 956eaf2b8d6c9999024705ddadc7393bc707de02.
 Cherry-picked from: 4dda4e6
 Resolves: #1222517
 ---
- src/shared/generator.c | 63 ++++++++++++++++++++++++++++++++++++++++++++++----
+ src/shared/generator.c | 63 +++++++++++++++++++++++++++++++++++++++---
  1 file changed, 59 insertions(+), 4 deletions(-)
 
 diff --git a/src/shared/generator.c b/src/shared/generator.c

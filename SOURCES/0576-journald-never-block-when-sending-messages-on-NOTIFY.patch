@@ -19,11 +19,11 @@ Fixes: #1505.
 
 Resolves: #1511565
 ---
- src/journal/journald-server.c     | 130 +++++++++++++++++++++++++++++++++++++-
- src/journal/journald-server.h     |  13 ++--
- src/journal/journald-stream.c     |  68 ++++++++++++++++++--
+ src/journal/journald-server.c     | 130 +++++++++++++++++++++++++++++-
+ src/journal/journald-server.h     |  13 ++-
+ src/journal/journald-stream.c     |  68 ++++++++++++++--
  src/journal/journald-stream.h     |   3 +
- src/journal/journald.c            |   8 ---
+ src/journal/journald.c            |   8 --
  units/systemd-journald.service.in |   1 -
  6 files changed, 201 insertions(+), 22 deletions(-)
 

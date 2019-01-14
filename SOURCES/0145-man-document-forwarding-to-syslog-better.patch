@@ -8,7 +8,7 @@ https://bugzilla.redhat.com/show_bug.cgi?id=1147651
 Cherry-picked from: 589532d0
 Resolves: #1177336
 ---
- man/journald.conf.xml | 70 ++++++++++++++++++++++++++++++++-------------------
+ man/journald.conf.xml | 70 +++++++++++++++++++++++++++----------------
  1 file changed, 44 insertions(+), 26 deletions(-)
 
 diff --git a/man/journald.conf.xml b/man/journald.conf.xml

@@ -14,7 +14,7 @@ size of the map (1024), now it is unlimited.
 
 Resolves: #1500119
 ---
- src/udev/udev-builtin-keyboard.c | 45 ++++++++++++++++------------------------
+ src/udev/udev-builtin-keyboard.c | 45 +++++++++++++-------------------
  1 file changed, 18 insertions(+), 27 deletions(-)
 
 diff --git a/src/udev/udev-builtin-keyboard.c b/src/udev/udev-builtin-keyboard.c

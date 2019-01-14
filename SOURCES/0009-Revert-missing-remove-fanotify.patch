@@ -10,8 +10,8 @@ Conflicts:
 ---
  Makefile.am                 |  1 +
  configure.ac                |  1 +
- src/shared/linux/fanotify.h | 98 +++++++++++++++++++++++++++++++++++++++++++++
- src/shared/missing.h        | 64 +++++++++++++++++++++++++++++
+ src/shared/linux/fanotify.h | 98 +++++++++++++++++++++++++++++++++++++
+ src/shared/missing.h        | 64 ++++++++++++++++++++++++
  4 files changed, 164 insertions(+)
  create mode 100644 src/shared/linux/fanotify.h
 

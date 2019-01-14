@@ -6,8 +6,8 @@ Subject: [PATCH] loginctl: print nontrivial properties in logictl show-*
 Cherry-picked from: 2a998c74028a109d6bd8888951abfa8e25a15fb1
 Resolves: #1260465
 ---
- src/login/loginctl.c | 152 ++++++++++++++++++++++++++++++++++++++++++++++++++-
- src/shared/macro.h   |  13 +++++
+ src/login/loginctl.c | 152 ++++++++++++++++++++++++++++++++++++++++++-
+ src/shared/macro.h   |  13 ++++
  2 files changed, 162 insertions(+), 3 deletions(-)
 
 diff --git a/src/login/loginctl.c b/src/login/loginctl.c

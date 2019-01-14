@@ -14,10 +14,10 @@ The test-ns tool can test setup_namespace() with and without chroot:
 Cherry-picked from: ee818b89f4890b3a00e93772249fce810f60811e
 Resolves: #1421181
 ---
- src/core/execute.c   |  8 ++++--
- src/core/namespace.c | 80 +++++++++++++++++++++++++++++++++++++++++++++-------
+ src/core/execute.c   |  8 +++--
+ src/core/namespace.c | 80 ++++++++++++++++++++++++++++++++++++++------
  src/core/namespace.h |  3 +-
- src/test/test-ns.c   | 24 ++++++++++++++--
+ src/test/test-ns.c   | 24 +++++++++++--
  4 files changed, 100 insertions(+), 15 deletions(-)
 
 diff --git a/src/core/execute.c b/src/core/execute.c

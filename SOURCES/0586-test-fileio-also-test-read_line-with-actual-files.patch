@@ -10,7 +10,7 @@ the same.
 
 Resolves: #1503106
 ---
- src/test/test-fileio.c | 63 ++++++++++++++++++++++++++++++++++++++++----------
+ src/test/test-fileio.c | 63 ++++++++++++++++++++++++++++++++++--------
  1 file changed, 51 insertions(+), 12 deletions(-)
 
 diff --git a/src/test/test-fileio.c b/src/test/test-fileio.c

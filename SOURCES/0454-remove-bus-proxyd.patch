@@ -20,21 +20,21 @@ Resolves: #1317518
  README                                   |    3 -
  TODO                                     |    4 -
  man/busctl.xml                           |    1 -
- man/systemd-bus-proxyd.xml               |  109 ---
+ man/systemd-bus-proxyd.xml               |  109 --
  man/systemd-bus-proxyd@.service.xml      |   81 --
  src/bus-proxyd/Makefile                  |    1 -
- src/bus-proxyd/bus-proxyd.c              |  346 --------
- src/bus-proxyd/bus-xml-policy.c          | 1325 ------------------------------
- src/bus-proxyd/bus-xml-policy.h          |  151 ----
- src/bus-proxyd/driver.c                  |  608 --------------
+ src/bus-proxyd/bus-proxyd.c              |  346 ------
+ src/bus-proxyd/bus-xml-policy.c          | 1325 ----------------------
+ src/bus-proxyd/bus-xml-policy.h          |  151 ---
+ src/bus-proxyd/driver.c                  |  608 ----------
  src/bus-proxyd/driver.h                  |   27 -
- src/bus-proxyd/proxy.c                   |  864 -------------------
- src/bus-proxyd/proxy.h                   |   53 --
- src/bus-proxyd/stdio-bridge.c            |  263 ------
- src/bus-proxyd/synthesize.c              |  228 -----
+ src/bus-proxyd/proxy.c                   |  864 --------------
+ src/bus-proxyd/proxy.h                   |   53 -
+ src/bus-proxyd/stdio-bridge.c            |  263 -----
+ src/bus-proxyd/synthesize.c              |  228 ----
  src/bus-proxyd/synthesize.h              |   34 -
- src/bus-proxyd/test-bus-xml-policy.c     |  182 ----
- src/stdio-bridge/stdio-bridge.c          |  303 +++++++
+ src/bus-proxyd/test-bus-xml-policy.c     |  182 ---
+ src/stdio-bridge/stdio-bridge.c          |  303 +++++
  src/test/test-tables.c                   |    3 -
  sysusers.d/systemd.conf.m4               |    3 -
  units/.gitignore                         |    2 -

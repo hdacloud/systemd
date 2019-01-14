@@ -13,7 +13,7 @@ a file.
 
 (cherry picked from commit 8527b07be1c5211b50a1a6496585952857a25c73)
 ---
- src/systemctl/systemctl.c | 46 +++++++++++++++++++++++-----------------------
+ src/systemctl/systemctl.c | 46 +++++++++++++++++++--------------------
  1 file changed, 23 insertions(+), 23 deletions(-)
 
 diff --git a/src/systemctl/systemctl.c b/src/systemctl/systemctl.c

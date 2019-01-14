@@ -18,9 +18,9 @@ this fix as well. Additionally, corresponding tests has been added.
 Resolves: #1472439
 ---
  src/nspawn/nspawn.c       |   2 +-
- src/shared/path-util.c    | 219 ++++++++++++++++++++++++++++++++++++----------
+ src/shared/path-util.c    | 219 +++++++++++++++++++++++++++++---------
  src/shared/path-util.h    |   1 +
- src/test/test-path-util.c |  62 +++++++++++++
+ src/test/test-path-util.c |  62 +++++++++++
  4 files changed, 235 insertions(+), 49 deletions(-)
 
 diff --git a/src/nspawn/nspawn.c b/src/nspawn/nspawn.c

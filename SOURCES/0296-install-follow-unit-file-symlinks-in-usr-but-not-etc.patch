@@ -70,7 +70,7 @@ Resolves: #1159308
  src/dbus1-generator/dbus1-generator.c |    2 +-
  src/firstboot/firstboot.c             |   18 +-
  src/shared/cgroup-util.c              |    6 +-
- src/shared/install.c                  | 1909 +++++++++++++++++++--------------
+ src/shared/install.c                  | 1909 ++++++++++++++-----------
  src/shared/install.h                  |   46 +-
  src/shared/path-util.c                |   34 +
  src/shared/path-util.h                |   27 +
@@ -80,7 +80,7 @@ Resolves: #1159308
  src/shared/util.h                     |    1 +
  src/systemctl/systemctl.c             |    6 +-
  src/sysv-generator/sysv-generator.c   |   10 +-
- src/test/test-install-root.c          |  663 ++++++++++++
+ src/test/test-install-root.c          |  663 +++++++++
  src/test/test-install.c               |   71 +-
  23 files changed, 1998 insertions(+), 923 deletions(-)
  create mode 100644 src/test/test-install-root.c

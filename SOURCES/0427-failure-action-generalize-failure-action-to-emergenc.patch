@@ -6,21 +6,21 @@ Subject: [PATCH] failure-action: generalize failure action to emergency action
 Cherry-picked from: 87a47f99bc8e576a63581ad2593c62eb10a53814
 Resolves: #1353028
 ---
- Makefile.am                                       |  4 +-
- src/core/dbus-service.c                           |  6 +--
- src/core/dbus-unit.c                              |  4 +-
- src/core/{failure-action.c => emergency-action.c} | 65 ++++++++++++-----------
- src/core/{failure-action.h => emergency-action.h} | 28 +++++-----
- src/core/job.c                                    |  2 +-
- src/core/load-fragment-gperf.gperf.m4             |  6 +--
- src/core/load-fragment.c                          |  4 +-
- src/core/load-fragment.h                          |  2 +-
- src/core/manager.h                                |  2 +-
- src/core/service.c                                |  4 +-
- src/core/service.h                                |  6 +--
- src/core/unit.c                                   |  4 +-
- src/core/unit.h                                   |  4 +-
- src/test/test-tables.c                            |  2 +-
+ Makefile.am                                   |  4 +-
+ src/core/dbus-service.c                       |  6 +-
+ src/core/dbus-unit.c                          |  4 +-
+ .../{failure-action.c => emergency-action.c}  | 65 ++++++++++---------
+ .../{failure-action.h => emergency-action.h}  | 28 ++++----
+ src/core/job.c                                |  2 +-
+ src/core/load-fragment-gperf.gperf.m4         |  6 +-
+ src/core/load-fragment.c                      |  4 +-
+ src/core/load-fragment.h                      |  2 +-
+ src/core/manager.h                            |  2 +-
+ src/core/service.c                            |  4 +-
+ src/core/service.h                            |  6 +-
+ src/core/unit.c                               |  4 +-
+ src/core/unit.h                               |  4 +-
+ src/test/test-tables.c                        |  2 +-
  15 files changed, 72 insertions(+), 71 deletions(-)
  rename src/core/{failure-action.c => emergency-action.c} (63%)
  rename src/core/{failure-action.h => emergency-action.h} (58%)

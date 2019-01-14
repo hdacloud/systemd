@@ -5,7 +5,7 @@ Subject: [PATCH] kernel-install: add fedora specific callouts to
  new-kernel-pkg
 
 ---
- src/kernel-install/kernel-install | 36 ++++++++++++++++++++++++++++++++++++
+ src/kernel-install/kernel-install | 36 +++++++++++++++++++++++++++++++
  1 file changed, 36 insertions(+)
  mode change 100644 => 100755 src/kernel-install/kernel-install
 

@@ -14,7 +14,7 @@ preprocessor macro namespace.
 
 Related: #1447937
 ---
- src/shared/sparse-endian.h | 47 ++++++++++++++++++++++++----------------------
+ src/shared/sparse-endian.h | 47 ++++++++++++++++++++------------------
  1 file changed, 25 insertions(+), 22 deletions(-)
 
 diff --git a/src/shared/sparse-endian.h b/src/shared/sparse-endian.h

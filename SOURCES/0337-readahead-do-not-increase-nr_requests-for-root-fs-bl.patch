@@ -16,9 +16,9 @@ See: http://article.gmane.org/gmane.linux.kernel/1072356
 RHEL-only
 Resolves: #1314559
 ---
- src/readahead/readahead-common.c | 64 ----------------------------------------
- src/readahead/readahead-common.h |  2 --
- src/readahead/readahead-replay.c |  2 --
+ src/readahead/readahead-common.c | 64 --------------------------------
+ src/readahead/readahead-common.h |  2 -
+ src/readahead/readahead-replay.c |  2 -
  3 files changed, 68 deletions(-)
 
 diff --git a/src/readahead/readahead-common.c b/src/readahead/readahead-common.c

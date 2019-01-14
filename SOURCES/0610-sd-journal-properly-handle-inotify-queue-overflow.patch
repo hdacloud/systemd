@@ -23,8 +23,8 @@ Resolves: #1540538
 ---
  src/journal/journal-file.h     |   2 +
  src/journal/journal-internal.h |   2 +
- src/journal/sd-journal.c       | 237 ++++++++++++++++++++++++++++++++---------
- src/shared/path-util.c         |  14 +++
+ src/journal/sd-journal.c       | 237 ++++++++++++++++++++++++++-------
+ src/shared/path-util.c         |  14 ++
  src/shared/path-util.h         |   2 +
  5 files changed, 206 insertions(+), 51 deletions(-)
 

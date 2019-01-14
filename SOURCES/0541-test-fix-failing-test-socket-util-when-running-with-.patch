@@ -12,7 +12,7 @@ parsing tests unconditional.
 
 Resolves: #1497639
 ---
- src/test/test-socket-util.c | 41 +++++++++++++++++++----------------------
+ src/test/test-socket-util.c | 41 +++++++++++++++++--------------------
  1 file changed, 19 insertions(+), 22 deletions(-)
 
 diff --git a/src/test/test-socket-util.c b/src/test/test-socket-util.c

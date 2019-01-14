@@ -22,7 +22,7 @@ ID=cryptsetup:/dev/block/<maj>:<min>
 Cherry-picked from: e51b9486d1b59e72c293028fed1384f4e4ef09aa
 Resolves: #1226333
 ---
- src/cryptsetup/cryptsetup.c | 90 +++++++++++++++++++++++++++++----------------
+ src/cryptsetup/cryptsetup.c | 90 ++++++++++++++++++++++++-------------
  1 file changed, 58 insertions(+), 32 deletions(-)
 
 diff --git a/src/cryptsetup/cryptsetup.c b/src/cryptsetup/cryptsetup.c

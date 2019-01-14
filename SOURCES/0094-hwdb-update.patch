@@ -5,10 +5,10 @@ Subject: [PATCH] hwdb: update
 
 (cherry picked from commit b83cbcb7d95482baa588706227f01bbbe44b9d12)
 ---
- hwdb/20-OUI.hwdb               | 247 ++++++++++-
- hwdb/20-pci-vendor-model.hwdb  | 936 +++++++++++++++++++++++++++--------------
+ hwdb/20-OUI.hwdb               | 247 ++++++++-
+ hwdb/20-pci-vendor-model.hwdb  | 936 ++++++++++++++++++++++-----------
  hwdb/20-sdio-vendor-model.hwdb |  30 ++
- hwdb/20-usb-vendor-model.hwdb  | 181 +++++++-
+ hwdb/20-usb-vendor-model.hwdb  | 181 ++++++-
  4 files changed, 1060 insertions(+), 334 deletions(-)
 
 diff --git a/hwdb/20-OUI.hwdb b/hwdb/20-OUI.hwdb

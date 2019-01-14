@@ -26,8 +26,8 @@ Apart from the CCW bus, this commit adds bus support for the:
 Cherry-picked from: e7eb5a8d88367a755944fdda3023a308e5272953
 Resolves: #1274401
 ---
- rules/40-redhat.rules           | 25 ++++++++++++++++
- src/udev/udev-builtin-path_id.c | 63 +++++++++++++++++++++++------------------
+ rules/40-redhat.rules           | 25 +++++++++++++
+ src/udev/udev-builtin-path_id.c | 63 ++++++++++++++++++---------------
  2 files changed, 60 insertions(+), 28 deletions(-)
 
 diff --git a/rules/40-redhat.rules b/rules/40-redhat.rules

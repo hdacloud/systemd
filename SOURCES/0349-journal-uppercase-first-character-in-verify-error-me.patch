@@ -10,7 +10,7 @@ verification error messages.
 Cherry-picked from: e80acc51aeaf2d74cb4d6cecbcb6e18f74c22c05
 Related: #1350232
 ---
- src/journal/journal-verify.c | 162 ++++++++++++++++++++-----------------------
+ src/journal/journal-verify.c | 162 ++++++++++++++++-------------------
  1 file changed, 75 insertions(+), 87 deletions(-)
 
 diff --git a/src/journal/journal-verify.c b/src/journal/journal-verify.c

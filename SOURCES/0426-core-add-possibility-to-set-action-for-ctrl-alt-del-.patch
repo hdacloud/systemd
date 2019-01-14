@@ -11,10 +11,10 @@ Patching the keymaps to disable that is really not a way to go for them, because
 Cherry-picked from: 24dd31c19ede505143833346ff850af942694aa6
 Resolves: #1353028
 ---
- man/systemd-system.conf.xml | 11 ++++++++++
- src/core/main.c             |  5 +++++
- src/core/manager.c          | 51 +++++++++++++++++++++++++++++++++------------
- src/core/manager.h          | 14 ++++++++++++-
+ man/systemd-system.conf.xml | 11 ++++++++
+ src/core/main.c             |  5 ++++
+ src/core/manager.c          | 51 +++++++++++++++++++++++++++----------
+ src/core/manager.h          | 14 +++++++++-
  src/core/system.conf        |  1 +
  5 files changed, 68 insertions(+), 14 deletions(-)
 

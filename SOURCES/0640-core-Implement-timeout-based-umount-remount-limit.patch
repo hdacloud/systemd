@@ -18,11 +18,11 @@ attempt, failures are reported as they occur.
 
 Related: #1571098
 ---
- src/core/umount.c         | 112 +++++++++++++++++++++++++++++++++++++---------
+ src/core/umount.c         | 112 ++++++++++++++++++++++++++++++--------
  src/shared/def.h          |   2 -
  src/shared/login-shared.c |   1 +
- src/shared/util.c         |  61 +++++++++++++++++++++++++
- src/shared/util.h         |  16 +++++++
+ src/shared/util.c         |  61 +++++++++++++++++++++
+ src/shared/util.h         |  16 ++++++
  5 files changed, 168 insertions(+), 24 deletions(-)
 
 diff --git a/src/core/umount.c b/src/core/umount.c

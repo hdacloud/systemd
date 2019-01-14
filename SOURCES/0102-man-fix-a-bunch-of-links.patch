@@ -10,57 +10,57 @@ All hail linkchecker!
 Conflicts:
 	man/systemd-efi-boot-generator.xml
 ---
- man/busctl.xml                             |  4 ++--
- man/crypttab.xml                           | 20 +++++++++----------
+ man/busctl.xml                             |  4 +--
+ man/crypttab.xml                           | 20 +++++++-------
  man/file-hierarchy.xml                     |  2 +-
  man/kernel-command-line.xml                |  2 +-
- man/locale.conf.xml                        |  8 ++++----
- man/localectl.xml                          |  8 ++++----
+ man/locale.conf.xml                        |  8 +++---
+ man/localectl.xml                          |  8 +++---
  man/logind.conf.xml                        |  2 +-
- man/machine-id.xml                         |  4 ++--
+ man/machine-id.xml                         |  4 +--
  man/modules-load.d.xml                     |  2 +-
  man/os-release.xml                         |  2 +-
  man/sd_bus_message_append.xml              |  2 +-
  man/sd_bus_open_user.xml                   |  2 +-
- man/sd_event_add_signal.xml                |  4 ++--
+ man/sd_event_add_signal.xml                |  4 +--
  man/sd_journal_get_catalog.xml             |  2 +-
  man/sd_journal_get_cursor.xml              |  2 +-
- man/sd_journal_print.xml                   | 14 ++++++-------
- man/sysctl.d.xml                           |  8 ++++----
- man/systemctl.xml                          |  6 +++---
+ man/sd_journal_print.xml                   | 14 +++++-----
+ man/sysctl.d.xml                           |  8 +++---
+ man/systemctl.xml                          |  6 ++--
  man/systemd-activate.xml                   |  2 +-
- man/systemd-analyze.xml                    |  4 ++--
+ man/systemd-analyze.xml                    |  4 +--
  man/systemd-cat.xml                        |  2 +-
  man/systemd-cryptsetup-generator.xml       |  2 +-
  man/systemd-cryptsetup@.service.xml        |  2 +-
- man/systemd-efi-boot-generator.xml         |  4 ++--
- man/systemd-firstboot.xml                  | 14 ++++++-------
- man/systemd-fstab-generator.xml            |  4 ++--
- man/systemd-gpt-auto-generator.xml         |  8 ++++----
+ man/systemd-efi-boot-generator.xml         |  4 +--
+ man/systemd-firstboot.xml                  | 14 +++++-----
+ man/systemd-fstab-generator.xml            |  4 +--
+ man/systemd-gpt-auto-generator.xml         |  8 +++---
  man/systemd-hibernate-resume-generator.xml |  2 +-
  man/systemd-journald.service.xml           |  2 +-
- man/systemd-localed.service.xml            |  8 ++++----
- man/systemd-nspawn.xml                     |  4 ++--
+ man/systemd-localed.service.xml            |  8 +++---
+ man/systemd-nspawn.xml                     |  4 +--
  man/systemd-quotacheck.service.xml         |  2 +-
- man/systemd-remount-fs.service.xml         |  6 +++---
- man/systemd-socket-proxyd.xml              |  8 ++++----
- man/systemd-sysctl.service.xml             |  8 ++++----
+ man/systemd-remount-fs.service.xml         |  6 ++--
+ man/systemd-socket-proxyd.xml              |  8 +++---
+ man/systemd-sysctl.service.xml             |  8 +++---
  man/systemd-system.conf.xml                |  2 +-
  man/systemd-update-utmp.service.xml        |  2 +-
- man/systemd-vconsole-setup.service.xml     |  8 ++++----
- man/systemd.automount.xml                  |  6 +++---
- man/systemd.exec.xml                       | 16 +++++++--------
+ man/systemd-vconsole-setup.service.xml     |  8 +++---
+ man/systemd.automount.xml                  |  6 ++--
+ man/systemd.exec.xml                       | 16 +++++------
  man/systemd.generator.xml                  |  2 +-
  man/systemd.journal-fields.xml             |  2 +-
- man/systemd.kill.xml                       |  4 ++--
- man/systemd.mount.xml                      | 14 ++++++-------
- man/systemd.network.xml                    |  8 ++++----
- man/systemd.path.xml                       |  4 ++--
- man/systemd.socket.xml                     | 32 +++++++++++++++---------------
- man/systemd.swap.xml                       | 10 +++++-----
- man/systemd.unit.xml                       |  4 ++--
- man/systemd.xml                            |  6 +++---
- man/vconsole.conf.xml                      |  6 +++---
+ man/systemd.kill.xml                       |  4 +--
+ man/systemd.mount.xml                      | 14 +++++-----
+ man/systemd.network.xml                    |  8 +++---
+ man/systemd.path.xml                       |  4 +--
+ man/systemd.socket.xml                     | 32 +++++++++++-----------
+ man/systemd.swap.xml                       | 10 +++----
+ man/systemd.unit.xml                       |  4 +--
+ man/systemd.xml                            |  6 ++--
+ man/vconsole.conf.xml                      |  6 ++--
  51 files changed, 151 insertions(+), 151 deletions(-)
 
 diff --git a/man/busctl.xml b/man/busctl.xml

@@ -48,7 +48,7 @@ Replaces: #1904
 Cherry-picked from: dc00966228ff90c554fd034e588ea55eb605ec52
 Related: #1318994
 ---
- src/journal/journalctl.c | 71 ++++++++++++++++++++++++++++--------------------
+ src/journal/journalctl.c | 71 ++++++++++++++++++++++++----------------
  1 file changed, 42 insertions(+), 29 deletions(-)
 
 diff --git a/src/journal/journalctl.c b/src/journal/journalctl.c

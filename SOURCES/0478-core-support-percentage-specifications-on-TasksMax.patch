@@ -10,13 +10,13 @@ neatly subdivide the available room for tasks within containers.
 Cherry-picked from: 83f8e80857090f63cf6a02c54d381dad3c0fad55
 Related: #1337244
 ---
- man/systemd.resource-control.xml | 15 +++----
- src/core/dbus-cgroup.c           | 22 +++++++++++
- src/core/load-fragment.c         | 15 +++++--
- src/libsystemd/sd-bus/bus-util.c | 19 +++++++++
- src/shared/util.c                | 84 ++++++++++++++++++++++++++++++++++++++++
- src/shared/util.h                |  5 +++
- src/test/test-util.c             | 39 +++++++++++++++++++
+ man/systemd.resource-control.xml | 15 +++---
+ src/core/dbus-cgroup.c           | 22 +++++++++
+ src/core/load-fragment.c         | 15 ++++--
+ src/libsystemd/sd-bus/bus-util.c | 19 ++++++++
+ src/shared/util.c                | 84 ++++++++++++++++++++++++++++++++
+ src/shared/util.h                |  5 ++
+ src/test/test-util.c             | 39 +++++++++++++++
  7 files changed, 187 insertions(+), 12 deletions(-)
 
 diff --git a/man/systemd.resource-control.xml b/man/systemd.resource-control.xml

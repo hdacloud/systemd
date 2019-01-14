@@ -10,7 +10,7 @@ too.
 Cherry-picked from: 45bc27b621c51b9d0e0229835deb6d188bcd417b
 Related: #1318994
 ---
- src/journal/journalctl.c | 42 +++++++++++++++++++++++-------------------
+ src/journal/journalctl.c | 42 ++++++++++++++++++++++------------------
  1 file changed, 23 insertions(+), 19 deletions(-)
 
 diff --git a/src/journal/journalctl.c b/src/journal/journalctl.c

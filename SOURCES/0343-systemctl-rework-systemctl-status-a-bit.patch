@@ -26,7 +26,7 @@ Also see: #3504
 (cherry picked from commit 3dced37b7c2c9a5c733817569d2bbbaa397adaf7)
 Related: #1047466
 ---
- src/systemctl/systemctl.c | 106 +++++++++++++++++++++++++++++-----------------
+ src/systemctl/systemctl.c | 106 ++++++++++++++++++++++++--------------
  1 file changed, 68 insertions(+), 38 deletions(-)
 
 diff --git a/src/systemctl/systemctl.c b/src/systemctl/systemctl.c

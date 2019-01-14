@@ -8,8 +8,8 @@ https://bugs.freedesktop.org/show_bug.cgi?id=89486
 ---
  src/journal-remote/journal-remote-parse.c |  2 +-
  src/journal-remote/journal-remote-write.c |  2 +-
- src/journal-remote/journal-remote.c       | 36 +++++++++++++++----------------
- src/journal-remote/microhttpd-util.c      |  4 ++--
+ src/journal-remote/journal-remote.c       | 36 +++++++++++------------
+ src/journal-remote/microhttpd-util.c      |  4 +--
  4 files changed, 22 insertions(+), 22 deletions(-)
 
 diff --git a/src/journal-remote/journal-remote-parse.c b/src/journal-remote/journal-remote-parse.c

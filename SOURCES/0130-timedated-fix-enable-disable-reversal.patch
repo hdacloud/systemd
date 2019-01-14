@@ -12,7 +12,7 @@ state directly, so the Context parameter can be removed.
 
 (based on 81b843990297ad8c813c531fccd8da30bb715bd6)
 ---
- src/timedate/timedated.c | 50 +++++++++++++++++-------------------------------
+ src/timedate/timedated.c | 50 +++++++++++++++-------------------------
  1 file changed, 18 insertions(+), 32 deletions(-)
 
 diff --git a/src/timedate/timedated.c b/src/timedate/timedated.c

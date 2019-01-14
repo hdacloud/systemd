@@ -11,11 +11,11 @@ branch and use them in appropriate places. Also introduce relevant tests.
 
 Resolves: #1493976
 ---
- src/core/load-fragment.c |  49 +++-----
- src/core/main.c          |  48 ++------
- src/shared/util.c        |  91 +++++++++++++++
+ src/core/load-fragment.c |  49 ++-----
+ src/core/main.c          |  48 +------
+ src/shared/util.c        |  91 ++++++++++++
  src/shared/util.h        |   9 ++
- src/test/test-util.c     | 296 +++++++++++++++++++++++++++++++++++++++++++++++
+ src/test/test-util.c     | 296 +++++++++++++++++++++++++++++++++++++++
  5 files changed, 417 insertions(+), 76 deletions(-)
 
 diff --git a/src/core/load-fragment.c b/src/core/load-fragment.c

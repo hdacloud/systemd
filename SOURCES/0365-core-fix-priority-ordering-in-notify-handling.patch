@@ -22,7 +22,7 @@ message that was read and let sd-event handle everything else.
 (cherry picked from commit b215b0ede11c0dda90009c8412609d2416150075)
 Related: #1267707
 ---
- src/core/manager.c | 158 ++++++++++++++++++++++++++---------------------------
+ src/core/manager.c | 158 ++++++++++++++++++++++-----------------------
  1 file changed, 78 insertions(+), 80 deletions(-)
 
 diff --git a/src/core/manager.c b/src/core/manager.c

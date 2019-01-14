@@ -71,7 +71,7 @@ Fixes #518
 
 Resolves: #1404657,#1471230
 ---
- src/core/service.c | 195 ++++++++++++++++++++++++++++++++++++++++++++++++-----
+ src/core/service.c | 195 +++++++++++++++++++++++++++++++++++++++++----
  1 file changed, 180 insertions(+), 15 deletions(-)
 
 diff --git a/src/core/service.c b/src/core/service.c

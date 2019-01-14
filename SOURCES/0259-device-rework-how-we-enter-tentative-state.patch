@@ -13,7 +13,7 @@ reloads, we need to serialize and deserialize it.
 Cherry-picked from: f62009410
 Resolves: #1283579
 ---
- src/core/device.c | 79 +++++++++++++++++++++++++++++++++++++++++++++++--------
+ src/core/device.c | 79 ++++++++++++++++++++++++++++++++++++++++-------
  src/core/device.h |  2 +-
  2 files changed, 69 insertions(+), 12 deletions(-)
 

@@ -40,11 +40,11 @@ https://github.com/systemd/systemd/issues/1961
 Cherry-picked from: d8fdc62037b5b0a9fd603ad5efd6b49f956f86b5
 Resolves: #1305608
 ---
- src/cgroups-agent/cgroups-agent.c |  48 ++++++------
+ src/cgroups-agent/cgroups-agent.c |  48 +++++-----
  src/core/cgroup.c                 |   2 +
- src/core/dbus.c                   |  56 +++++++-------
+ src/core/dbus.c                   |  56 ++++++-----
  src/core/dbus.h                   |   2 +
- src/core/manager.c                | 149 ++++++++++++++++++++++++++++++++++++--
+ src/core/manager.c                | 149 ++++++++++++++++++++++++++++--
  src/core/manager.h                |   3 +
  6 files changed, 198 insertions(+), 62 deletions(-)
 

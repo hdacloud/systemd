@@ -28,7 +28,7 @@ Subject: [PATCH] sd-journal: various clean-ups and modernizations
 
 Related: #1465759
 ---
- src/journal/sd-journal.c | 242 ++++++++++++++++++++++-------------------------
+ src/journal/sd-journal.c | 242 ++++++++++++++++++---------------------
  1 file changed, 111 insertions(+), 131 deletions(-)
 
 diff --git a/src/journal/sd-journal.c b/src/journal/sd-journal.c

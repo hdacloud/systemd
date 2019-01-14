@@ -33,14 +33,14 @@ CapAmb: 0000000000003000
 Cherry-picked from: 755d4b6
 Resolves: #1387398
 ---
- src/core/dbus-execute.c               | 19 ++++++++
- src/core/execute.c                    | 90 ++++++++++++++++++++++++++++-------
+ src/core/dbus-execute.c               | 19 ++++++
+ src/core/execute.c                    | 90 ++++++++++++++++++++++-----
  src/core/execute.h                    |  2 +
  src/core/load-fragment-gperf.gperf.m4 |  1 +
  src/core/load-fragment.c              |  4 +-
- src/shared/capability.c               | 55 +++++++++++++++++++++
- src/shared/capability.h               |  3 ++
- src/shared/missing.h                  | 16 +++++++
+ src/shared/capability.c               | 55 ++++++++++++++++
+ src/shared/capability.h               |  3 +
+ src/shared/missing.h                  | 16 +++++
  src/test/test-unit-file.c             |  1 +
  9 files changed, 174 insertions(+), 17 deletions(-)
 

@@ -19,8 +19,8 @@ Fixes #1669.
 Resolves: #1465759
 ---
  src/journal/journal-internal.h |  2 +-
- src/journal/journalctl.c       | 27 ++++++++++++++++++-----
- src/journal/sd-journal.c       | 49 ++++++++++++++++++++++++++++++++++--------
+ src/journal/journalctl.c       | 27 +++++++++++++++----
+ src/journal/sd-journal.c       | 49 +++++++++++++++++++++++++++-------
  3 files changed, 63 insertions(+), 15 deletions(-)
 
 diff --git a/src/journal/journal-internal.h b/src/journal/journal-internal.h

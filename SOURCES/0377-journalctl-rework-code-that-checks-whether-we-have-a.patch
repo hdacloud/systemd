@@ -13,8 +13,8 @@ Subject: [PATCH] journalctl: rework code that checks whether we have access to
 Cherry-picked from: e346512c684e9efae84c6442f7e6a5781564ecde
 Related: #1318994
 ---
- src/journal/journalctl.c | 120 ++++++++++++++++++++++++-----------------------
- src/shared/acl-util.c    | 102 ++++++++++++++++++++++------------------
+ src/journal/journalctl.c | 120 ++++++++++++++++++++-------------------
+ src/shared/acl-util.c    | 102 ++++++++++++++++++---------------
  src/shared/acl-util.h    |   2 +-
  3 files changed, 119 insertions(+), 105 deletions(-)
 

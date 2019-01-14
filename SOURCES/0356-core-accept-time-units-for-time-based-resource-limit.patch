@@ -14,11 +14,11 @@ Fixes: #1772
 Cherry-picked from: a4c1800284e3546bbfab2dc19eb59bcb91c4a2ca
 Related: #1351415
 ---
- man/systemd.exec.xml                  |  86 ++++++++++++++++++++++-------
+ man/systemd.exec.xml                  |  86 ++++++++++++++++------
  src/core/load-fragment-gperf.gperf.m4 |   4 +-
- src/core/load-fragment.c              | 101 ++++++++++++++++++++++++++++++++++
+ src/core/load-fragment.c              | 101 ++++++++++++++++++++++++++
  src/core/load-fragment.h              |   2 +
- src/test/test-unit-file.c             |  61 ++++++++++++++++++++
+ src/test/test-unit-file.c             |  61 ++++++++++++++++
  5 files changed, 231 insertions(+), 23 deletions(-)
 
 diff --git a/man/systemd.exec.xml b/man/systemd.exec.xml

@@ -42,12 +42,12 @@ Resolves: #1442262
 did very poor job merging old and new code and identified a lot of merge
 conflicts in a code that was totally unrelated.]
 ---
- man/journald.conf.xml            |  18 ++++++
- man/systemd.journal-fields.xml   |  22 ++++++++
+ man/journald.conf.xml            |  18 +++++
+ man/systemd.journal-fields.xml   |  22 ++++++
  src/journal/journald-gperf.gperf |   1 +
- src/journal/journald-server.c    |  68 +++++++++++++++++++++++
+ src/journal/journald-server.c    |  68 ++++++++++++++++++
  src/journal/journald-server.h    |   3 +
- src/journal/journald-stream.c    | 116 ++++++++++++++++++++++++++++++++-------
+ src/journal/journald-stream.c    | 116 +++++++++++++++++++++++++------
  src/journal/journald.conf        |   1 +
  7 files changed, 209 insertions(+), 20 deletions(-)
 

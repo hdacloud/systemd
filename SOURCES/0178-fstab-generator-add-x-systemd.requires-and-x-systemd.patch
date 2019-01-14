@@ -44,9 +44,9 @@ Conflicts:
 Cherry-picked from: 3519d230c8bafe834b2dac26ace49fcfba139823
 Resolves: #1164334
 ---
- man/systemd.mount.xml                 | 30 ++++++++++++++
- src/fstab-generator/fstab-generator.c | 76 +++++++++++++++++++++++++++++++++++
- src/shared/fstab-util.c               | 30 ++++++++++++++
+ man/systemd.mount.xml                 | 30 +++++++++++
+ src/fstab-generator/fstab-generator.c | 76 +++++++++++++++++++++++++++
+ src/shared/fstab-util.c               | 30 +++++++++++
  src/shared/fstab-util.h               |  2 +
  4 files changed, 138 insertions(+)
 

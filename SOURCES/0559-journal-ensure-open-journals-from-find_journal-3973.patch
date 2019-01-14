@@ -19,7 +19,7 @@ Fixes https://github.com/systemd/systemd/issues/3968
 
 Resolves: #1493846
 ---
- src/journal/journald-server.c | 217 ++++++++++++++++++++++--------------------
+ src/journal/journald-server.c | 217 ++++++++++++++++++----------------
  1 file changed, 114 insertions(+), 103 deletions(-)
 
 diff --git a/src/journal/journald-server.c b/src/journal/journald-server.c

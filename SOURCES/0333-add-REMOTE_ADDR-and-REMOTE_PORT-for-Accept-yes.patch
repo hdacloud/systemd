@@ -8,9 +8,9 @@ Resolves: #1341154
 ---
  TODO                                     |  2 -
  man/systemd.socket.xml                   |  7 ++-
- src/core/service.c                       | 42 +++++++++++++++++-
+ src/core/service.c                       | 42 ++++++++++++-
  src/libsystemd/sd-resolve/test-resolve.c |  2 +-
- src/shared/socket-util.c                 | 76 +++++++++++++++++++++++---------
+ src/shared/socket-util.c                 | 76 +++++++++++++++++-------
  src/shared/socket-util.h                 |  4 +-
  src/timesync/timesyncd-server.h          |  2 +-
  7 files changed, 107 insertions(+), 28 deletions(-)

@@ -12,8 +12,8 @@ Fixes #4642.
 Cherry-picked from: b001ad61e91b6499897f0c977045c7608c233bfa
 Resolves: #1384014
 ---
- man/crypttab.xml                      | 13 +++++++++++++
- src/cryptsetup/cryptsetup-generator.c | 36 +++++++++++++++++++++++------------
+ man/crypttab.xml                      | 13 ++++++++++
+ src/cryptsetup/cryptsetup-generator.c | 36 ++++++++++++++++++---------
  2 files changed, 37 insertions(+), 12 deletions(-)
 
 diff --git a/man/crypttab.xml b/man/crypttab.xml

@@ -9,9 +9,9 @@ Subject: [PATCH] resolved: Do not add .busname dependencies, when compiling
 Cherry-picked from: 33ff64c
 Resolves: #1222517
 ---
- Makefile.am                                                           | 2 +-
- units/.gitignore                                                      | 1 +
- units/{systemd-resolved.service.in => systemd-resolved.service.m4.in} | 2 ++
+ Makefile.am                                                     | 2 +-
+ units/.gitignore                                                | 1 +
+ ...stemd-resolved.service.in => systemd-resolved.service.m4.in} | 2 ++
  3 files changed, 4 insertions(+), 1 deletion(-)
  rename units/{systemd-resolved.service.in => systemd-resolved.service.m4.in} (96%)
 

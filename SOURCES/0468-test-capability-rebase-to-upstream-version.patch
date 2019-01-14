@@ -5,16 +5,16 @@ Subject: [PATCH] test-capability: rebase to upstream version
 
 Related: #1387398
 ---
- src/test/test-capability.c                         | 80 +++++++++++++++++++---
- src/test/test-execute.c                            | 43 ++++++++++++
- ...ec-capabilityambientset-merge-nfsnobody.service |  9 +++
- test/exec-capabilityambientset-merge.service       |  9 +++
- test/exec-capabilityambientset-nfsnobody.service   |  8 +++
- test/exec-capabilityambientset.service             |  8 +++
- test/exec-capabilityboundingset-invert.service     |  7 ++
- test/exec-capabilityboundingset-merge.service      |  8 +++
- test/exec-capabilityboundingset-reset.service      |  8 +++
- test/exec-capabilityboundingset-simple.service     |  7 ++
+ src/test/test-capability.c                    | 80 +++++++++++++++++--
+ src/test/test-execute.c                       | 43 ++++++++++
+ ...pabilityambientset-merge-nfsnobody.service |  9 +++
+ test/exec-capabilityambientset-merge.service  |  9 +++
+ ...xec-capabilityambientset-nfsnobody.service |  8 ++
+ test/exec-capabilityambientset.service        |  8 ++
+ .../exec-capabilityboundingset-invert.service |  7 ++
+ test/exec-capabilityboundingset-merge.service |  8 ++
+ test/exec-capabilityboundingset-reset.service |  8 ++
+ .../exec-capabilityboundingset-simple.service |  7 ++
  10 files changed, 179 insertions(+), 8 deletions(-)
  create mode 100644 test/exec-capabilityambientset-merge-nfsnobody.service
  create mode 100644 test/exec-capabilityambientset-merge.service

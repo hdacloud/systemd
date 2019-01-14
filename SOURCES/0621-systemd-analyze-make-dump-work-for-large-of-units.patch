@@ -11,9 +11,9 @@ via a fd.
 
 Resolves: #1446095
 ---
- src/analyze/analyze.c                  | 57 ++++++++++++++++++++++++++++------
- src/core/dbus-manager.c                | 26 ++++++++++++++--
- src/core/org.freedesktop.systemd1.conf |  4 +++
+ src/analyze/analyze.c                  | 57 ++++++++++++++++++++++----
+ src/core/dbus-manager.c                | 26 +++++++++++-
+ src/core/org.freedesktop.systemd1.conf |  4 ++
  3 files changed, 76 insertions(+), 11 deletions(-)
 
 diff --git a/src/analyze/analyze.c b/src/analyze/analyze.c

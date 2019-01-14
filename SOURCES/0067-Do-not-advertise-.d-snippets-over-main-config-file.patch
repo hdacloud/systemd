@@ -15,19 +15,19 @@ https://bugs.freedesktop.org/show_bug.cgi?id=89397
  man/bootchart.conf.xml         |  3 +--
  man/coredump.conf.xml          |  3 +--
  man/journald.conf.xml          |  3 +--
- man/logind.conf.xml            |  8 +++++---
+ man/logind.conf.xml            |  8 ++++---
  man/resolved.conf.xml          |  3 +--
- man/standard-conf.xml          | 42 ++++++++++++++++++++++++++++++++++--------
+ man/standard-conf.xml          | 42 +++++++++++++++++++++++++++-------
  man/systemd-sleep.conf.xml     |  3 +--
  man/systemd-system.conf.xml    |  3 +--
  man/timesyncd.conf.xml         |  3 +--
- src/bootchart/bootchart.conf   |  7 ++++---
- src/core/system.conf           |  7 ++++---
- src/journal/coredump.conf      |  7 ++++---
- src/journal/journald.conf      |  7 ++++---
- src/login/logind.conf          |  7 ++++---
- src/resolve/resolved.conf.in   |  5 +++--
- src/timesync/timesyncd.conf.in |  7 ++++---
+ src/bootchart/bootchart.conf   |  7 +++---
+ src/core/system.conf           |  7 +++---
+ src/journal/coredump.conf      |  7 +++---
+ src/journal/journald.conf      |  7 +++---
+ src/login/logind.conf          |  7 +++---
+ src/resolve/resolved.conf.in   |  5 ++--
+ src/timesync/timesyncd.conf.in |  7 +++---
  16 files changed, 73 insertions(+), 45 deletions(-)
 
 diff --git a/man/bootchart.conf.xml b/man/bootchart.conf.xml

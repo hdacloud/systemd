@@ -16,7 +16,7 @@ https://bugzilla.redhat.com/show_bug.cgi?id=1224211
 Cherry-picked from: d868f2a
 Related: #1230190
 ---
- src/libsystemd/sd-bus/bus-socket.c | 70 +++++++-------------------------------
+ src/libsystemd/sd-bus/bus-socket.c | 70 +++++-------------------------
  1 file changed, 12 insertions(+), 58 deletions(-)
 
 diff --git a/src/libsystemd/sd-bus/bus-socket.c b/src/libsystemd/sd-bus/bus-socket.c

@@ -22,7 +22,7 @@ https://bugs.freedesktop.org/show_bug.cgi?id=89516
 ---
  src/journal-remote/journal-remote-parse.c |  1 +
  src/journal-remote/journal-remote-parse.h |  1 +
- src/journal-remote/journal-remote.c       | 65 +++++++++++++++++++++++++++----
+ src/journal-remote/journal-remote.c       | 65 ++++++++++++++++++++---
  3 files changed, 59 insertions(+), 8 deletions(-)
 
 diff --git a/src/journal-remote/journal-remote-parse.c b/src/journal-remote/journal-remote-parse.c

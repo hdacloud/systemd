@@ -10,8 +10,8 @@ Conflicts:
 
 Resolves: #1427927
 ---
- src/core/dbus-manager.c          | 16 ++++++++++++++++
- src/libsystemd/sd-bus/bus-util.c | 39 +++++++++++++++++++++++++++++++++++++++
+ src/core/dbus-manager.c          | 16 +++++++++++++
+ src/libsystemd/sd-bus/bus-util.c | 39 ++++++++++++++++++++++++++++++++
  src/libsystemd/sd-bus/bus-util.h |  1 +
  3 files changed, 56 insertions(+)
 

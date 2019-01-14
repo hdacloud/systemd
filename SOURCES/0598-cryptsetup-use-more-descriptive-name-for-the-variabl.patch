@@ -18,7 +18,7 @@ those paths are equivalent.
 
 Related: #1511043
 ---
- src/cryptsetup/cryptsetup.c | 41 ++++++++---------------------------------
+ src/cryptsetup/cryptsetup.c | 41 ++++++++-----------------------------
  1 file changed, 8 insertions(+), 33 deletions(-)
 
 diff --git a/src/cryptsetup/cryptsetup.c b/src/cryptsetup/cryptsetup.c

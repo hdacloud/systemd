@@ -8,7 +8,7 @@ RHEL-only
 Resolves: #957112
 ---
  rules/60-persistent-storage.rules |  2 ++
- src/udev/udev-builtin-path_id.c   | 33 ++++++++++++++++++++++++++-------
+ src/udev/udev-builtin-path_id.c   | 33 ++++++++++++++++++++++++-------
  2 files changed, 28 insertions(+), 7 deletions(-)
 
 diff --git a/rules/60-persistent-storage.rules b/rules/60-persistent-storage.rules

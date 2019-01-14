@@ -11,7 +11,7 @@ attributes, recursively and not.
 
 Related: #1299714
 ---
- src/tmpfiles/tmpfiles.c | 150 ++++++++++++++++++++++++++++++++++++++++++++++++
+ src/tmpfiles/tmpfiles.c | 150 ++++++++++++++++++++++++++++++++++++++++
  1 file changed, 150 insertions(+)
 
 diff --git a/src/tmpfiles/tmpfiles.c b/src/tmpfiles/tmpfiles.c

@@ -19,9 +19,9 @@ Related: #1472439
  src/nspawn/nspawn.c                         |  10 +-
  src/shared/cgroup-util.c                    |   2 +-
  src/shared/condition.c                      |   2 +-
- src/shared/path-util.c                      | 209 ++++++----------------------
+ src/shared/path-util.c                      | 209 +++++---------------
  src/shared/path-util.h                      |   3 +-
- src/test/test-path-util.c                   |  66 +--------
+ src/test/test-path-util.c                   |  66 +------
  12 files changed, 62 insertions(+), 242 deletions(-)
 
 diff --git a/src/core/automount.c b/src/core/automount.c

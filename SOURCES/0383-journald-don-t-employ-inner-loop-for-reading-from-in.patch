@@ -15,7 +15,7 @@ Fixes #125
 Related: #1318994
 Cherry-picked from: a315ac4e076c4ce7ce3e5c95792cf916d5e918c5
 ---
- src/journal/journald-server.c | 204 +++++++++++++++++++++---------------------
+ src/journal/journald-server.c | 204 +++++++++++++++++-----------------
  1 file changed, 100 insertions(+), 104 deletions(-)
 
 diff --git a/src/journal/journald-server.c b/src/journal/journald-server.c

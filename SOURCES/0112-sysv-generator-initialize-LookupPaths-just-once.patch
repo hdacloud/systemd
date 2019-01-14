@@ -11,11 +11,11 @@ and constify it everywhere.
 
 (cherry picked from commit a8ffe6fbcbfdba39aef8dce8b298b3e0cb377c0e)
 ---
- src/shared/install.c                | 55 ++++++++++++++++++++++---------------
- src/shared/install.h                | 11 +++++++-
+ src/shared/install.c                | 55 +++++++++++++++++------------
+ src/shared/install.h                | 11 +++++-
  src/shared/path-lookup.c            |  1 +
  src/shared/path-lookup.h            |  3 +-
- src/sysv-generator/sysv-generator.c | 14 +++++-----
+ src/sysv-generator/sysv-generator.c | 14 ++++----
  5 files changed, 53 insertions(+), 31 deletions(-)
 
 diff --git a/src/shared/install.c b/src/shared/install.c

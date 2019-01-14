@@ -5,7 +5,7 @@ Subject: [PATCH] hwdb: sync 60-evdev.hwdb from systemd v235
 
 Resolves: rhbz#1500119
 ---
- hwdb/60-evdev.hwdb | 407 ++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ hwdb/60-evdev.hwdb | 407 ++++++++++++++++++++++++++++++++++++++++++++-
  1 file changed, 400 insertions(+), 7 deletions(-)
 
 diff --git a/hwdb/60-evdev.hwdb b/hwdb/60-evdev.hwdb

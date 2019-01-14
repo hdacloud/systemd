@@ -5,24 +5,24 @@ Subject: [PATCH] everything: remove traces of --user
 
 Resolves: #1071363
 ---
- man/busctl.xml                        |  6 ++--
- man/journalctl.xml                    | 14 --------
- man/pam_systemd.xml                   |  7 ++--
- man/systemctl.xml                     | 55 +++++------------------------
- man/systemd-analyze.xml               |  6 ----
+ man/busctl.xml                        |  6 +--
+ man/journalctl.xml                    | 14 ------
+ man/pam_systemd.xml                   |  7 +--
+ man/systemctl.xml                     | 55 ++++------------------
+ man/systemd-analyze.xml               |  6 ---
  man/systemd-run.xml                   |  1 -
- man/systemd-system.conf.xml           |  5 +--
- man/systemd.device.xml                |  4 +--
- man/systemd.exec.xml                  | 17 ++-------
- man/systemd.special.xml               | 46 ++----------------------
- man/systemd.unit.xml                  | 66 +----------------------------------
- man/systemd.xml                       | 63 +++++----------------------------
- man/user-system-options.xml           |  9 -----
+ man/systemd-system.conf.xml           |  5 +-
+ man/systemd.device.xml                |  4 +-
+ man/systemd.exec.xml                  | 17 ++-----
+ man/systemd.special.xml               | 46 +------------------
+ man/systemd.unit.xml                  | 66 +--------------------------
+ man/systemd.xml                       | 63 ++++---------------------
+ man/user-system-options.xml           |  9 ----
  shell-completion/bash/busctl          |  2 +-
- shell-completion/bash/journalctl      |  5 +--
+ shell-completion/bash/journalctl      |  5 +-
  shell-completion/bash/systemctl.in    |  2 +-
- shell-completion/bash/systemd-analyze | 12 +++----
- shell-completion/bash/systemd-run     |  4 +--
+ shell-completion/bash/systemd-analyze | 12 ++---
+ shell-completion/bash/systemd-run     |  4 +-
  src/analyze/analyze.c                 |  1 -
  src/core/main.c                       |  1 -
  src/journal/journalctl.c              |  1 -

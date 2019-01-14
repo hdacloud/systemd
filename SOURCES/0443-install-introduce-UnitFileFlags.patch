@@ -9,13 +9,13 @@ functions. It unifies the code, makes it a bit cleaner and extensible.
 (cherry picked from commit b3796dd8349af4235143889e44522a730c1635c0)
 Related: #1413041
 ---
- src/core/dbus-manager.c      | 36 ++++++++++++++++++--------
+ src/core/dbus-manager.c      | 36 +++++++++++++++------
  src/core/main.c              |  2 +-
- src/shared/install.c         | 61 ++++++++++++++++++++------------------------
- src/shared/install.h         | 25 ++++++++++--------
- src/systemctl/systemctl.c    | 28 ++++++++++++--------
- src/test/test-install-root.c | 58 ++++++++++++++++++++---------------------
- src/test/test-install.c      | 38 +++++++++++++--------------
+ src/shared/install.c         | 61 ++++++++++++++++--------------------
+ src/shared/install.h         | 25 +++++++++------
+ src/systemctl/systemctl.c    | 28 +++++++++++------
+ src/test/test-install-root.c | 58 +++++++++++++++++-----------------
+ src/test/test-install.c      | 38 +++++++++++-----------
  7 files changed, 135 insertions(+), 113 deletions(-)
 
 diff --git a/src/core/dbus-manager.c b/src/core/dbus-manager.c

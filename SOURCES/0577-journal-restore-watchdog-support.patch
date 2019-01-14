@@ -11,8 +11,8 @@ Conflicts:
 
 Related: #1511565
 ---
- src/journal/journald-server.c     | 62 +++++++++++++++++++++++++++++++++++----
- src/journal/journald-server.h     | 13 ++++----
+ src/journal/journald-server.c     | 62 ++++++++++++++++++++++++++++---
+ src/journal/journald-server.h     | 13 ++++---
  units/systemd-journald.service.in |  1 +
  3 files changed, 66 insertions(+), 10 deletions(-)
 

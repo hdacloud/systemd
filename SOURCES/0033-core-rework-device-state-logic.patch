@@ -16,10 +16,10 @@ its BindTo dependency on the device would not be fulfilled.
 
 (cherry picked from commit 628c89cc68ab96fce2de7ebba5933725d147aecc)
 ---
- src/core/device.c | 368 +++++++++++++++++++++++++++++++++---------------------
- src/core/device.h |  14 ++-
- src/core/mount.c  |  46 ++++---
- src/core/swap.c   |  32 +++--
+ src/core/device.c | 368 ++++++++++++++++++++++++++++------------------
+ src/core/device.h |  14 +-
+ src/core/mount.c  |  46 +++---
+ src/core/swap.c   |  32 ++--
  src/core/swap.h   |   4 +-
  src/core/unit.c   |   1 -
  6 files changed, 285 insertions(+), 180 deletions(-)

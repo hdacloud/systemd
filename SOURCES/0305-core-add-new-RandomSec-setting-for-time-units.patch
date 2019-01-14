@@ -9,12 +9,12 @@ in order to spread time events in a network evenly across a range.
 Cherry-picked from: 744c7693751830149ae78fdaf95c6c6f99d59f07
 Resolves: #1305279
 ---
- man/systemd.timer.xml                 | 43 ++++++++++++++++++++++++++++++-----
- src/core/dbus-timer.c                 | 17 ++++++++++++++
+ man/systemd.timer.xml                 | 43 +++++++++++++++++++++++----
+ src/core/dbus-timer.c                 | 17 +++++++++++
  src/core/load-fragment-gperf.gperf.m4 |  1 +
- src/core/timer.c                      | 28 +++++++++++++++++++++++
+ src/core/timer.c                      | 28 +++++++++++++++++
  src/core/timer.h                      |  1 +
- src/libsystemd/sd-bus/bus-util.c      | 16 +++++++++++++
+ src/libsystemd/sd-bus/bus-util.c      | 16 ++++++++++
  6 files changed, 100 insertions(+), 6 deletions(-)
 
 diff --git a/man/systemd.timer.xml b/man/systemd.timer.xml

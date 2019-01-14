@@ -7,10 +7,10 @@ Cherry-picked from: 7732f92
 Resolves: #1417387
 ---
  Makefile.am                   |   2 +
- man/systemd-nspawn.xml        |  65 ++++++++++++--
- src/nspawn/nspawn-stub-pid1.c | 196 ++++++++++++++++++++++++++++++++++++++++++
- src/nspawn/nspawn-stub-pid1.h |  22 +++++
- src/nspawn/nspawn.c           |  56 ++++++++++--
+ man/systemd-nspawn.xml        |  65 +++++++++--
+ src/nspawn/nspawn-stub-pid1.c | 196 ++++++++++++++++++++++++++++++++++
+ src/nspawn/nspawn-stub-pid1.h |  22 ++++
+ src/nspawn/nspawn.c           |  56 ++++++++--
  5 files changed, 328 insertions(+), 13 deletions(-)
  create mode 100644 src/nspawn/nspawn-stub-pid1.c
  create mode 100644 src/nspawn/nspawn-stub-pid1.h

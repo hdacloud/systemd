@@ -9,8 +9,8 @@ were non-conforming, resulting in an error ("Invalid field.") when reading.
 https://bugs.freedesktop.org/show_bug.cgi?id=89391
 (cherry picked from commit 09d801a82a46df518dd752e40bf13ac404daa2ce)
 ---
- src/journal-remote/journal-remote-parse.c | 31 ++++++++++++++++++-------------
- src/journal-remote/journal-remote-parse.h |  4 +++-
+ src/journal-remote/journal-remote-parse.c | 31 +++++++++++++----------
+ src/journal-remote/journal-remote-parse.h |  4 ++-
  2 files changed, 21 insertions(+), 14 deletions(-)
 
 diff --git a/src/journal-remote/journal-remote-parse.c b/src/journal-remote/journal-remote-parse.c

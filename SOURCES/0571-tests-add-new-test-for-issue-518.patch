@@ -8,7 +8,7 @@ Subject: [PATCH] tests: add new test for issue #518
 Related: #1404657, #1471230
 ---
  Makefile.am                       |   3 +-
- test/test-exec-deserialization.py | 192 ++++++++++++++++++++++++++++++++++++++
+ test/test-exec-deserialization.py | 192 ++++++++++++++++++++++++++++++
  2 files changed, 194 insertions(+), 1 deletion(-)
  create mode 100755 test/test-exec-deserialization.py
 

@@ -27,7 +27,7 @@ https://build.opensuse.org/package/view_file/Base:System/systemd/1001-re-enable-
 
 Resolves: #1045498
 ---
- src/udev/udev-builtin-path_id.c | 53 +++++++++++++++++++++++++++++++----------
+ src/udev/udev-builtin-path_id.c | 53 +++++++++++++++++++++++++--------
  1 file changed, 41 insertions(+), 12 deletions(-)
 
 diff --git a/src/udev/udev-builtin-path_id.c b/src/udev/udev-builtin-path_id.c

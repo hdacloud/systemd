@@ -12,7 +12,7 @@ And it rewrites the functions in a more table-based style.
 
 Related: #1506256
 ---
- src/core/job.c | 192 ++++++++++++++++++++-------------------------------------
+ src/core/job.c | 192 ++++++++++++++++++-------------------------------
  1 file changed, 68 insertions(+), 124 deletions(-)
 
 diff --git a/src/core/job.c b/src/core/job.c

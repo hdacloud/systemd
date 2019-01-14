@@ -6,7 +6,7 @@ Subject: [PATCH] test: add test for capability bounding set parsing
 Cherry-picked from: a8107a54
 Resolves: #1387398
 ---
- src/test/test-unit-file.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
+ src/test/test-unit-file.c | 45 +++++++++++++++++++++++++++++++++++++++
  1 file changed, 45 insertions(+)
 
 diff --git a/src/test/test-unit-file.c b/src/test/test-unit-file.c

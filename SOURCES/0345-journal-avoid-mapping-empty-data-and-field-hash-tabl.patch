@@ -21,7 +21,7 @@ This improves handling of some journal files reported in #487.
 Cherry-picked from: dade37d403f1b8c1d7bb2efbe2361f2a3e999613
 Related: #1350232
 ---
- src/journal/journal-file.c   | 37 ++++++++++++++++++++++++++-----------
+ src/journal/journal-file.c   | 37 +++++++++++++++++++++++++-----------
  src/journal/journal-file.h   |  3 +++
  src/journal/journal-verify.c | 14 ++++++++++++++
  3 files changed, 43 insertions(+), 11 deletions(-)

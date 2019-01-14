@@ -12,12 +12,12 @@ and/or persistent.
 Cherry-picked from: 39fd5b08a73f144a20202a665bd25cad51d8a90b
 Resolves: #1082179
 ---
- Makefile-man.am                      |  7 +++
+ Makefile-man.am                      |  7 ++
  man/sd-journal.xml                   |  8 ++-
- man/sd_journal_has_runtime_files.xml | 95 ++++++++++++++++++++++++++++++++++++
+ man/sd_journal_has_runtime_files.xml | 95 ++++++++++++++++++++++++++++
  src/journal/journal-internal.h       |  2 +
- src/journal/sd-journal.c             | 29 +++++++----
- src/systemd/sd-journal.h             |  3 ++
+ src/journal/sd-journal.c             | 29 ++++++---
+ src/systemd/sd-journal.h             |  3 +
  6 files changed, 133 insertions(+), 11 deletions(-)
  create mode 100644 man/sd_journal_has_runtime_files.xml
 

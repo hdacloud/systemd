@@ -21,12 +21,12 @@ Addresses: https://github.com/systemd/systemd/issues/1772
 Cherry-picked from: 412ea7a936ebaa5342a4c2abf48b9e408e6ba5dc
 Related: #1351415
 ---
- man/systemd-system.conf.xml           |  6 +++--
- man/systemd.exec.xml                  |  4 +++-
- src/core/load-fragment-gperf.gperf.m4 | 16 ++++++-------
- src/core/load-fragment.c              | 43 +++++++++++++++++++++++++++++++++++
+ man/systemd-system.conf.xml           |  6 ++--
+ man/systemd.exec.xml                  |  4 ++-
+ src/core/load-fragment-gperf.gperf.m4 | 16 +++++-----
+ src/core/load-fragment.c              | 43 +++++++++++++++++++++++++++
  src/core/load-fragment.h              |  1 +
- src/core/main.c                       | 16 ++++++-------
+ src/core/main.c                       | 16 +++++-----
  6 files changed, 67 insertions(+), 19 deletions(-)
 
 diff --git a/man/systemd-system.conf.xml b/man/systemd-system.conf.xml

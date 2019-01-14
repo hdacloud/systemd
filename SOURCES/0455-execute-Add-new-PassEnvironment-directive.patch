@@ -25,16 +25,16 @@ No regressions in `make check`.
 
 Resolves: #1426214
 ---
- man/systemd.exec.xml                  | 27 +++++++++++++++
+ man/systemd.exec.xml                  | 27 +++++++++++
  shell-completion/bash/systemd-run     |  2 +-
- src/core/dbus-execute.c               | 34 ++++++++++++++++++
- src/core/execute.c                    | 44 ++++++++++++++++++++++--
+ src/core/dbus-execute.c               | 34 ++++++++++++++
+ src/core/execute.c                    | 44 +++++++++++++++++-
  src/core/execute.h                    |  1 +
  src/core/load-fragment-gperf.gperf.m4 |  1 +
- src/core/load-fragment.c              | 65 +++++++++++++++++++++++++++++++++++
+ src/core/load-fragment.c              | 65 +++++++++++++++++++++++++++
  src/core/load-fragment.h              |  1 +
  src/libsystemd/sd-bus/bus-util.c      |  2 +-
- src/shared/env-util.c                 | 15 ++++++++
+ src/shared/env-util.c                 | 15 +++++++
  src/shared/env-util.h                 |  1 +
  11 files changed, 189 insertions(+), 4 deletions(-)
 

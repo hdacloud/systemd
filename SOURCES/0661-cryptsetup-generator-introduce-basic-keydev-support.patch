@@ -26,8 +26,8 @@ Example:
 
 Resolves: #1619743
 ---
- man/systemd-cryptsetup-generator.xml  |  14 ++++
- src/cryptsetup/cryptsetup-generator.c | 122 ++++++++++++++++++++++++++++++++--
+ man/systemd-cryptsetup-generator.xml  |  14 +++
+ src/cryptsetup/cryptsetup-generator.c | 122 ++++++++++++++++++++++++--
  2 files changed, 131 insertions(+), 5 deletions(-)
 
 diff --git a/man/systemd-cryptsetup-generator.xml b/man/systemd-cryptsetup-generator.xml

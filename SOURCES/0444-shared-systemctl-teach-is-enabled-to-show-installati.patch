@@ -19,11 +19,11 @@ running systemctl start.
 Resolves: #1413041
 ---
  man/systemctl.xml                      |  3 ++
- src/core/dbus-manager.c                | 44 ++++++++++++++++++++
+ src/core/dbus-manager.c                | 44 ++++++++++++++++
  src/core/org.freedesktop.systemd1.conf |  4 ++
- src/shared/install.c                   | 35 +++++++++-------
+ src/shared/install.c                   | 35 +++++++-----
  src/shared/install.h                   |  3 +-
- src/systemctl/systemctl.c              | 73 +++++++++++++++++++++++++++++++++-
+ src/systemctl/systemctl.c              | 73 +++++++++++++++++++++++++-
  6 files changed, 145 insertions(+), 17 deletions(-)
 
 diff --git a/man/systemctl.xml b/man/systemctl.xml

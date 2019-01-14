@@ -25,7 +25,7 @@ Conflicts:
 
 Related: #1299714
 ---
- src/tmpfiles/tmpfiles.c | 207 ++++++++++++++++++++++++++----------------------
+ src/tmpfiles/tmpfiles.c | 207 ++++++++++++++++++++++------------------
  1 file changed, 114 insertions(+), 93 deletions(-)
 
 diff --git a/src/tmpfiles/tmpfiles.c b/src/tmpfiles/tmpfiles.c

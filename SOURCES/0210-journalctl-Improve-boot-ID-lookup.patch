@@ -29,7 +29,7 @@ https://bugs.freedesktop.org/show_bug.cgi?id=72601
 Cherry-picked from: 596a232
 Resolves: #1222517
 ---
- src/journal/journalctl.c | 275 ++++++++++++++++++++++++++++++-----------------
+ src/journal/journalctl.c | 275 +++++++++++++++++++++++++--------------
  1 file changed, 174 insertions(+), 101 deletions(-)
 
 diff --git a/src/journal/journalctl.c b/src/journal/journalctl.c

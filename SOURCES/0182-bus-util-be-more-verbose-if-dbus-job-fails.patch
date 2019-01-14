@@ -12,7 +12,7 @@ https://bugzilla.redhat.com/show_bug.cgi?id=1016680
 Cherry-picked from: d5cad22109749faffb7563e4b2a3a728486d47b5
 Resolves: #1016680
 ---
- src/libsystemd/sd-bus/bus-util.c | 79 ++++++++++++++++++++++++++++++++++++----
+ src/libsystemd/sd-bus/bus-util.c | 79 +++++++++++++++++++++++++++++---
  1 file changed, 72 insertions(+), 7 deletions(-)
 
 diff --git a/src/libsystemd/sd-bus/bus-util.c b/src/libsystemd/sd-bus/bus-util.c

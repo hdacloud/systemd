@@ -12,7 +12,7 @@ on C's downgrade-to-bool feature, as suggested in CODING_STYLE.
 Cherry-picked from: 65dce26488030eff078c498673d5d93e3c87b6a1
 Resolves: #1387398
 ---
- src/core/load-fragment.c | 42 +++++++++++++++++++-----------------------
+ src/core/load-fragment.c | 42 ++++++++++++++++++----------------------
  1 file changed, 19 insertions(+), 23 deletions(-)
 
 diff --git a/src/core/load-fragment.c b/src/core/load-fragment.c

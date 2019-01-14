@@ -10,12 +10,12 @@ rhel-only
 Resolves: #1249968
 ---
  Makefile-man.am                       |  5 -----
- Makefile.am                           |  7 ++-----
+ Makefile.am                           |  7 ++----
  man/systemd-journald.service.xml      |  2 --
  src/core/namespace.c                  |  3 ++-
  src/journal/journald-server.c         |  3 +--
  src/journal/journald-syslog.c         |  2 +-
- units/systemd-journald-dev-log.socket | 32 --------------------------------
+ units/systemd-journald-dev-log.socket | 32 ---------------------------
  units/systemd-journald.service.in     |  4 ++--
  units/systemd-journald.socket         |  2 +-
  9 files changed, 9 insertions(+), 51 deletions(-)

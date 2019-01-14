@@ -8,8 +8,8 @@ Subject: [PATCH] man: add journal-remote.conf(5)
 Cherry-picked from: 90d2614
 Resolves: #1222517
 ---
- Makefile-man.am                |   7 +++
- man/journal-remote.conf.xml    | 114 +++++++++++++++++++++++++++++++++++++++++
+ Makefile-man.am                |   7 ++
+ man/journal-remote.conf.xml    | 114 +++++++++++++++++++++++++++++++++
  man/systemd-journal-remote.xml |   1 +
  3 files changed, 122 insertions(+)
  create mode 100644 man/journal-remote.conf.xml

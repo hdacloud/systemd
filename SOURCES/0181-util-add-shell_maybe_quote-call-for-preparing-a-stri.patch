@@ -17,11 +17,11 @@ Conflicts:
 Cherry-picked from: 019c7fba
 Resolves: #1016680
 ---
- src/core/job.c                   |  8 +++----
- src/libsystemd/sd-bus/bus-util.c | 15 +++++++-------
- src/shared/util.c                | 45 ++++++++++++++++++++++++++++++++++++++--
+ src/core/job.c                   |  8 +++---
+ src/libsystemd/sd-bus/bus-util.c | 15 +++++------
+ src/shared/util.c                | 45 ++++++++++++++++++++++++++++++--
  src/shared/util.h                |  2 ++
- src/test/test-util.c             | 19 +++++++++++++++++
+ src/test/test-util.c             | 19 ++++++++++++++
  5 files changed, 74 insertions(+), 15 deletions(-)
 
 diff --git a/src/core/job.c b/src/core/job.c

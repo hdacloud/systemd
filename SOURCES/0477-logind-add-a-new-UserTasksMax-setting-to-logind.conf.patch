@@ -20,12 +20,12 @@ Conflicts:
 
 Resolves: #1337244
 ---
- man/logind.conf.xml          | 15 ++++++-
- src/login/logind-dbus.c      | 94 +++++++++++++++++++++++++++++++++++++++++++-
+ man/logind.conf.xml          | 15 +++++-
+ src/login/logind-dbus.c      | 94 +++++++++++++++++++++++++++++++++++-
  src/login/logind-gperf.gperf |  1 +
- src/login/logind-session.c   | 25 +++++++-----
+ src/login/logind-session.c   | 25 ++++++----
  src/login/logind-session.h   |  3 +-
- src/login/logind-user.c      | 41 +++++++++++++------
+ src/login/logind-user.c      | 41 +++++++++++-----
  src/login/logind.c           |  1 +
  src/login/logind.conf        |  1 +
  src/login/logind.h           |  4 +-

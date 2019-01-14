@@ -17,9 +17,9 @@ Cherry-picked from: 9c857b9d160c10b4454fc9f83442c1878343422f
 Resolves: #1307080
 ---
  src/machine/machinectl.c |  2 +-
- src/nspawn/nspawn.c      | 48 +++++++++++++++++--------------
+ src/nspawn/nspawn.c      | 48 ++++++++++++++-----------
  src/run/run.c            |  2 +-
- src/shared/ptyfwd.c      | 75 ++++++++++++++++++++++++++++--------------------
+ src/shared/ptyfwd.c      | 75 +++++++++++++++++++++++-----------------
  src/shared/ptyfwd.h      |  2 +-
  5 files changed, 74 insertions(+), 55 deletions(-)
 

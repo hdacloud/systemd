@@ -7,7 +7,7 @@ Subject: [PATCH] Revert "journald: allow restarting journald without losing
 This reverts commit 13790add4bf648fed816361794d8277a75253410.
 ---
  src/journal/journald-server.c     |  26 +--
- src/journal/journald-stream.c     | 376 ++++++--------------------------------
+ src/journal/journald-stream.c     | 376 ++++--------------------------
  src/journal/journald-stream.h     |   3 +-
  units/systemd-journald.service.in |   1 -
  4 files changed, 61 insertions(+), 345 deletions(-)

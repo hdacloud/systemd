@@ -17,7 +17,7 @@ Conflicts:
 
 Resolves: #1299714
 ---
- src/journal/journal-file.c | 46 ++++++++++++++++++++++++++++++++++++----------
+ src/journal/journal-file.c | 46 +++++++++++++++++++++++++++++---------
  1 file changed, 36 insertions(+), 10 deletions(-)
 
 diff --git a/src/journal/journal-file.c b/src/journal/journal-file.c

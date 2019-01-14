@@ -40,9 +40,9 @@ Conflicts:
 Resolves: #1500119
 ---
  Makefile.am                      |  2 +
- hwdb/60-evdev.hwdb               | 37 +++++++++++++++++
- rules/60-evdev.rules             | 14 +++++++
- src/udev/udev-builtin-keyboard.c | 86 ++++++++++++++++++++++++++++++++++++++--
+ hwdb/60-evdev.hwdb               | 37 ++++++++++++++
+ rules/60-evdev.rules             | 14 ++++++
+ src/udev/udev-builtin-keyboard.c | 86 ++++++++++++++++++++++++++++++--
  4 files changed, 135 insertions(+), 4 deletions(-)
  create mode 100644 hwdb/60-evdev.hwdb
  create mode 100644 rules/60-evdev.rules

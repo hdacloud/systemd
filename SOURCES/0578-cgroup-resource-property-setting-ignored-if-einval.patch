@@ -6,15 +6,15 @@ Subject: [PATCH] cgroup resource property setting ignored if einval
 Resolves: rhbz#1302305
 Cherry-picked from: d53d94743c5e5e3a4a6, 3fdf9ad
 ---
- man/systemd.resource-control.xml |   9 +--
- src/core/cgroup.c                |  54 +++++++++--------
- src/core/cgroup.h                |  14 ++---
- src/core/dbus-cgroup.c           | 125 +++++++++++++++------------------------
- src/core/load-fragment.c         |  54 +++++++----------
+ man/systemd.resource-control.xml |   9 ++-
+ src/core/cgroup.c                |  54 ++++++-------
+ src/core/cgroup.h                |  14 ++--
+ src/core/dbus-cgroup.c           | 125 ++++++++++++-------------------
+ src/core/load-fragment.c         |  54 +++++--------
  src/core/unit.c                  |   4 +-
- src/libsystemd/sd-bus/bus-util.c |  35 +++++++----
- src/shared/cgroup-util.c         |  41 +++++++++++++
- src/shared/cgroup-util.h         |  27 +++++++++
+ src/libsystemd/sd-bus/bus-util.c |  35 ++++++---
+ src/shared/cgroup-util.c         |  41 ++++++++++
+ src/shared/cgroup-util.h         |  27 +++++++
  9 files changed, 205 insertions(+), 158 deletions(-)
 
 diff --git a/man/systemd.resource-control.xml b/man/systemd.resource-control.xml

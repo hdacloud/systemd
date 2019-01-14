@@ -9,7 +9,7 @@ No functional changes, just to make the next patch easier to review
 
 Resolves: #1500119
 ---
- src/udev/udev-builtin-keyboard.c | 56 ++++++++++++++++++++--------------------
+ src/udev/udev-builtin-keyboard.c | 56 ++++++++++++++++----------------
  1 file changed, 28 insertions(+), 28 deletions(-)
 
 diff --git a/src/udev/udev-builtin-keyboard.c b/src/udev/udev-builtin-keyboard.c

@@ -9,7 +9,7 @@ This reverts commit 91cb89c1b79ef3c475d91319edb0c052cb9f2724.
 Resolves: #1359939
 ---
  src/journal/journald-server.c |  26 ++-
- src/journal/journald-stream.c | 371 ++++++++++++++++++++++++++++++++++++------
+ src/journal/journald-stream.c | 371 +++++++++++++++++++++++++++++-----
  src/journal/journald-stream.h |   3 +-
  3 files changed, 340 insertions(+), 60 deletions(-)
 

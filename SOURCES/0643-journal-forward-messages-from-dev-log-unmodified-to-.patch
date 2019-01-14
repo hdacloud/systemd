@@ -9,7 +9,7 @@ Subject: [PATCH] journal: forward messages from /dev/log unmodified to
 Resolves: #1409659
 ---
  src/journal/journald-server.c |  2 +-
- src/journal/journald-syslog.c | 39 +++++++++++++++++++++++++--------------
+ src/journal/journald-syslog.c | 39 ++++++++++++++++++++++-------------
  src/journal/journald-syslog.h |  2 +-
  3 files changed, 27 insertions(+), 16 deletions(-)
 

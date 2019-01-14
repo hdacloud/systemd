@@ -9,7 +9,7 @@ valgrind-clean.
 Cherry-picked from: 909dea0c7ced0042fa3acd8cd05f5007a2cf2cea
 Related: #1318994
 ---
- src/journal/journalctl.c | 51 +++++++++++++++++++++++++-----------------------
+ src/journal/journalctl.c | 51 +++++++++++++++++++++-------------------
  1 file changed, 27 insertions(+), 24 deletions(-)
 
 diff --git a/src/journal/journalctl.c b/src/journal/journalctl.c

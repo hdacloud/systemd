@@ -9,8 +9,8 @@ applications to easily track session's Lock status.
 Cherry-picked from: 42d35e1301928d08dd32ec51f0205252ae658ba5
 Resolves: #1335499
 ---
- src/login/logind-session-dbus.c       | 50 +++++++++++++++++++++++++++++++++++
- src/login/logind-session.c            | 17 ++++++++++++
+ src/login/logind-session-dbus.c       | 50 +++++++++++++++++++++++++++
+ src/login/logind-session.c            | 17 +++++++++
  src/login/logind-session.h            |  4 +++
  src/login/org.freedesktop.login1.conf |  4 +++
  4 files changed, 75 insertions(+)

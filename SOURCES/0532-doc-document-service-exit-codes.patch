@@ -11,7 +11,7 @@ Replaces: #5159
 
 Resolves: #1178929
 ---
- man/systemd.exec.xml | 310 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ man/systemd.exec.xml | 310 +++++++++++++++++++++++++++++++++++++++++++
  1 file changed, 310 insertions(+)
 
 diff --git a/man/systemd.exec.xml b/man/systemd.exec.xml

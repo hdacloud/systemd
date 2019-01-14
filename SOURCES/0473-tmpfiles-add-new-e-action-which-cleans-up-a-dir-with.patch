@@ -13,8 +13,8 @@ v2: properly add 'e' to needs_glob() and takes_ownership()
 (cherry picked from commit df8dee85da5fa41e95dd7f536e67fcc6940a6488)
 Resolves: #1225739
 ---
- man/tmpfiles.d.xml      |  9 ++++++++-
- src/tmpfiles/tmpfiles.c | 51 +++++++++++++++----------------------------------
+ man/tmpfiles.d.xml      |  9 +++++++-
+ src/tmpfiles/tmpfiles.c | 51 ++++++++++++-----------------------------
  2 files changed, 23 insertions(+), 37 deletions(-)
 
 diff --git a/man/tmpfiles.d.xml b/man/tmpfiles.d.xml

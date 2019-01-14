@@ -7,7 +7,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        219
-Release:        62%{?dist}
+Release:        62%{?dist}.2
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        A System and Service Manager
@@ -703,6 +703,10 @@ Patch0661: 0661-cryptsetup-generator-introduce-basic-keydev-support.patch
 Patch0662: 0662-cryptsetup-generator-don-t-return-error-if-target-di.patch
 Patch0663: 0663-cryptsetup-generator-allow-whitespace-characters-in-.patch
 Patch0664: 0664-Make-sure-the-mount-units-pulled-by-RequiresMountsFo.patch
+Patch0665: 0665-dhcp6-make-sure-we-have-enough-space-for-the-DHCP6-o.patch
+Patch0666: 0666-journald-do-not-store-the-iovec-entry-for-process-co.patch
+Patch0667: 0667-journald-set-a-limit-on-the-number-of-fields-1k.patch
+Patch0668: 0668-journal-remote-set-a-limit-on-the-number-of-fields-i.patch
 
 %global num_patches %{lua: c=0; for i,p in ipairs(patches) do c=c+1; end; print(c);}
 
@@ -1679,6 +1683,14 @@ fi
 %{_mandir}/man8/systemd-resolved.*
 
 %changelog
+* Mon Jan 07 2019 Lukas Nykryn <lnykryn@redhat.com> - 219-62.2
+- journald: do not store the iovec entry for process commandline on stack (#1657788)
+- journald: set a limit on the number of fields (1k) (#1657792)
+- journal-remote: set a limit on the number of fields in a message (#1657792)
+
+* Mon Nov 26 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-62.1
+- dhcp6: make sure we have enough space for the DHCP6 option header (CVE-2018-15688)
+
 * Fri Sep 07 2018 Lukas Nykryn <lnykryn@redhat.com> - 219-62
 - cryptsetup-generator: introduce basic keydev support (#1619743)
 - cryptsetup-generator: don't return error if target directory already exists (#1619743)

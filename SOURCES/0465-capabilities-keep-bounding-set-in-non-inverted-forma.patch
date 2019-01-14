@@ -10,18 +10,18 @@ reflects those capabilities that we want to keep instead of drop.
 Resolves: #1387398
 ---
  src/core/dbus-execute.c               |  4 +-
- src/core/execute.c                    |  9 ++--
+ src/core/execute.c                    |  9 +--
  src/core/execute.h                    |  2 +-
  src/core/load-fragment-gperf.gperf.m4 |  2 +-
- src/core/load-fragment.c              | 25 +++++-----
+ src/core/load-fragment.c              | 25 ++++----
  src/core/load-fragment.h              |  2 +-
- src/core/main.c                       | 10 ++--
+ src/core/main.c                       | 10 +--
  src/core/unit.c                       |  2 +-
  src/import/import-common.c            |  2 +-
  src/nspawn/nspawn.c                   |  2 +-
- src/shared/capability.c               | 16 +++----
- src/shared/capability.h               | 12 ++++-
- src/test/test-unit-file.c             | 89 +++++++++++++++++++----------------
+ src/shared/capability.c               | 16 ++---
+ src/shared/capability.h               | 12 +++-
+ src/test/test-unit-file.c             | 89 +++++++++++++++------------
  13 files changed, 96 insertions(+), 81 deletions(-)
 
 diff --git a/src/core/dbus-execute.c b/src/core/dbus-execute.c

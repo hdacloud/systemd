@@ -12,7 +12,7 @@ including overflow.
 Resolves: #1503106
 ---
  Makefile.am                 |   7 ++
- src/test/test-conf-parser.c | 155 ++++++++++++++++++++++++++++++++++++++++++++
+ src/test/test-conf-parser.c | 155 ++++++++++++++++++++++++++++++++++++
  2 files changed, 162 insertions(+)
  create mode 100644 src/test/test-conf-parser.c
 

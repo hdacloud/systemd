@@ -9,7 +9,7 @@ A journal file that carries no objects should be considered valid.
 Cherry-picked from: 8dc37a85255f68d62f7af66696cbf6a66401fb2a
 Resolves: #1350232
 ---
- src/journal/journal-verify.c | 37 ++++++++++++++-----------------------
+ src/journal/journal-verify.c | 37 ++++++++++++++----------------------
  1 file changed, 14 insertions(+), 23 deletions(-)
 
 diff --git a/src/journal/journal-verify.c b/src/journal/journal-verify.c

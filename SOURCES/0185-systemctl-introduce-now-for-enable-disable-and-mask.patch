@@ -14,13 +14,13 @@ Cherry-picked from: 57ab2eabb8f92fad5239c7d4492e9c6e23ee0678
 Resolves: #1233081
 ---
  Makefile.am                      |   1 +
- man/systemctl.xml                |  33 ++++++++----
- src/libsystemd/sd-bus/bus-util.c |   6 ++-
+ man/systemctl.xml                |  33 ++++++---
+ src/libsystemd/sd-bus/bus-util.c |   6 +-
  src/libsystemd/sd-bus/bus-util.h |   3 +-
  src/machine/machinectl.c         |   2 +-
- src/shared/install.c             | 112 +++++++++++++++++++--------------------
+ src/shared/install.c             | 112 +++++++++++++++----------------
  src/shared/install.h             |   1 +
- src/systemctl/systemctl.c        |  28 ++++++++--
+ src/systemctl/systemctl.c        |  28 ++++++--
  8 files changed, 114 insertions(+), 72 deletions(-)
 
 diff --git a/Makefile.am b/Makefile.am

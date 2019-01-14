@@ -19,7 +19,7 @@ Cherry-picked from: 795ab08f783e78e85f1493879f13ac44cb113b00
 Resolves: #947636
 ---
  Makefile.am              |   3 +-
- src/journal/journalctl.c | 118 ++++++++++++++++++++++++++++++++++++++---------
+ src/journal/journalctl.c | 118 +++++++++++++++++++++++++++++++--------
  2 files changed, 97 insertions(+), 24 deletions(-)
 
 diff --git a/Makefile.am b/Makefile.am

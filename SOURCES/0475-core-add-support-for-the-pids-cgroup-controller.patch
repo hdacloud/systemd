@@ -23,20 +23,20 @@ and hence keep things in sync here.
 Cherry-picked from: 03a7b521e3ffb7f5d153d90480ba5d4bc29d1e8f
 Resolves: #1337244
 ---
- man/systemd-system.conf.xml           | 22 ++++++------
- man/systemd.resource-control.xml      | 63 ++++++++++++++++++++++++++++-------
- src/core/cgroup.c                     | 44 ++++++++++++++++++++++++
+ man/systemd-system.conf.xml           | 22 +++++-----
+ man/systemd.resource-control.xml      | 63 ++++++++++++++++++++++-----
+ src/core/cgroup.c                     | 44 +++++++++++++++++++
  src/core/cgroup.h                     |  5 +++
- src/core/dbus-cgroup.c                | 41 ++++++++++++++++++++++-
- src/core/dbus-unit.c                  | 25 ++++++++++++++
- src/core/load-fragment-gperf.gperf.m4 |  2 ++
- src/core/load-fragment.c              | 37 +++++++++++++++++---
+ src/core/dbus-cgroup.c                | 41 ++++++++++++++++-
+ src/core/dbus-unit.c                  | 25 +++++++++++
+ src/core/load-fragment-gperf.gperf.m4 |  2 +
+ src/core/load-fragment.c              | 37 ++++++++++++++--
  src/core/load-fragment.h              |  1 +
  src/core/main.c                       |  3 ++
  src/core/manager.h                    |  1 +
  src/core/unit.c                       |  1 +
  src/shared/cgroup-util.h              |  1 +
- src/systemctl/systemctl.c             | 17 ++++++++++
+ src/systemctl/systemctl.c             | 17 ++++++++
  14 files changed, 236 insertions(+), 27 deletions(-)
 
 diff --git a/man/systemd-system.conf.xml b/man/systemd-system.conf.xml

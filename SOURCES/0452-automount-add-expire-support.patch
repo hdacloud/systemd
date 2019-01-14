@@ -6,14 +6,14 @@ Subject: [PATCH] automount: add expire support
 (cherry picked from commit deb0a77cf0b409141c4b116ae30becb3d878e1ad)
 Resolves: #1354410
 ---
- man/systemd.automount.xml             |   8 ++
+ man/systemd.automount.xml             |   8 +
  man/systemd.mount.xml                 |   9 ++
- src/core/automount.c                  | 224 ++++++++++++++++++++++++++++++++--
+ src/core/automount.c                  | 224 ++++++++++++++++++++++++--
  src/core/automount.h                  |   6 +-
  src/core/dbus-automount.c             |   1 +
  src/core/load-fragment-gperf.gperf.m4 |   1 +
  src/core/mount.c                      |  20 +--
- src/fstab-generator/fstab-generator.c |  28 +++++
+ src/fstab-generator/fstab-generator.c |  28 ++++
  8 files changed, 269 insertions(+), 28 deletions(-)
 
 diff --git a/man/systemd.automount.xml b/man/systemd.automount.xml

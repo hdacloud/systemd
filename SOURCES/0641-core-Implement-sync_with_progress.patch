@@ -15,7 +15,7 @@ sent to the sync process and the shutdown continues.
 
 Related: #1571098
 ---
- src/core/shutdown.c | 116 +++++++++++++++++++++++++++++++++++++++++++++++++---
+ src/core/shutdown.c | 116 ++++++++++++++++++++++++++++++++++++++++++--
  1 file changed, 111 insertions(+), 5 deletions(-)
 
 diff --git a/src/core/shutdown.c b/src/core/shutdown.c

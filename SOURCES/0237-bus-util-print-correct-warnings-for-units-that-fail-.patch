@@ -7,7 +7,7 @@ Subject: [PATCH] bus-util: print correct warnings for units that fail but for
 Cherry-picked from: 373a99e
 Related: #1016680
 ---
- src/libsystemd/sd-bus/bus-util.c | 34 ++++++++++++++++++++--------------
+ src/libsystemd/sd-bus/bus-util.c | 34 +++++++++++++++++++-------------
  1 file changed, 20 insertions(+), 14 deletions(-)
 
 diff --git a/src/libsystemd/sd-bus/bus-util.c b/src/libsystemd/sd-bus/bus-util.c

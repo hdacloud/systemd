@@ -29,8 +29,8 @@ The job completion message is sufficient in this case.
 
 Resolves: #1506256
 ---
- src/core/job.c  | 65 +++++++++++++++++++++++++++++++++++++++------------------
- src/core/unit.c | 36 +++++++++++---------------------
+ src/core/job.c  | 65 ++++++++++++++++++++++++++++++++++---------------
+ src/core/unit.c | 36 +++++++++------------------
  src/core/unit.h |  1 +
  3 files changed, 58 insertions(+), 44 deletions(-)
 

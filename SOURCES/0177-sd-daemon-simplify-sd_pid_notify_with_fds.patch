@@ -16,7 +16,7 @@ http://lists.freedesktop.org/archives/systemd-devel/2015-April/031348.html
 Cherry-picked from: c1258d6
 Resolves: #1222517
 ---
- src/libsystemd/sd-daemon/sd-daemon.c | 61 ++++++++++++++++--------------------
+ src/libsystemd/sd-daemon/sd-daemon.c | 61 ++++++++++++----------------
  1 file changed, 27 insertions(+), 34 deletions(-)
 
 diff --git a/src/libsystemd/sd-daemon/sd-daemon.c b/src/libsystemd/sd-daemon/sd-daemon.c

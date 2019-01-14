@@ -13,7 +13,7 @@ rule, this is probably fine.
 
 Resolves: #1500119
 ---
- src/udev/udev-builtin-keyboard.c | 58 +++++++++++++++++++++++-----------------
+ src/udev/udev-builtin-keyboard.c | 58 ++++++++++++++++++--------------
  1 file changed, 33 insertions(+), 25 deletions(-)
 
 diff --git a/src/udev/udev-builtin-keyboard.c b/src/udev/udev-builtin-keyboard.c
