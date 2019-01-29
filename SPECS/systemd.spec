@@ -7,7 +7,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        219
-Release:        62%{?dist}.2
+Release:        62%{?dist}.3
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        A System and Service Manager
@@ -707,6 +707,7 @@ Patch0665: 0665-dhcp6-make-sure-we-have-enough-space-for-the-DHCP6-o.patch
 Patch0666: 0666-journald-do-not-store-the-iovec-entry-for-process-co.patch
 Patch0667: 0667-journald-set-a-limit-on-the-number-of-fields-1k.patch
 Patch0668: 0668-journal-remote-set-a-limit-on-the-number-of-fields-i.patch
+Patch0669: 0669-journald-free-cmdline-buffers-owned-by-iovec.patch
 
 %global num_patches %{lua: c=0; for i,p in ipairs(patches) do c=c+1; end; print(c);}
 
@@ -1683,6 +1684,9 @@ fi
 %{_mandir}/man8/systemd-resolved.*
 
 %changelog
+* Wed Jan 16 2019 Lukas Nykryn <lnykryn@redhat.com> - 219-62.3
+- journald: free cmdline buffers owned by iovec (#1666646)
+
 * Mon Jan 07 2019 Lukas Nykryn <lnykryn@redhat.com> - 219-62.2
 - journald: do not store the iovec entry for process commandline on stack (#1657788)
 - journald: set a limit on the number of fields (1k) (#1657792)
