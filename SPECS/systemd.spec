@@ -7,7 +7,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        219
-Release:        62%{?dist}.3
+Release:        62%{?dist}.5
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        A System and Service Manager
@@ -708,6 +708,9 @@ Patch0666: 0666-journald-do-not-store-the-iovec-entry-for-process-co.patch
 Patch0667: 0667-journald-set-a-limit-on-the-number-of-fields-1k.patch
 Patch0668: 0668-journal-remote-set-a-limit-on-the-number-of-fields-i.patch
 Patch0669: 0669-journald-free-cmdline-buffers-owned-by-iovec.patch
+Patch0670: 0670-Refuse-dbus-message-paths-longer-than-BUS_PATH_SIZE_.patch
+Patch0671: 0671-Allocate-temporary-strings-to-hold-dbus-paths-on-the.patch
+Patch0672: 0672-sd-bus-if-we-receive-an-invalid-dbus-message-ignore-.patch
 
 %global num_patches %{lua: c=0; for i,p in ipairs(patches) do c=c+1; end; print(c);}
 
@@ -1684,6 +1687,13 @@ fi
 %{_mandir}/man8/systemd-resolved.*
 
 %changelog
+* Thu Feb 14 2019 Lukas Nykryn <lnykryn@redhat.com> - 219-62.5
+- sd-bus: if we receive an invalid dbus message, ignore and proceeed (#1667871)
+
+* Thu Feb 07 2019 Lukas Nykryn <lnykryn@redhat.com> - 219-62.4
+- Refuse dbus message paths longer than BUS_PATH_SIZE_MAX limit. (#1667870)
+- Allocate temporary strings to hold dbus paths on the heap (#1667870)
+
 * Wed Jan 16 2019 Lukas Nykryn <lnykryn@redhat.com> - 219-62.3
 - journald: free cmdline buffers owned by iovec (#1666646)
 
