@@ -7,7 +7,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        219
-Release:        62%{?dist}.6
+Release:        62%{?dist}.7
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        A System and Service Manager
@@ -712,6 +712,7 @@ Patch0670: 0670-Refuse-dbus-message-paths-longer-than-BUS_PATH_SIZE_.patch
 Patch0671: 0671-Allocate-temporary-strings-to-hold-dbus-paths-on-the.patch
 Patch0672: 0672-sd-bus-if-we-receive-an-invalid-dbus-message-ignore-.patch
 Patch0673: 0673-Revert-bus-when-dumping-string-property-values-escap.patch
+Patch0674: 0674-rules-fix-memory-hotplug-rule-so-systemd-detect-virt.patch
 
 %global num_patches %{lua: c=0; for i,p in ipairs(patches) do c=c+1; end; print(c);}
 
@@ -1688,6 +1689,9 @@ fi
 %{_mandir}/man8/systemd-resolved.*
 
 %changelog
+* Wed Apr 24 2019 Lukas Nykryn <lnykryn@redhat.com> - 219-62.7
+- rules: fix memory hotplug rule so systemd-detect-virt does not run too often (#1701230)
+
 * Thu Mar 21 2019 Lukas Nykryn <lnykryn@redhat.com> - 219-62.6
 - Revert "bus: when dumping string property values escape the chars we use as end-of-line and end-of-item marks" (#1643172)
 
