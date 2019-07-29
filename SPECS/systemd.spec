@@ -7,7 +7,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        219
-Release:        62%{?dist}.7
+Release:        62%{?dist}.9
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        A System and Service Manager
@@ -713,6 +713,8 @@ Patch0671: 0671-Allocate-temporary-strings-to-hold-dbus-paths-on-the.patch
 Patch0672: 0672-sd-bus-if-we-receive-an-invalid-dbus-message-ignore-.patch
 Patch0673: 0673-Revert-bus-when-dumping-string-property-values-escap.patch
 Patch0674: 0674-rules-fix-memory-hotplug-rule-so-systemd-detect-virt.patch
+Patch0675: 0675-sd-bus-deal-with-cookie-overruns.patch
+Patch0676: 0676-core-Fix-edge-case-when-processing-proc-self-mountin.patch
 
 %global num_patches %{lua: c=0; for i,p in ipairs(patches) do c=c+1; end; print(c);}
 
@@ -1689,6 +1691,12 @@ fi
 %{_mandir}/man8/systemd-resolved.*
 
 %changelog
+* Mon Jun 24 2019 Michal Sekletár <msekleta@redhat.com> - 219-62.9
+- core: Fix edge case when processing /proc/self/mountinfo (#1722576)
+
+* Wed Jun 19 2019 Michal Sekletár <msekleta@redhat.com> - 219-62.8
+- sd-bus: deal with cookie overruns (#1720699)
+
 * Wed Apr 24 2019 Lukas Nykryn <lnykryn@redhat.com> - 219-62.7
 - rules: fix memory hotplug rule so systemd-detect-virt does not run too often (#1701230)
 
