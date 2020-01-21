@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        15%{?dist}
+Release:        21%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -250,6 +250,101 @@ Patch0197: 0197-test-add-test-for-Type-exec.patch
 Patch0198: 0198-journal-gateway-explicitly-declare-local-variables.patch
 Patch0199: 0199-tools-drop-unused-variable.patch
 Patch0200: 0200-journal-gateway-use-localStorage-cursor-only-when-it.patch
+Patch0201: 0201-sd-bus-deal-with-cookie-overruns.patch
+Patch0202: 0202-journal-remote-do-not-request-Content-Length-if-Tran.patch
+Patch0203: 0203-journal-do-not-remove-multiple-spaces-after-identifi.patch
+Patch0204: 0204-cryptsetup-Do-not-fallback-to-PLAIN-mapping-if-LUKS-.patch
+Patch0205: 0205-cryptsetup-call-crypt_load-for-LUKS-only-once.patch
+Patch0206: 0206-cryptsetup-Add-LUKS2-token-support.patch
+Patch0207: 0207-udev-scsi_id-fix-incorrect-page-length-when-get-devi.patch
+Patch0208: 0208-Change-job-mode-of-manager-triggered-restarts-to-JOB.patch
+Patch0209: 0209-bash-completion-analyze-support-security.patch
+Patch0210: 0210-man-note-that-journal-does-not-validate-syslog-field.patch
+Patch0211: 0211-rules-skip-memory-hotplug-on-ppc64.patch
+Patch0212: 0212-mount-simplify-proc-self-mountinfo-handler.patch
+Patch0213: 0213-mount-rescan-proc-self-mountinfo-before-processing-w.patch
+Patch0214: 0214-swap-scan-proc-swaps-before-processing-waitid-result.patch
+Patch0215: 0215-analyze-security-fix-potential-division-by-zero.patch
+Patch0216: 0216-core-never-propagate-reload-failure-to-service-resul.patch
+Patch0217: 0217-man-document-systemd-analyze-security.patch
+Patch0218: 0218-man-reorder-and-add-examples-to-systemd-analyze-1.patch
+Patch0219: 0219-travis-move-to-CentOS-8-docker-images.patch
+Patch0220: 0220-travis-drop-SCL-remains.patch
+Patch0221: 0221-syslog-fix-segfault-in-syslog_parse_priority.patch
+Patch0222: 0222-sd-bus-make-strict-asan-shut-up.patch
+Patch0223: 0223-travis-don-t-run-slow-tests-under-ASan-UBSan.patch
+Patch0224: 0224-kernel-install-do-not-require-non-empty-kernel-cmdli.patch
+Patch0225: 0225-ask-password-prevent-buffer-overrow-when-reading-fro.patch
+Patch0226: 0226-core-try-to-reopen-dev-kmsg-again-right-after-mounti.patch
+Patch0227: 0227-buildsys-don-t-garbage-collect-sections-while-linkin.patch
+Patch0228: 0228-udev-introduce-CONST-key-name.patch
+Patch0229: 0229-Call-getgroups-to-know-size-of-supplementary-groups-.patch
+Patch0230: 0230-Consider-smb3-as-remote-filesystem.patch
+Patch0231: 0231-process-util-introduce-pid_is_my_child-helper.patch
+Patch0232: 0232-core-reduce-the-number-of-stalled-PIDs-from-the-watc.patch
+Patch0233: 0233-core-only-watch-processes-when-it-s-really-necessary.patch
+Patch0234: 0234-core-implement-per-unit-journal-rate-limiting.patch
+Patch0235: 0235-path-stop-watching-path-specs-once-we-triggered-the-.patch
+Patch0236: 0236-journald-fixed-assertion-failure-when-system-journal.patch
+Patch0237: 0237-test-use-PBKDF2-instead-of-Argon2-in-cryptsetup.patch
+Patch0238: 0238-test-mask-several-unnecessary-services.patch
+Patch0239: 0239-test-bump-the-second-partition-s-size-to-50M.patch
+Patch0240: 0240-shared-sleep-config-exclude-zram-devices-from-hibern.patch
+Patch0241: 0241-selinux-don-t-log-SELINUX_INFO-and-SELINUX_WARNING-m.patch
+Patch0242: 0242-sd-device-introduce-log_device_-macros.patch
+Patch0243: 0243-udev-Add-id-program-and-rule-for-FIDO-security-token.patch
+Patch0244: 0244-shared-but-util-drop-trusted-annotation-from-bus_ope.patch
+Patch0245: 0245-sd-bus-adjust-indentation-of-comments.patch
+Patch0246: 0246-resolved-do-not-run-loop-twice.patch
+Patch0247: 0247-resolved-allow-access-to-Set-Link-and-Revert-methods.patch
+Patch0248: 0248-resolved-query-polkit-only-after-parsing-the-data.patch
+Patch0249: 0249-journal-rely-on-_cleanup_free_-to-free-a-temporary-s.patch
+Patch0250: 0250-basic-user-util-allow-dots-in-user-names.patch
+Patch0251: 0251-sd-bus-bump-message-queue-size-again.patch
+Patch0252: 0252-tests-put-fuzz_journald_processing_function-in-a-.c-.patch
+Patch0253: 0253-tests-add-a-fuzzer-for-dev_kmsg_record.patch
+Patch0254: 0254-basic-remove-an-assertion-from-cunescape_one.patch
+Patch0255: 0255-journal-fix-an-off-by-one-error-in-dev_kmsg_record.patch
+Patch0256: 0256-tests-add-a-reproducer-for-a-memory-leak-fixed-in-30.patch
+Patch0257: 0257-tests-add-a-reproducer-for-a-heap-buffer-overflow-fi.patch
+Patch0258: 0258-test-initialize-syslog_fd-in-fuzz-journald-kmsg-too.patch
+Patch0259: 0259-tests-add-a-fuzzer-for-process_audit_string.patch
+Patch0260: 0260-journald-check-whether-sscanf-has-changed-the-value-.patch
+Patch0261: 0261-tests-introduce-dummy_server_init-and-use-it-in-all-.patch
+Patch0262: 0262-tests-add-a-fuzzer-for-journald-streams.patch
+Patch0263: 0263-tests-add-a-fuzzer-for-server_process_native_file.patch
+Patch0264: 0264-fuzz-journal-stream-avoid-assertion-failure-on-sampl.patch
+Patch0265: 0265-journald-take-leading-spaces-into-account-in-syslog_.patch
+Patch0266: 0266-Add-a-warning-about-the-difference-in-permissions-be.patch
+Patch0267: 0267-execute-remove-one-redundant-comparison-check.patch
+Patch0268: 0268-core-change-ownership-mode-of-the-execution-director.patch
+Patch0269: 0269-core-dbus-execute-remove-unnecessary-initialization.patch
+Patch0270: 0270-shared-cpu-set-util-move-the-part-to-print-cpu-set-i.patch
+Patch0271: 0271-shared-cpu-set-util-remove-now-unused-CPU_SIZE_TO_NU.patch
+Patch0272: 0272-Rework-cpu-affinity-parsing.patch
+Patch0273: 0273-Move-cpus_in_affinity_mask-to-cpu-set-util.-ch.patch
+Patch0274: 0274-test-cpu-set-util-add-simple-test-for-cpus_in_affini.patch
+Patch0275: 0275-test-cpu-set-util-add-a-smoke-test-for-test_parse_cp.patch
+Patch0276: 0276-pid1-parse-CPUAffinity-in-incremental-fashion.patch
+Patch0277: 0277-pid1-don-t-reset-setting-from-proc-cmdline-upon-rest.patch
+Patch0278: 0278-pid1-when-reloading-configuration-forget-old-setting.patch
+Patch0279: 0279-test-execute-use-CPUSet-too.patch
+Patch0280: 0280-shared-cpu-set-util-drop-now-unused-cleanup-function.patch
+Patch0281: 0281-shared-cpu-set-util-make-transfer-of-cpu_set_t-over-.patch
+Patch0282: 0282-test-cpu-set-util-add-test-for-dbus-conversions.patch
+Patch0283: 0283-shared-cpu-set-util-introduce-cpu_set_to_range.patch
+Patch0284: 0284-systemctl-present-CPUAffinity-mask-as-a-list-of-CPU-.patch
+Patch0285: 0285-shared-cpu-set-util-only-force-range-printing-one-ti.patch
+Patch0286: 0286-execute-dump-CPUAffinity-as-a-range-string-instead-o.patch
+Patch0287: 0287-cpu-set-util-use-d-d-format-in-cpu_set_to_range_stri.patch
+Patch0288: 0288-core-introduce-NUMAPolicy-and-NUMAMask-options.patch
+Patch0289: 0289-core-disable-CPUAccounting-by-default.patch
+Patch0290: 0290-set-kptr_restrict-1.patch
+Patch0291: 0291-cryptsetup-reduce-the-chance-that-we-will-be-OOM-kil.patch
+Patch0292: 0292-core-job-fix-breakage-of-ordering-dependencies-by-sy.patch
+Patch0293: 0293-debug-generator-enable-custom-systemd.debug_shell-tt.patch
+Patch0294: 0294-test-cpu-set-util-fix-comparison-for-allocation-size.patch
+Patch0295: 0295-test-cpu-set-util-fix-allocation-size-check-on-i386.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -869,6 +964,120 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Mon Dec 09 2019 systemd maintenance team <systemd-maint@redhat.com> - 239-21
+- test-cpu-set-util: fix comparison for allocation size (#1734787)
+- test-cpu-set-util: fix allocation size check on i386 (#1734787)
+
+* Mon Dec 09 2019 systemd maintenance team <systemd-maint@redhat.com> - 239-20
+- journal: rely on _cleanup_free_ to free a temporary string used in client_context_read_cgroup (#1764560)
+- basic/user-util: allow dots in user names (#1717603)
+- sd-bus: bump message queue size again (#1770189)
+- tests: put fuzz_journald_processing_function in a .c file (#1764560)
+- tests: add a fuzzer for dev_kmsg_record (#1764560)
+- basic: remove an assertion from cunescape_one (#1764560)
+- journal: fix an off-by-one error in dev_kmsg_record (#1764560)
+- tests: add a reproducer for a memory leak fixed in 30eddcd51b8a472e05d3b8d1 in August (#1764560)
+- tests: add a reproducer for a heap-buffer-overflow fixed in 937b1171378bc1000a (#1764560)
+- test: initialize syslog_fd in fuzz-journald-kmsg too (#1764560)
+- tests: add a fuzzer for process_audit_string (#1764560)
+- journald: check whether sscanf has changed the value corresponding to %n (#1764560)
+- tests: introduce dummy_server_init and use it in all journald fuzzers (#1764560)
+- tests: add a fuzzer for journald streams (#1764560)
+- tests: add a fuzzer for server_process_native_file (#1764560)
+- fuzz-journal-stream: avoid assertion failure on samples which don't fit in pipe (#1764560)
+- journald: take leading spaces into account in syslog_parse_identifier (#1764560)
+- Add a warning about the difference in permissions between existing directories and unit settings. (#1778384)
+- execute: remove one redundant comparison check (#1778384)
+- core: change ownership/mode of the execution directories also for static users (#1778384)
+- core/dbus-execute: remove unnecessary initialization (#1734787)
+- shared/cpu-set-util: move the part to print cpu-set into a separate function (#1734787)
+- shared/cpu-set-util: remove now-unused CPU_SIZE_TO_NUM() (#1734787)
+- Rework cpu affinity parsing (#1734787)
+- Move cpus_in_affinity_mask() to cpu-set-util.[ch] (#1734787)
+- test-cpu-set-util: add simple test for cpus_in_affinity_mask() (#1734787)
+- test-cpu-set-util: add a smoke test for test_parse_cpu_set_extend() (#1734787)
+- pid1: parse CPUAffinity= in incremental fashion (#1734787)
+- pid1: don't reset setting from /proc/cmdline upon restart (#1734787)
+- pid1: when reloading configuration, forget old settings (#1734787)
+- test-execute: use CPUSet too (#1734787)
+- shared/cpu-set-util: drop now-unused cleanup function (#1734787)
+- shared/cpu-set-util: make transfer of cpu_set_t over bus endian safe (#1734787)
+- test-cpu-set-util: add test for dbus conversions (#1734787)
+- shared/cpu-set-util: introduce cpu_set_to_range() (#1734787)
+- systemctl: present CPUAffinity mask as a list of CPU index ranges (#1734787)
+- shared/cpu-set-util: only force range printing one time (#1734787)
+- execute: dump CPUAffinity as a range string instead of a list of CPUs (#1734787)
+- cpu-set-util: use %d-%d format in  cpu_set_to_range_string() only for actual ranges (#1734787)
+- core: introduce NUMAPolicy and NUMAMask options (#1734787)
+- core: disable CPUAccounting by default (#1734787)
+- set kptr_restrict=1 (#1689346)
+- cryptsetup: reduce the chance that we will be OOM killed (#1696602)
+- core, job: fix breakage of ordering dependencies by systemctl reload command (#1766417)
+- debug-generator: enable custom systemd.debug_shell tty (#1723722)
+
+* Thu Oct 24 2019 Lukas Nykryn <lnykryn@redhat.com> - 239-19
+- core: never propagate reload failure to service result (#1735787)
+- man: document systemd-analyze security (#1750343)
+- man: reorder and add examples to systemd-analyze(1) (#1750343)
+- travis: move to CentOS 8 docker images (#1761519)
+- travis: drop SCL remains (#1761519)
+- syslog: fix segfault in syslog_parse_priority() (#1761519)
+- sd-bus: make strict asan shut up (#1761519)
+- travis: don't run slow tests under ASan/UBSan (#1761519)
+- kernel-install: do not require non-empty kernel cmdline (#1701454)
+- ask-password: prevent buffer overrow when reading from keyring (#1752050)
+- core: try to reopen /dev/kmsg again right after mounting /dev (#1749212)
+- buildsys: don't garbage collect sections while linking (#1748258)
+- udev: introduce CONST key name (#1762679)
+- Call getgroups() to know size of supplementary groups array to allocate (#1743230256 KB
+#1743235)
+- Consider smb3 as remote filesystem (#1757257)
+- process-util: introduce pid_is_my_child() helper (#1744972)
+- core: reduce the number of stalled PIDs from the watched processes list when possible (#1744972)
+- core: only watch processes when it's really necessary (#1744972)
+- core: implement per unit journal rate limiting (#1719577)
+- path: stop watching path specs once we triggered the target unit (#1763161)
+- journald: fixed assertion failure when system journal rotation fails (#9893) (#1763619)
+- test: use PBKDF2 instead of Argon2 in cryptsetup... (#1761519)
+- test: mask several unnecessary services (#1761519)
+- test: bump the second partition's size to 50M (#1761519)
+- shared/sleep-config: exclude zram devices from hibernation candidates (#1763617)
+- selinux: don't log SELINUX_INFO and SELINUX_WARNING messages to audit (#1763612)
+- sd-device: introduce log_device_*() macros (#1753369)
+- udev: Add id program and rule for FIDO security tokens (#1753369)
+- shared/but-util: drop trusted annotation from bus_open_system_watch_bind_with_description() (#1746857)
+- sd-bus: adjust indentation of comments (#1746857)
+- resolved: do not run loop twice (#1746857)
+- resolved: allow access to Set*Link and Revert methods through polkit (#1746857)
+- resolved: query polkit only after parsing the data (#1746857)
+
+* Fri Aug 30 2019 Lukas Nykryn <lnykryn@redhat.com> - 239-18
+- shared/but-util: drop trusted annotation from bus_open_system_watch_bind_with_description() (#1746857)
+- sd-bus: adjust indentation of comments (#1746857)
+- resolved: do not run loop twice (#1746857)
+- resolved: allow access to Set*Link and Revert methods through polkit (#1746857)
+- resolved: query polkit only after parsing the data (#1746857)
+
+* Wed Aug 07 2019 Lukas Nykryn <lnykryn@redhat.com> - 239-17
+- mount: simplify /proc/self/mountinfo handler (#1696178)
+- mount: rescan /proc/self/mountinfo before processing waitid() results (#1696178)
+- swap: scan /proc/swaps before processing waitid() results (#1696178)
+- analyze-security: fix potential division by zero (#1734400)
+
+* Fri Jul 26 2019 Lukas Nykryn <lnykryn@redhat.com> - 239-16
+- sd-bus: deal with cookie overruns (#1694999)
+- journal-remote: do not request Content-Length if Transfer-Encoding is chunked (#1708849)
+- journal: do not remove multiple spaces after identifier in syslog message (#1691817)
+- cryptsetup: Do not fallback to PLAIN mapping if LUKS data device set fails. (#1719153)
+- cryptsetup: call crypt_load() for LUKS only once (#1719153)
+- cryptsetup: Add LUKS2 token support. (#1719153)
+- udev/scsi_id: fix incorrect page length when get device identification VPD page (#1713227)
+- Change job mode of manager triggered restarts to JOB_REPLACE (#11456
+#1712524)
+- bash-completion: analyze: support 'security' (#1733395)
+- man: note that journal does not validate syslog fields (#1707175)
+- rules: skip memory hotplug on ppc64 (#1713159)
+
 * Thu May 23 2019 Lukas Nykryn <lnykryn@redhat.com> - 239-15
 - tree-wide: shorten error logging a bit (#1697893)
 - nspawn: simplify machine terminate bus call (#1697893)
