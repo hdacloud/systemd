@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        18%{?dist}.1
+Release:        18%{?dist}.2
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -271,6 +271,7 @@ Patch0218: 0218-sd-bus-adjust-indentation-of-comments.patch
 Patch0219: 0219-resolved-do-not-run-loop-twice.patch
 Patch0220: 0220-resolved-allow-access-to-Set-Link-and-Revert-methods.patch
 Patch0221: 0221-resolved-query-polkit-only-after-parsing-the-data.patch
+Patch0222: 0222-ask-password-prevent-buffer-overrow-when-reading-fro.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -890,6 +891,9 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Fri Nov 29 2019 systemd maintenance team <systemd-maint@redhat.com> - 239-18.2
+- ask-password: prevent buffer overrow when reading from keyring (#1777037)
+
 * Tue Nov 05 2019 Lukas Nykryn <lnykryn@redhat.com> - 239-18.1
 - journal: rely on _cleanup_free_ to free a temporary string used in client_context_read_cgroup (#1767716)
 
