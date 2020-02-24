@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        18%{?dist}.2
+Release:        18%{?dist}.4
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -272,6 +272,23 @@ Patch0219: 0219-resolved-do-not-run-loop-twice.patch
 Patch0220: 0220-resolved-allow-access-to-Set-Link-and-Revert-methods.patch
 Patch0221: 0221-resolved-query-polkit-only-after-parsing-the-data.patch
 Patch0222: 0222-ask-password-prevent-buffer-overrow-when-reading-fro.patch
+Patch0223: 0223-core-job-fix-breakage-of-ordering-dependencies-by-sy.patch
+Patch0224: 0224-syslog-fix-segfault-in-syslog_parse_priority.patch
+Patch0225: 0225-journald-fixed-assertion-failure-when-system-journal.patch
+Patch0226: 0226-test-use-PBKDF2-instead-of-Argon2-in-cryptsetup.patch
+Patch0227: 0227-test-mask-several-unnecessary-services.patch
+Patch0228: 0228-test-bump-the-second-partition-s-size-to-50M.patch
+Patch0229: 0229-sd-bus-make-rqueue-wqueue-sizes-of-type-size_t.patch
+Patch0230: 0230-sd-bus-reorder-bus-ref-and-bus-message-ref-handling.patch
+Patch0231: 0231-sd-bus-make-sure-dispatch_rqueue-initializes-return-.patch
+Patch0232: 0232-sd-bus-drop-two-inappropriate-empty-lines.patch
+Patch0233: 0233-sd-bus-initialize-mutex-after-we-allocated-the-wqueu.patch
+Patch0234: 0234-sd-bus-always-go-through-sd_bus_unref-to-free-messag.patch
+Patch0235: 0235-bus-message-introduce-two-kinds-of-references-to-bus.patch
+Patch0236: 0236-sd-bus-introduce-API-for-re-enqueuing-incoming-messa.patch
+Patch0237: 0237-sd-event-add-sd_event_source_disable_unref-helper.patch
+Patch0238: 0238-polkit-when-authorizing-via-PK-let-s-re-resolve-call.patch
+Patch0239: 0239-sd-bus-use-queue-message-references-for-managing-r-w.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -891,6 +908,27 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Thu Feb 13 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-18.4
+- sd-bus: use "queue" message references for managing r/w message queues in connection objects (CVE-2020-1712)
+
+* Mon Feb 03 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-18.3
+- core, job: fix breakage of ordering dependencies by systemctl reload command (#1781712)
+- syslog: fix segfault in syslog_parse_priority() (#1781712)
+- journald: fixed assertion failure when system journal rotation fails (#9893) (#1781712)
+- test: use PBKDF2 instead of Argon2 in cryptsetup... (#1781712)
+- test: mask several unnecessary services (#1781712)
+- test: bump the second partition's size to 50M (#1781712)
+- sd-bus: make rqueue/wqueue sizes of type size_t (#20201712)
+- sd-bus: reorder bus ref and bus message ref handling (#20201712)
+- sd-bus: make sure dispatch_rqueue() initializes return parameter on all types of success (#20201712)
+- sd-bus: drop two inappropriate empty lines (#20201712)
+- sd-bus: initialize mutex after we allocated the wqueue (#20201712)
+- sd-bus: always go through sd_bus_unref() to free messages (#20201712)
+- bus-message: introduce two kinds of references to bus messages (#20201712)
+- sd-bus: introduce API for re-enqueuing incoming messages (#20201712)
+- sd-event: add sd_event_source_disable_unref() helper (#20201712)
+- polkit: when authorizing via PK let's re-resolve callback/userdata instead of caching it (#20201712)
+
 * Fri Nov 29 2019 systemd maintenance team <systemd-maint@redhat.com> - 239-18.2
 - ask-password: prevent buffer overrow when reading from keyring (#1777037)
 
