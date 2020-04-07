@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        18%{?dist}.4
+Release:        18%{?dist}.5
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -289,6 +289,8 @@ Patch0236: 0236-sd-bus-introduce-API-for-re-enqueuing-incoming-messa.patch
 Patch0237: 0237-sd-event-add-sd_event_source_disable_unref-helper.patch
 Patch0238: 0238-polkit-when-authorizing-via-PK-let-s-re-resolve-call.patch
 Patch0239: 0239-sd-bus-use-queue-message-references-for-managing-r-w.patch
+Patch0240: 0240-journal-do-not-trigger-assertion-when-journal_file_c.patch
+Patch0241: 0241-journal-use-cleanup-attribute-at-one-more-place.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -908,6 +910,10 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Thu Feb 27 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-18.5
+- journal: do not trigger assertion when journal_file_close() get NULL (#1807350)
+- journal: use cleanup attribute at one more place (#1807350)
+
 * Thu Feb 13 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-18.4
 - sd-bus: use "queue" message references for managing r/w message queues in connection objects (CVE-2020-1712)
 
