@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        29%{?dist}
+Release:        30%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -392,6 +392,9 @@ Patch0339: 0339-test-add-a-simple-sanity-check-for-systems-without-N.patch
 Patch0340: 0340-test-drop-the-missed-exit-1-expression.patch
 Patch0341: 0341-test-replace-cursor-file-with-a-plain-cursor.patch
 Patch0342: 0342-cryptsetup-Treat-key-file-errors-as-a-failed-passwor.patch
+Patch0343: 0343-pid1-fix-the-names-of-AllowedCPUs-and-AllowedMemoryN.patch
+Patch0344: 0344-core-fix-re-realization-of-cgroup-siblings.patch
+Patch0345: 0345-basic-use-comma-as-separator-in-cpuset-cgroup-cpu-ra.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -1016,6 +1019,11 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Wed Apr 15 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-30
+- pid1: fix the names of AllowedCPUs= and AllowedMemoryNodes= (#1824129)
+- core: fix re-realization of cgroup siblings (#1824129)
+- basic: use comma as separator in cpuset cgroup cpu ranges (#1824129)
+
 * Mon Mar 23 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-29
 - cryptsetup: Treat key file errors as a failed password attempt (#1763155)
 
