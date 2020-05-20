@@ -1,0 +1,26 @@
+From 8606f4b13ba677efad8bb6aae2d61c98e23a75f2 Mon Sep 17 00:00:00 2001
+From: Frantisek Sumsal <fsumsal@redhat.com>
+Date: Wed, 27 Feb 2019 18:53:19 +0100
+Subject: [PATCH] import: drop unnecessary condition
+
+Relevant commit: d61b34f1b22d1d7a641a1652ff23113d3e87ace7
+
+Resolves: #1694605
+---
+ src/import/import-common.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/src/import/import-common.c b/src/import/import-common.c
+index 243e657c56..713a218c67 100644
+--- a/src/import/import-common.c
++++ b/src/import/import-common.c
+@@ -455,8 +455,7 @@ int import_verify(
+         }
+ 
+ finish:
+-        if (sig_file >= 0)
+-                unlink(sig_file_path);
++        (void) unlink(sig_file_path);
+ 
+         if (gpg_home_created)
+                 rm_rf_dangerous(gpg_home, false, true, false);

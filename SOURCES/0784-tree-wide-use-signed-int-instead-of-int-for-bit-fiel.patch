@@ -1,0 +1,28 @@
+From 16c52e0a0efcdddc7809eca7fa6543f47e91ec9b Mon Sep 17 00:00:00 2001
+From: Frantisek Sumsal <fsumsal@redhat.com>
+Date: Wed, 27 Feb 2019 19:45:59 +0100
+Subject: [PATCH] tree-wide: use 'signed int' instead of 'int' for bit field
+ variables
+
+Suggested by LGTM: https://lgtm.com/rules/1506024027114/
+
+(cherry picked from commit 845d247a3dbca437fd8a118a118328acb322e2c1)
+
+Resolves: #1694605
+---
+ src/libsystemd/sd-event/sd-event.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/libsystemd/sd-event/sd-event.c b/src/libsystemd/sd-event/sd-event.c
+index 9d48e5a490..1cd2dfac84 100644
+--- a/src/libsystemd/sd-event/sd-event.c
++++ b/src/libsystemd/sd-event/sd-event.c
+@@ -68,7 +68,7 @@ struct sd_event_source {
+         char *description;
+ 
+         EventSourceType type:5;
+-        int enabled:3;
++        signed int enabled:3;
+         bool pending:1;
+         bool dispatching:1;
+         bool floating:1;

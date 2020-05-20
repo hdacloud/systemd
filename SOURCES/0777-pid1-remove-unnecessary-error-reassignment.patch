@@ -1,0 +1,30 @@
+From f1851da2600d24191d90cfa2474574821c240969 Mon Sep 17 00:00:00 2001
+From: Frantisek Sumsal <fsumsal@redhat.com>
+Date: Wed, 27 Feb 2019 18:11:44 +0100
+Subject: [PATCH] pid1: remove unnecessary error reassignment
+
+r is always >= 0 so let's drop the unnecessary condition
+to make LGTM happy
+
+Based on commit 7c3733d5defb5428ddfeefae6d80fcbcc253e7ef
+
+Resolves: #1694605
+---
+ src/core/manager.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/src/core/manager.c b/src/core/manager.c
+index afa4d2b8fa..88d156e8fb 100644
+--- a/src/core/manager.c
++++ b/src/core/manager.c
+@@ -2805,9 +2805,7 @@ int manager_reload(Manager *m) {
+         lookup_paths_free(&m->lookup_paths);
+ 
+         /* Find new unit paths */
+-        q = manager_run_generators(m);
+-        if (q < 0 && r >= 0)
+-                r = q;
++        r = manager_run_generators(m);
+ 
+         q = lookup_paths_init(
+                         &m->lookup_paths, m->running_as, true,

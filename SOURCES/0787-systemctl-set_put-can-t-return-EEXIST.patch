@@ -1,0 +1,30 @@
+From 732efbce6725db08a527e14d34f4e10e51fae965 Mon Sep 17 00:00:00 2001
+From: Frantisek Sumsal <fsumsal@redhat.com>
+Date: Thu, 28 Feb 2019 11:35:53 +0100
+Subject: [PATCH] systemctl: set_put() can't return (-)EEXIST
+
+set_put() returns 0 if the key already exists, 1 if the entry
+was inserted successfully, and -ENOMEM otherwise.
+
+See: set_put(), hashmap_base_put_boldly()
+
+Found by LGTM.
+
+Resolves: #1694605
+---
+ src/systemctl/systemctl.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/systemctl/systemctl.c b/src/systemctl/systemctl.c
+index 398727cc7d..83c418f0b7 100644
+--- a/src/systemctl/systemctl.c
++++ b/src/systemctl/systemctl.c
+@@ -4310,7 +4310,7 @@ static int show_one(
+                                 return log_oom();
+ 
+                         r = set_put(found_properties, name);
+-                        if (r < 0 && r != EEXIST)
++                        if (r < 0)
+                                 return log_oom();
+ 
+                         r = print_property(name, reply, contents);

@@ -1,0 +1,343 @@
+From c7c8a7648623a25c00dc585bd42b9037a20396c8 Mon Sep 17 00:00:00 2001
+From: Lennart Poettering <lennart@poettering.net>
+Date: Thu, 9 Aug 2018 16:26:27 +0200
+Subject: [PATCH] core: rework StopWhenUnneeded= logic
+
+Previously, we'd act immediately on StopWhenUnneeded= when a unit state
+changes. With this rework we'll maintain a queue instead: whenever
+there's the chance that StopWhenUneeded= might have an effect we enqueue
+the unit, and process it later when we have nothing better to do.
+
+This should make the implementation a bit more reliable, as the unit notify event
+cannot immediately enqueue tons of side-effect jobs that might
+contradict each other, but we do so only in a strictly ordered fashion,
+from the main event loop.
+
+This slightly changes the check when to consider a unit "unneeded".
+Previously, we'd assume that a unit in "deactivating" state could also
+be cleaned up. With this new logic we'll only consider units unneeded
+that are fully up and have no job queued. This means that whenever
+there's something pending for a unit we won't clean it up.
+
+(cherry picked from commit a3c1168ac293f16d9343d248795bb4c246aaff4a)
+(cherry picked from commit 65ebf5e453846e29ab5894670a83b5d8b942c858)
+
+Resolves: #1810576
+---
+ src/core/manager.c |  43 +++++++++++++++
+ src/core/manager.h |   3 ++
+ src/core/unit.c    | 132 ++++++++++++++++++++++++---------------------
+ src/core/unit.h    |   7 +++
+ 4 files changed, 124 insertions(+), 61 deletions(-)
+
+diff --git a/src/core/manager.c b/src/core/manager.c
+index 4c87ad8a2f..f0553b4df9 100644
+--- a/src/core/manager.c
++++ b/src/core/manager.c
+@@ -961,6 +961,45 @@ static unsigned manager_dispatch_gc_queue(Manager *m) {
+         return n;
+ }
+ 
++static unsigned manager_dispatch_stop_when_unneeded_queue(Manager *m) {
++        unsigned n = 0;
++        Unit *u;
++        int r;
++
++        assert(m);
++
++        while ((u = m->stop_when_unneeded_queue)) {
++                _cleanup_(sd_bus_error_free) sd_bus_error error = SD_BUS_ERROR_NULL;
++                assert(m->stop_when_unneeded_queue);
++
++                assert(u->in_stop_when_unneeded_queue);
++                LIST_REMOVE(stop_when_unneeded_queue, m->stop_when_unneeded_queue, u);
++                u->in_stop_when_unneeded_queue = false;
++
++                n++;
++
++                if (!unit_is_unneeded(u))
++                        continue;
++
++                log_unit_debug(u->id, "Unit is not needed anymore.");
++
++                /* If stopping a unit fails continuously we might enter a stop loop here, hence stop acting on the
++                 * service being unnecessary after a while. */
++
++                if (!ratelimit_test(&u->check_unneeded_ratelimit)) {
++                        log_unit_warning(u->id, "Unit not needed anymore, but not stopping since we tried this too often recently.");
++                        continue;
++                }
++
++                /* Ok, nobody needs us anymore. Sniff. Then let's commit suicide */
++                r = manager_add_job(u->manager, JOB_STOP, u, JOB_FAIL, true, &error, NULL);
++                if (r < 0)
++                        log_unit_warning_errno(u->id, r, "Failed to enqueue stop job, ignoring: %s", bus_error_message(&error, r));
++        }
++
++        return n;
++}
++
+ static void manager_clear_jobs_and_units(Manager *m) {
+         Unit *u;
+ 
+@@ -977,6 +1016,7 @@ static void manager_clear_jobs_and_units(Manager *m) {
+         assert(!m->dbus_job_queue);
+         assert(!m->cleanup_queue);
+         assert(!m->gc_queue);
++        assert(!m->stop_when_unneeded_queue);
+ 
+         assert(hashmap_isempty(m->jobs));
+         assert(hashmap_isempty(m->units));
+@@ -2259,6 +2299,9 @@ int manager_loop(Manager *m) {
+                 if (manager_dispatch_cgroup_queue(m) > 0)
+                         continue;
+ 
++                if (manager_dispatch_stop_when_unneeded_queue(m) > 0)
++                        continue;
++
+                 if (manager_dispatch_dbus_queue(m) > 0)
+                         continue;
+ 
+diff --git a/src/core/manager.h b/src/core/manager.h
+index cfc564dfb6..f9280956e9 100644
+--- a/src/core/manager.h
++++ b/src/core/manager.h
+@@ -117,6 +117,9 @@ struct Manager {
+         /* Target units whose default target dependencies haven't been set yet */
+         LIST_HEAD(Unit, target_deps_queue);
+ 
++        /* Units that might be subject to StopWhenUnneeded= clean-up */
++        LIST_HEAD(Unit, stop_when_unneeded_queue);
++
+         sd_event *event;
+ 
+         /* We use two hash tables here, since the same PID might be
+diff --git a/src/core/unit.c b/src/core/unit.c
+index 583b9fae28..dc2df4c89c 100644
+--- a/src/core/unit.c
++++ b/src/core/unit.c
+@@ -380,6 +380,22 @@ void unit_add_to_dbus_queue(Unit *u) {
+         u->in_dbus_queue = true;
+ }
+ 
++void unit_add_to_stop_when_unneeded_queue(Unit *u) {
++        assert(u);
++
++        if (u->in_stop_when_unneeded_queue)
++                return;
++
++        if (!u->stop_when_unneeded)
++                return;
++
++        if (!UNIT_IS_ACTIVE_OR_RELOADING(unit_active_state(u)))
++                return;
++
++        LIST_PREPEND(stop_when_unneeded_queue, u->manager->stop_when_unneeded_queue, u);
++        u->in_stop_when_unneeded_queue = true;
++}
++
+ static void bidi_set_free(Unit *u, Set *s) {
+         Iterator i;
+         Unit *other;
+@@ -544,6 +560,9 @@ void unit_free(Unit *u) {
+                 u->manager->n_in_gc_queue--;
+         }
+ 
++        if (u->in_stop_when_unneeded_queue)
++                LIST_REMOVE(stop_when_unneeded_queue, u->manager->stop_when_unneeded_queue, u);
++
+         if (u->on_console)
+                 manager_unref_console(u->manager);
+ 
+@@ -1565,49 +1584,68 @@ bool unit_can_reload(Unit *u) {
+         return UNIT_VTABLE(u)->can_reload(u);
+ }
+ 
+-static void unit_check_unneeded(Unit *u) {
+-        Iterator i;
+-        Unit *other;
++bool unit_is_unneeded(Unit *u) {
++        static const UnitDependency deps[] = {
++                UNIT_REQUIRED_BY,
++                UNIT_REQUIRED_BY_OVERRIDABLE,
++                UNIT_WANTED_BY,
++                UNIT_BOUND_BY,
++        };
++        size_t j;
+ 
+         assert(u);
+ 
+-        /* If this service shall be shut down when unneeded then do
+-         * so. */
+-
+         if (!u->stop_when_unneeded)
+-                return;
++                return false;
+ 
+-        if (!UNIT_IS_ACTIVE_OR_ACTIVATING(unit_active_state(u)))
+-                return;
++        /* Don't clean up while the unit is transitioning or is even inactive. */
++        if (!UNIT_IS_ACTIVE_OR_RELOADING(unit_active_state(u)))
++                return false;
++        if (u->job)
++                return false;
+ 
+-        SET_FOREACH(other, u->dependencies[UNIT_REQUIRED_BY], i)
+-                if (unit_active_or_pending(other))
+-                        return;
++        for (j = 0; j < ELEMENTSOF(deps); j++) {
++                Unit *other;
++                Iterator i;
+ 
+-        SET_FOREACH(other, u->dependencies[UNIT_REQUIRED_BY_OVERRIDABLE], i)
+-                if (unit_active_or_pending(other))
+-                        return;
++                /* If a dependending unit has a job queued, or is active (or in transitioning), or is marked for
++                 * restart, then don't clean this one up. */
+ 
+-        SET_FOREACH(other, u->dependencies[UNIT_WANTED_BY], i)
+-                if (unit_active_or_pending(other))
+-                        return;
++                SET_FOREACH(other, u->dependencies[deps[j]], i) {
++                        if (u->job)
++                                return false;
+ 
+-        SET_FOREACH(other, u->dependencies[UNIT_BOUND_BY], i)
+-                if (unit_active_or_pending(other))
+-                        return;
+-
+-        /* If stopping a unit fails continously we might enter a stop
+-         * loop here, hence stop acting on the service being
+-         * unnecessary after a while. */
+-        if (!ratelimit_test(&u->check_unneeded_ratelimit)) {
+-                log_unit_warning(u->id, "Unit not needed anymore, but not stopping since we tried this too often recently.");
+-                return;
++                        if (!UNIT_IS_INACTIVE_OR_FAILED(unit_active_state(other)))
++                                return false;
++                }
+         }
+ 
+-        log_unit_info(u->id, "Unit %s is not needed anymore. Stopping.", u->id);
++        return true;
++}
+ 
+-        /* Ok, nobody needs us anymore. Sniff. Then let's commit suicide */
+-        manager_add_job(u->manager, JOB_STOP, u, JOB_FAIL, true, NULL, NULL);
++static void check_unneeded_dependencies(Unit *u) {
++
++        static const UnitDependency deps[] = {
++                UNIT_REQUIRES,
++                UNIT_REQUIRES_OVERRIDABLE,
++                UNIT_REQUISITE,
++                UNIT_REQUISITE_OVERRIDABLE,
++                UNIT_WANTS,
++                UNIT_BINDS_TO,
++        };
++        size_t j;
++
++        assert(u);
++
++        /* Add all units this unit depends on to the queue that processes StopWhenUnneeded= behaviour. */
++
++        for (j = 0; j < ELEMENTSOF(deps); j++) {
++                Unit *other;
++                Iterator i;
++
++                SET_FOREACH(other, u->dependencies[deps[j]], i)
++                        unit_add_to_stop_when_unneeded_queue(other);
++        }
+ }
+ 
+ static void unit_check_binds_to(Unit *u) {
+@@ -1693,34 +1731,6 @@ static void retroactively_stop_dependencies(Unit *u) {
+                         manager_add_job(u->manager, JOB_STOP, other, JOB_REPLACE, true, NULL, NULL);
+ }
+ 
+-static void check_unneeded_dependencies(Unit *u) {
+-        Iterator i;
+-        Unit *other;
+-
+-        assert(u);
+-        assert(UNIT_IS_INACTIVE_OR_DEACTIVATING(unit_active_state(u)));
+-
+-        /* Garbage collect services that might not be needed anymore, if enabled */
+-        SET_FOREACH(other, u->dependencies[UNIT_REQUIRES], i)
+-                if (!UNIT_IS_INACTIVE_OR_DEACTIVATING(unit_active_state(other)))
+-                        unit_check_unneeded(other);
+-        SET_FOREACH(other, u->dependencies[UNIT_REQUIRES_OVERRIDABLE], i)
+-                if (!UNIT_IS_INACTIVE_OR_DEACTIVATING(unit_active_state(other)))
+-                        unit_check_unneeded(other);
+-        SET_FOREACH(other, u->dependencies[UNIT_WANTS], i)
+-                if (!UNIT_IS_INACTIVE_OR_DEACTIVATING(unit_active_state(other)))
+-                        unit_check_unneeded(other);
+-        SET_FOREACH(other, u->dependencies[UNIT_REQUISITE], i)
+-                if (!UNIT_IS_INACTIVE_OR_DEACTIVATING(unit_active_state(other)))
+-                        unit_check_unneeded(other);
+-        SET_FOREACH(other, u->dependencies[UNIT_REQUISITE_OVERRIDABLE], i)
+-                if (!UNIT_IS_INACTIVE_OR_DEACTIVATING(unit_active_state(other)))
+-                        unit_check_unneeded(other);
+-        SET_FOREACH(other, u->dependencies[UNIT_BINDS_TO], i)
+-                if (!UNIT_IS_INACTIVE_OR_DEACTIVATING(unit_active_state(other)))
+-                        unit_check_unneeded(other);
+-}
+-
+ void unit_start_on_failure(Unit *u) {
+         Unit *other;
+         Iterator i;
+@@ -1898,7 +1908,7 @@ void unit_notify(Unit *u, UnitActiveState os, UnitActiveState ns, bool reload_su
+                 }
+ 
+                 /* stop unneeded units regardless if going down was expected or not */
+-                if (UNIT_IS_INACTIVE_OR_DEACTIVATING(ns))
++                if (UNIT_IS_INACTIVE_OR_FAILED(ns))
+                         check_unneeded_dependencies(u);
+ 
+                 if (ns != os && ns == UNIT_FAILED) {
+@@ -1959,7 +1969,7 @@ void unit_notify(Unit *u, UnitActiveState os, UnitActiveState ns, bool reload_su
+         if (u->manager->n_reloading <= 0) {
+                 /* Maybe we finished startup and are now ready for
+                  * being stopped because unneeded? */
+-                unit_check_unneeded(u);
++                unit_add_to_stop_when_unneeded_queue(u);
+ 
+                 /* Maybe we finished startup, but something we needed
+                  * has vanished? Let's die then. (This happens when
+diff --git a/src/core/unit.h b/src/core/unit.h
+index 29353ea81c..38c97397ee 100644
+--- a/src/core/unit.h
++++ b/src/core/unit.h
+@@ -165,6 +165,9 @@ struct Unit {
+         /* Target dependencies queue */
+         LIST_FIELDS(Unit, target_deps_queue);
+ 
++        /* Queue of units with StopWhenUnneeded set that shell be checked for clean-up. */
++        LIST_FIELDS(Unit, stop_when_unneeded_queue);
++
+         /* PIDs we keep an eye on. Note that a unit might have many
+          * more, but these are the ones we care enough about to
+          * process SIGCHLD for */
+@@ -235,6 +238,7 @@ struct Unit {
+         bool in_gc_queue:1;
+         bool in_cgroup_queue:1;
+         bool in_target_deps_queue:1;
++        bool in_stop_when_unneeded_queue:1;
+ 
+         bool sent_dbus_new_signal:1;
+ 
+@@ -508,6 +512,7 @@ void unit_add_to_dbus_queue(Unit *u);
+ void unit_add_to_cleanup_queue(Unit *u);
+ void unit_add_to_gc_queue(Unit *u);
+ void unit_add_to_target_deps_queue(Unit *u);
++void unit_add_to_stop_when_unneeded_queue(Unit *u);
+ 
+ int unit_merge(Unit *u, Unit *other);
+ int unit_merge_by_name(Unit *u, const char *other);
+@@ -627,6 +632,8 @@ int unit_make_transient(Unit *u);
+ 
+ int unit_require_mounts_for(Unit *u, const char *path);
+ 
++bool unit_is_unneeded(Unit *u);
++
+ pid_t unit_control_pid(Unit *u);
+ pid_t unit_main_pid(Unit *u);
+ 

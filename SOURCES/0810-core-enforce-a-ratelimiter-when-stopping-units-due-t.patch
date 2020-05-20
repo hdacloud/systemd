@@ -1,0 +1,60 @@
+From f57ee0c7862260f3c7054b224f360cdef5140685 Mon Sep 17 00:00:00 2001
+From: Lennart Poettering <lennart@poettering.net>
+Date: Tue, 19 May 2015 16:00:24 +0200
+Subject: [PATCH] core: enforce a ratelimiter when stopping units due to
+ StopWhenUnneeded=1
+
+Otherwise we might end up in an endless stop loop.
+
+http://lists.freedesktop.org/archives/systemd-devel/2015-April/030224.html
+(cherry picked from commit bea355dac94e82697aa98e25d80ee4248263bf92)
+(cherry picked from commit 6c72a575c7c61e17c8e96b23042f7b4a5ac39339)
+
+Related: #1810576
+---
+ src/core/unit.c | 10 ++++++++++
+ src/core/unit.h |  3 +++
+ 2 files changed, 13 insertions(+)
+
+diff --git a/src/core/unit.c b/src/core/unit.c
+index eff9fdbe70..583b9fae28 100644
+--- a/src/core/unit.c
++++ b/src/core/unit.c
+@@ -97,6 +97,8 @@ Unit *unit_new(Manager *m, size_t size) {
+         u->on_failure_job_mode = JOB_REPLACE;
+         u->sigchldgen = 0;
+ 
++        RATELIMIT_INIT(u->check_unneeded_ratelimit, 10 * USEC_PER_SEC, 16);
++
+         return u;
+ }
+ 
+@@ -1594,6 +1596,14 @@ static void unit_check_unneeded(Unit *u) {
+                 if (unit_active_or_pending(other))
+                         return;
+ 
++        /* If stopping a unit fails continously we might enter a stop
++         * loop here, hence stop acting on the service being
++         * unnecessary after a while. */
++        if (!ratelimit_test(&u->check_unneeded_ratelimit)) {
++                log_unit_warning(u->id, "Unit not needed anymore, but not stopping since we tried this too often recently.");
++                return;
++        }
++
+         log_unit_info(u->id, "Unit %s is not needed anymore. Stopping.", u->id);
+ 
+         /* Ok, nobody needs us anymore. Sniff. Then let's commit suicide */
+diff --git a/src/core/unit.h b/src/core/unit.h
+index 3b0fd8d9df..29353ea81c 100644
+--- a/src/core/unit.h
++++ b/src/core/unit.h
+@@ -185,6 +185,9 @@ struct Unit {
+         /* Error code when we didn't manage to load the unit (negative) */
+         int load_error;
+ 
++        /* Make sure we never enter endless loops with the check unneeded logic */
++        RateLimit check_unneeded_ratelimit;
++
+         /* Cached unit file state and preset */
+         UnitFileState unit_file_state;
+         int unit_file_preset;

@@ -1,0 +1,37 @@
+From 83c66e1d0c1bc6e7522719250e77fad40a147870 Mon Sep 17 00:00:00 2001
+From: Lennart Poettering <lennart@poettering.net>
+Date: Tue, 9 Oct 2018 15:56:27 +0200
+Subject: [PATCH] core: tiny tweak for cgroup trimming during manager_free()
+
+Instead of blacklisting when not to trim the cgroup tree, let's instead
+whitelist when to do it, as an excercise of being careful when being
+destructive.
+
+This should not change behaviour with exception that during switch roots
+we now won't attempt to trim the cgroup tree anymore. Which is more
+correct behaviour after all we serialize/deserialize during the
+transition and should be needlessly destructive.
+
+(cherry picked from commit 86036b26a1da4d90ca274d37e77c56980ab689fd)
+
+Resolves: #1630378
+---
+ src/core/manager.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/src/core/manager.c b/src/core/manager.c
+index fdbb3c0fd9..afa4d2b8fa 100644
+--- a/src/core/manager.c
++++ b/src/core/manager.c
+@@ -998,9 +998,8 @@ Manager* manager_free(Manager *m) {
+                 if (unit_vtable[c]->shutdown)
+                         unit_vtable[c]->shutdown(m);
+ 
+-        /* If we reexecute ourselves, we keep the root cgroup
+-         * around */
+-        manager_shutdown_cgroup(m, m->exit_code != MANAGER_REEXECUTE);
++        /* Keep the cgroup hierarchy in place except when we know we are going down for good */
++        manager_shutdown_cgroup(m, IN_SET(m->exit_code, MANAGER_EXIT, MANAGER_REBOOT, MANAGER_POWEROFF, MANAGER_HALT, MANAGER_KEXEC));
+ 
+         manager_undo_generators(m);
+ 

@@ -1,0 +1,50 @@
+From d8c33d7a4e0d9b4375159776913f5c3fd2905c21 Mon Sep 17 00:00:00 2001
+From: Jan Synacek <jsynacek@redhat.com>
+Date: Tue, 7 Jan 2020 11:22:26 +0100
+Subject: [PATCH] journal: do not trigger assertion when journal_file_close()
+ get NULL
+
+We generally expect destructors to not complain if a NULL argument is passed.
+
+Closes #12400.
+
+(cherry picked from commit c377a6f3ad3d9bed4ce7e873e8e9ec6b1650c57d)
+(cherry picked from commit 248925c68092bab7ce0231449176db153f55d818)
+Resolves: #1807798
+---
+ src/journal/journal-file.c    | 3 ++-
+ src/journal/journald-server.c | 7 ++-----
+ 2 files changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/src/journal/journal-file.c b/src/journal/journal-file.c
+index 586f620e21..cf8dad3fcd 100644
+--- a/src/journal/journal-file.c
++++ b/src/journal/journal-file.c
+@@ -129,7 +129,8 @@ int journal_file_set_offline(JournalFile *f) {
+ }
+ 
+ void journal_file_close(JournalFile *f) {
+-        assert(f);
++        if (!f)
++                return;
+ 
+ #ifdef HAVE_GCRYPT
+         /* Write the final tag */
+diff --git a/src/journal/journald-server.c b/src/journal/journald-server.c
+index aaabb2f7ab..ffe2daa7be 100644
+--- a/src/journal/journald-server.c
++++ b/src/journal/journald-server.c
+@@ -1933,11 +1933,8 @@ void server_done(Server *s) {
+         while (s->stdout_streams)
+                 stdout_stream_free(s->stdout_streams);
+ 
+-        if (s->system_journal)
+-                journal_file_close(s->system_journal);
+-
+-        if (s->runtime_journal)
+-                journal_file_close(s->runtime_journal);
++        (void) journal_file_close(s->system_journal);
++        (void) journal_file_close(s->runtime_journal);
+ 
+         while ((f = ordered_hashmap_steal_first(s->user_journals)))
+                 journal_file_close(f);

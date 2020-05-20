@@ -1,0 +1,44 @@
+From 0d0ba7ee44d652c23e6027fe3b1c1ee8e2f65a25 Mon Sep 17 00:00:00 2001
+From: systemd team <systemd-maint@redhat.com>
+Date: Mon, 19 Aug 2019 13:51:48 +0200
+Subject: [PATCH] Call getgroups() to know size of supplementary groups array
+ to allocate
+
+Resolves RHBZ #1743230 - journalctl dumps core when stack limit is reduced to 256 KB
+---
+ src/shared/util.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/src/shared/util.c b/src/shared/util.c
+index 127a64c3c6..ce6678eb38 100644
+--- a/src/shared/util.c
++++ b/src/shared/util.c
+@@ -5097,7 +5097,7 @@ int get_group_creds(const char **groupname, gid_t *gid) {
+ 
+ int in_gid(gid_t gid) {
+         gid_t *gids;
+-        int ngroups_max, r, i;
++        int ngroups, r, i;
+ 
+         if (getgid() == gid)
+                 return 1;
+@@ -5105,12 +5105,15 @@ int in_gid(gid_t gid) {
+         if (getegid() == gid)
+                 return 1;
+ 
+-        ngroups_max = sysconf(_SC_NGROUPS_MAX);
+-        assert(ngroups_max > 0);
++        ngroups = getgroups(0, NULL);
++        if (ngroups < 0)
++                return -errno;
++        if (ngroups == 0)
++                return 0;
+ 
+-        gids = alloca(sizeof(gid_t) * ngroups_max);
++        gids = alloca(sizeof(gid_t) * ngroups);
+ 
+-        r = getgroups(ngroups_max, gids);
++        r = getgroups(ngroups, gids);
+         if (r < 0)
+                 return -errno;
+ 

@@ -1,0 +1,145 @@
+From c53791854050661d34417f12755837abd74d213a Mon Sep 17 00:00:00 2001
+From: Evgeny Vereshchagin <evvers@ya.ru>
+Date: Tue, 17 Nov 2015 11:21:23 +0000
+Subject: [PATCH] tests: add basic journal test
+
+(cherry picked from commit 1c36b4a73b876258fbe01fbe9bc9b750b7dcc9ce)
+(cherry picked from commit e974b9915ccc7bf56d23fd6fc67631990d893c89)
+Resolves: #1803802
+---
+ test/TEST-04-JOURNAL/Makefile        |  1 +
+ test/TEST-04-JOURNAL/test-journal.sh | 18 +++++++
+ test/TEST-04-JOURNAL/test.sh         | 76 ++++++++++++++++++++++++++++
+ test/test-functions                  |  2 +-
+ 4 files changed, 96 insertions(+), 1 deletion(-)
+ create mode 120000 test/TEST-04-JOURNAL/Makefile
+ create mode 100755 test/TEST-04-JOURNAL/test-journal.sh
+ create mode 100755 test/TEST-04-JOURNAL/test.sh
+
+diff --git a/test/TEST-04-JOURNAL/Makefile b/test/TEST-04-JOURNAL/Makefile
+new file mode 120000
+index 0000000000..e9f93b1104
+--- /dev/null
++++ b/test/TEST-04-JOURNAL/Makefile
+@@ -0,0 +1 @@
++../TEST-01-BASIC/Makefile
+\ No newline at end of file
+diff --git a/test/TEST-04-JOURNAL/test-journal.sh b/test/TEST-04-JOURNAL/test-journal.sh
+new file mode 100755
+index 0000000000..c75f396ceb
+--- /dev/null
++++ b/test/TEST-04-JOURNAL/test-journal.sh
+@@ -0,0 +1,18 @@
++#!/bin/bash
++
++set -x
++set -e
++set -o pipefail
++
++# Test stdout stream
++
++# Skip empty lines
++ID=$(journalctl --new-id128 | sed -n 2p)
++>/expected
++printf $'\n\n\n' | systemd-cat -t "$ID" --level-prefix false
++journalctl --flush
++journalctl -b -o cat -t "$ID" >/output
++cmp /expected /output
++
++touch /testok
++exit 0
+diff --git a/test/TEST-04-JOURNAL/test.sh b/test/TEST-04-JOURNAL/test.sh
+new file mode 100755
+index 0000000000..e37cb7d412
+--- /dev/null
++++ b/test/TEST-04-JOURNAL/test.sh
+@@ -0,0 +1,76 @@
++#!/bin/bash
++# -*- mode: shell-script; indent-tabs-mode: nil; sh-basic-offset: 4; -*-
++# ex: ts=8 sw=4 sts=4 et filetype=sh
++TEST_DESCRIPTION="Journal-related tests"
++
++. $TEST_BASE_DIR/test-functions
++
++check_result_qemu() {
++    ret=1
++    mkdir -p $TESTDIR/root
++    mount ${LOOPDEV}p1 $TESTDIR/root
++    [[ -e $TESTDIR/root/testok ]] && ret=0
++    [[ -f $TESTDIR/root/failed ]] && cp -a $TESTDIR/root/failed $TESTDIR
++    cp -a $TESTDIR/root/var/log/journal $TESTDIR
++    umount $TESTDIR/root
++    [[ -f $TESTDIR/failed ]] && cat $TESTDIR/failed
++    ls -l $TESTDIR/journal/*/*.journal
++    test -s $TESTDIR/failed && ret=$(($ret+1))
++    return $ret
++}
++
++test_run() {
++    if run_qemu; then
++        check_result_qemu || return 1
++    else
++        dwarn "can't run QEMU, skipping"
++    fi
++    if check_nspawn; then
++        run_nspawn
++        check_result_nspawn || return 1
++    else
++        dwarn "can't run systemd-nspawn, skipping"
++    fi
++    return 0
++}
++
++test_setup() {
++    create_empty_image
++    mkdir -p $TESTDIR/root
++    mount ${LOOPDEV}p1 $TESTDIR/root
++
++    # Create what will eventually be our root filesystem onto an overlay
++    (
++        LOG_LEVEL=5
++        eval $(udevadm info --export --query=env --name=${LOOPDEV}p2)
++
++        setup_basic_environment
++
++        # setup the testsuite service
++        cat >$initdir/etc/systemd/system/testsuite.service <<EOF
++[Unit]
++Description=Testsuite service
++After=multi-user.target
++
++[Service]
++ExecStart=/test-journal.sh
++Type=oneshot
++EOF
++
++        cp test-journal.sh $initdir/
++
++        setup_testsuite
++    )
++    setup_nspawn_root
++
++    ddebug "umount $TESTDIR/root"
++    umount $TESTDIR/root
++}
++
++test_cleanup() {
++    umount $TESTDIR/root 2>/dev/null
++    [[ $LOOPDEV ]] && losetup -d $LOOPDEV
++    return 0
++}
++
++do_test "$@"
+diff --git a/test/test-functions b/test/test-functions
+index e50ce556fd..d5e9650903 100644
+--- a/test/test-functions
++++ b/test/test-functions
+@@ -12,7 +12,7 @@ if ! ROOTLIBDIR=$(pkg-config --variable=systemdutildir systemd); then
+     ROOTLIBDIR=/usr/lib/systemd
+ fi
+ 
+-BASICTOOLS="test sh bash setsid loadkeys setfont login sulogin gzip sleep echo mount umount cryptsetup date dmsetup modprobe chmod chown ln"
++BASICTOOLS="test sh bash setsid loadkeys setfont login sulogin gzip sleep echo mount umount cryptsetup date dmsetup modprobe chmod chown ln sed cmp tee"
+ DEBUGTOOLS="df free ls stty cat ps ln ip route dmesg dhclient mkdir cp ping dhclient strace less grep id tty touch du sort hostname"
+ 
+ function find_qemu_bin() {

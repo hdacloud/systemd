@@ -1,0 +1,24 @@
+From 302a74feba2dd946a2f046857b5e9b6a874a2c8b Mon Sep 17 00:00:00 2001
+From: Tom Stellard <tstellar@redhat.com>
+Date: Tue, 31 Oct 2017 08:56:19 -0700
+Subject: [PATCH] udev-rules: Add rule for /dev/kfd
+
+(cherry picked from commit f301622d840ae414e7f56c364fe9b035f3041539)
+
+Resolves: #1659516
+---
+ rules/50-udev-default.rules | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/rules/50-udev-default.rules b/rules/50-udev-default.rules
+index 2bf9c1ec7e..27681c8a8b 100644
+--- a/rules/50-udev-default.rules
++++ b/rules/50-udev-default.rules
+@@ -31,6 +31,7 @@ SUBSYSTEM=="misc", KERNEL=="agpgart", GROUP="video"
+ SUBSYSTEM=="graphics", GROUP="video"
+ SUBSYSTEM=="drm", GROUP="video"
+ SUBSYSTEM=="dvb", GROUP="video"
++SUBSYSTEM=="kfd", GROUP="video"
+ 
+ SUBSYSTEM=="sound", GROUP="audio", \
+   OPTIONS+="static_node=snd/seq", OPTIONS+="static_node=snd/timer"

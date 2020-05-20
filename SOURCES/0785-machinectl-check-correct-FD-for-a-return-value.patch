@@ -1,0 +1,25 @@
+From 2d1a6a5665492cc0a71554045b2293e1193c889b Mon Sep 17 00:00:00 2001
+From: Frantisek Sumsal <fsumsal@redhat.com>
+Date: Wed, 27 Feb 2019 19:51:48 +0100
+Subject: [PATCH] machinectl: check correct FD for a return value
+
+Found by LGTM.
+
+Resolves: #1694605
+---
+ src/machine/machinectl.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/machine/machinectl.c b/src/machine/machinectl.c
+index 1a58aeaf11..66b64e1feb 100644
+--- a/src/machine/machinectl.c
++++ b/src/machine/machinectl.c
+@@ -1086,7 +1086,7 @@ static int copy_files(int argc, char *argv[], void *userdata) {
+                 return r;
+ 
+         hostfd = open(host_dirname, O_CLOEXEC|O_RDONLY|O_NOCTTY|O_DIRECTORY);
+-        if (r < 0)
++        if (hostfd < 0)
+                 return log_error_errno(errno, "Failed to open source directory: %m");
+ 
+         child = fork();

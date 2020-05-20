@@ -1,0 +1,30 @@
+From b6f311503a6d8cbca75d1579045ec4bff2d2459a Mon Sep 17 00:00:00 2001
+From: Evegeny Vereshchagin <evvers@ya.ru>
+Date: Tue, 26 Jun 2018 02:32:44 +0000
+Subject: [PATCH] sd-bus: stop using the result of an assignment as an operand
+ of &&
+
+This makes OBJECT_PATH_FOREACH_PREFIX consistent with PATH_FOREACH_PREFIX
+and also fixes 7 alerts reported by LGTM at
+https://lgtm.com/projects/g/systemd/systemd/snapshot/ac0a08700344a5690803df8dd80e8bb5013184a5/files/src/libsystemd/sd-bus/bus-objects.c?sort=name&dir=ASC&mode=heatmap&showExcluded=true#V1383
+
+(cherry picked from commit 283c2653877f2b958045ad99493869fe1a88be95)
+
+Resolves: #1694605
+---
+ src/libsystemd/sd-bus/bus-internal.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/libsystemd/sd-bus/bus-internal.h b/src/libsystemd/sd-bus/bus-internal.h
+index 1c5fbeac2a..33a5569146 100644
+--- a/src/libsystemd/sd-bus/bus-internal.h
++++ b/src/libsystemd/sd-bus/bus-internal.h
+@@ -378,7 +378,7 @@ char *bus_address_escape(const char *v);
+ 
+ #define OBJECT_PATH_FOREACH_PREFIX(prefix, path)                        \
+         for (char *_slash = ({ strcpy((prefix), (path)); streq((prefix), "/") ? NULL : strrchr((prefix), '/'); }) ; \
+-             _slash && !(_slash[(_slash) == (prefix)] = 0);             \
++             _slash && ((_slash[(_slash) == (prefix)] = 0), true);       \
+              _slash = streq((prefix), "/") ? NULL : strrchr((prefix), '/'))
+ 
+ /* If we are invoking callbacks of a bus object, ensure unreffing the

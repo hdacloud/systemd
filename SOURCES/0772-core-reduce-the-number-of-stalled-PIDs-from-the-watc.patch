@@ -1,0 +1,405 @@
+From 7aff4320eab8b12b19a8800a13f6573c0cdda946 Mon Sep 17 00:00:00 2001
+From: Franck Bui <fbui@suse.com>
+Date: Mon, 18 Mar 2019 20:59:36 +0100
+Subject: [PATCH] core: reduce the number of stalled PIDs from the watched
+ processes list when possible
+
+Some PIDs can remain in the watched list even though their processes have
+exited since a long time. It can easily happen if the main process of a forking
+service manages to spawn a child before the control process exits for example.
+
+However when a pid is about to be mapped to a unit by calling unit_watch_pid(),
+the caller usually knows if the pid should belong to this unit exclusively: if
+we just forked() off a child, then we can be sure that its PID is otherwise
+unused. In this case we take this opportunity to remove any stalled PIDs from
+the watched process list.
+
+If we learnt about a PID in any other form (for example via PID file, via
+searching, MAINPID= and so on), then we can't assume anything.
+
+(cherry picked from commit f75f613d259e9332be8e9657fa37e73f7aabcb8a)
+
+Resolves: #1501796
+---
+ src/core/busname.c    |  4 ++--
+ src/core/cgroup.c     |  8 +++-----
+ src/core/dbus-scope.c |  2 +-
+ src/core/mount.c      |  4 ++--
+ src/core/service.c    | 24 ++++++++++--------------
+ src/core/socket.c     |  6 +++---
+ src/core/swap.c       |  4 ++--
+ src/core/unit.c       | 25 ++++++++++++++++++++++---
+ src/core/unit.h       |  2 +-
+ src/shared/util.c     | 14 ++++++++++++++
+ src/shared/util.h     |  1 +
+ 11 files changed, 61 insertions(+), 33 deletions(-)
+
+diff --git a/src/core/busname.c b/src/core/busname.c
+index f5553e5418..8d149aae4e 100644
+--- a/src/core/busname.c
++++ b/src/core/busname.c
+@@ -350,7 +350,7 @@ static int busname_coldplug(Unit *u, Hashmap *deferred_work) {
+                 if (n->control_pid <= 0)
+                         return -EBADMSG;
+ 
+-                r = unit_watch_pid(UNIT(n), n->control_pid);
++                r = unit_watch_pid(UNIT(n), n->control_pid, false);
+                 if (r < 0)
+                         return r;
+ 
+@@ -413,7 +413,7 @@ static int busname_make_starter(BusName *n, pid_t *_pid) {
+                 _exit(ret);
+         }
+ 
+-        r = unit_watch_pid(UNIT(n), pid);
++        r = unit_watch_pid(UNIT(n), pid, true);
+         if (r < 0)
+                 goto fail;
+ 
+diff --git a/src/core/cgroup.c b/src/core/cgroup.c
+index 0779fa5552..0ce265dbf4 100644
+--- a/src/core/cgroup.c
++++ b/src/core/cgroup.c
+@@ -26,6 +26,7 @@
+ #include "special.h"
+ #include "cgroup-util.h"
+ #include "cgroup.h"
++#include "util.h"
+ 
+ #define CGROUP_CPU_QUOTA_PERIOD_USEC ((usec_t) 100 * USEC_PER_MSEC)
+ 
+@@ -881,7 +882,7 @@ void unit_destroy_cgroup_if_empty(Unit *u) {
+ 
+ pid_t unit_search_main_pid(Unit *u) {
+         _cleanup_fclose_ FILE *f = NULL;
+-        pid_t pid = 0, npid, mypid;
++        pid_t pid = 0, npid;
+ 
+         assert(u);
+ 
+@@ -891,15 +892,12 @@ pid_t unit_search_main_pid(Unit *u) {
+         if (cg_enumerate_processes(SYSTEMD_CGROUP_CONTROLLER, u->cgroup_path, &f) < 0)
+                 return 0;
+ 
+-        mypid = getpid();
+         while (cg_read_pid(f, &npid) > 0)  {
+-                pid_t ppid;
+-
+                 if (npid == pid)
+                         continue;
+ 
+                 /* Ignore processes that aren't our kids */
+-                if (get_parent_of_pid(npid, &ppid) >= 0 && ppid != mypid)
++                if (pid_is_my_child(npid) == 0)
+                         continue;
+ 
+                 if (pid != 0) {
+diff --git a/src/core/dbus-scope.c b/src/core/dbus-scope.c
+index 60215a1935..f31360ad56 100644
+--- a/src/core/dbus-scope.c
++++ b/src/core/dbus-scope.c
+@@ -93,7 +93,7 @@ static int bus_scope_set_transient_property(
+                                 return -EINVAL;
+ 
+                         if (mode != UNIT_CHECK) {
+-                                r = unit_watch_pid(UNIT(s), pid);
++                                r = unit_watch_pid(UNIT(s), pid, false);
+                                 if (r < 0 && r != -EEXIST)
+                                         return r;
+                         }
+diff --git a/src/core/mount.c b/src/core/mount.c
+index bfbfc10731..3167bd6bb1 100644
+--- a/src/core/mount.c
++++ b/src/core/mount.c
+@@ -659,7 +659,7 @@ static int mount_coldplug(Unit *u, Hashmap *deferred_work) {
+                 if (m->control_pid <= 0)
+                         return -EBADMSG;
+ 
+-                r = unit_watch_pid(UNIT(m), m->control_pid);
++                r = unit_watch_pid(UNIT(m), m->control_pid, false);
+                 if (r < 0)
+                         return r;
+ 
+@@ -751,7 +751,7 @@ static int mount_spawn(Mount *m, ExecCommand *c, pid_t *_pid) {
+         if (r < 0)
+                 goto fail;
+ 
+-        r = unit_watch_pid(UNIT(m), pid);
++        r = unit_watch_pid(UNIT(m), pid, true);
+         if (r < 0)
+                 /* FIXME: we need to do something here */
+                 goto fail;
+diff --git a/src/core/service.c b/src/core/service.c
+index f7b859d076..1ad154e41f 100644
+--- a/src/core/service.c
++++ b/src/core/service.c
+@@ -145,8 +145,6 @@ static void service_unwatch_pid_file(Service *s) {
+ }
+ 
+ static int service_set_main_pid(Service *s, pid_t pid) {
+-        pid_t ppid;
+-
+         assert(s);
+ 
+         if (pid <= 1)
+@@ -165,12 +163,10 @@ static int service_set_main_pid(Service *s, pid_t pid) {
+ 
+         s->main_pid = pid;
+         s->main_pid_known = true;
++        s->main_pid_alien = pid_is_my_child(pid) == 0;
+ 
+-        if (get_parent_of_pid(pid, &ppid) >= 0 && ppid != getpid()) {
++        if (s->main_pid_alien)
+                 log_unit_warning(UNIT(s)->id, "%s: Supervising process "PID_FMT" which is not our child. We'll most likely not notice when it exits.", UNIT(s)->id, pid);
+-                s->main_pid_alien = true;
+-        } else
+-                s->main_pid_alien = false;
+ 
+         return 0;
+ }
+@@ -809,7 +805,7 @@ static int service_load_pid_file(Service *s, bool may_warn) {
+         if (r < 0)
+                 return r;
+ 
+-        r = unit_watch_pid(UNIT(s), pid);
++        r = unit_watch_pid(UNIT(s), pid, false);
+         if (r < 0) {
+                 /* FIXME: we need to do something here */
+                 log_unit_warning(UNIT(s)->id, "Failed to watch PID "PID_FMT" from service %s", pid, UNIT(s)->id);
+@@ -844,7 +840,7 @@ static int service_search_main_pid(Service *s) {
+         if (r < 0)
+                 return r;
+ 
+-        r = unit_watch_pid(UNIT(s), pid);
++        r = unit_watch_pid(UNIT(s), pid, false);
+         if (r < 0) {
+                 /* FIXME: we need to do something here */
+                 log_unit_warning(UNIT(s)->id, "Failed to watch PID "PID_FMT" from service %s", pid, UNIT(s)->id);
+@@ -989,7 +985,7 @@ static int service_coldplug(Unit *u, Hashmap *deferred_work) {
+                             SERVICE_STOP, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL,
+                             SERVICE_STOP_SIGABRT, SERVICE_STOP_POST,
+                             SERVICE_FINAL_SIGTERM, SERVICE_FINAL_SIGKILL))) {
+-                        r = unit_watch_pid(UNIT(s), s->main_pid);
++                        r = unit_watch_pid(UNIT(s), s->main_pid, false);
+                         if (r < 0)
+                                 return r;
+                 }
+@@ -1001,7 +997,7 @@ static int service_coldplug(Unit *u, Hashmap *deferred_work) {
+                            SERVICE_STOP, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL,
+                            SERVICE_STOP_SIGABRT, SERVICE_STOP_POST,
+                            SERVICE_FINAL_SIGTERM, SERVICE_FINAL_SIGKILL)) {
+-                        r = unit_watch_pid(UNIT(s), s->control_pid);
++                        r = unit_watch_pid(UNIT(s), s->control_pid, false);
+                         if (r < 0)
+                                 return r;
+                 }
+@@ -1271,7 +1267,7 @@ static int service_spawn(
+         if (r < 0)
+                 goto fail;
+ 
+-        r = unit_watch_pid(UNIT(s), pid);
++        r = unit_watch_pid(UNIT(s), pid, true);
+         if (r < 0)
+                 /* FIXME: we need to do something here */
+                 goto fail;
+@@ -2325,7 +2321,7 @@ static int service_deserialize_item(Unit *u, const char *key, const char *value,
+                         log_unit_debug(u->id, "Failed to parse main-pid value %s", value);
+                 else {
+                         service_set_main_pid(s, pid);
+-                        unit_watch_pid(UNIT(s), pid);
++                        unit_watch_pid(UNIT(s), pid, false);
+                 }
+         } else if (streq(key, "main-pid-known")) {
+                 int b;
+@@ -3085,7 +3081,7 @@ static void service_notify_message(
+                         }
+                         if (r > 0) {
+                                 service_set_main_pid(s, new_main_pid);
+-                                unit_watch_pid(UNIT(s), new_main_pid);
++                                unit_watch_pid(UNIT(s), new_main_pid, false);
+                                 notify_dbus = true;
+                         }
+                 }
+@@ -3265,7 +3261,7 @@ static void service_bus_name_owner_change(
+                         log_unit_debug(u->id, "%s's D-Bus name %s is now owned by process %u", u->id, name, (unsigned) pid);
+ 
+                         service_set_main_pid(s, pid);
+-                        unit_watch_pid(UNIT(s), pid);
++                        unit_watch_pid(UNIT(s), pid, false);
+                 }
+         }
+ }
+diff --git a/src/core/socket.c b/src/core/socket.c
+index 1e8ae0a6e5..a5f610cd77 100644
+--- a/src/core/socket.c
++++ b/src/core/socket.c
+@@ -1350,7 +1350,7 @@ static int socket_coldplug(Unit *u, Hashmap *deferred_work) {
+                 if (s->control_pid <= 0)
+                         return -EBADMSG;
+ 
+-                r = unit_watch_pid(UNIT(s), s->control_pid);
++                r = unit_watch_pid(UNIT(s), s->control_pid, false);
+                 if (r < 0)
+                         return r;
+ 
+@@ -1427,7 +1427,7 @@ static int socket_spawn(Socket *s, ExecCommand *c, pid_t *_pid) {
+         if (r < 0)
+                 goto fail;
+ 
+-        r = unit_watch_pid(UNIT(s), pid);
++        r = unit_watch_pid(UNIT(s), pid, true);
+         if (r < 0)
+                 /* FIXME: we need to do something here */
+                 goto fail;
+@@ -1512,7 +1512,7 @@ static int socket_chown(Socket *s, pid_t *_pid) {
+                 _exit(ret);
+         }
+ 
+-        r = unit_watch_pid(UNIT(s), pid);
++        r = unit_watch_pid(UNIT(s), pid, true);
+         if (r < 0)
+                 goto fail;
+ 
+diff --git a/src/core/swap.c b/src/core/swap.c
+index 757a8d45c5..4a5e882332 100644
+--- a/src/core/swap.c
++++ b/src/core/swap.c
+@@ -548,7 +548,7 @@ static int swap_coldplug(Unit *u, Hashmap *deferred_work) {
+                 if (s->control_pid <= 0)
+                         return -EBADMSG;
+ 
+-                r = unit_watch_pid(UNIT(s), s->control_pid);
++                r = unit_watch_pid(UNIT(s), s->control_pid, false);
+                 if (r < 0)
+                         return r;
+ 
+@@ -645,7 +645,7 @@ static int swap_spawn(Swap *s, ExecCommand *c, pid_t *_pid) {
+         if (r < 0)
+                 goto fail;
+ 
+-        r = unit_watch_pid(UNIT(s), pid);
++        r = unit_watch_pid(UNIT(s), pid, true);
+         if (r < 0)
+                 /* FIXME: we need to do something here */
+                 goto fail;
+diff --git a/src/core/unit.c b/src/core/unit.c
+index def36a0930..cdac192eb6 100644
+--- a/src/core/unit.c
++++ b/src/core/unit.c
+@@ -52,6 +52,7 @@
+ #include "execute.h"
+ #include "virt.h"
+ #include "dropin.h"
++#include "util.h"
+ 
+ const UnitVTable * const unit_vtable[_UNIT_TYPE_MAX] = {
+         [UNIT_SERVICE] = &service_vtable,
+@@ -1961,7 +1962,7 @@ void unit_notify(Unit *u, UnitActiveState os, UnitActiveState ns, bool reload_su
+         unit_add_to_gc_queue(u);
+ }
+ 
+-int unit_watch_pid(Unit *u, pid_t pid) {
++int unit_watch_pid(Unit *u, pid_t pid, bool exclusive) {
+         int q, r;
+ 
+         assert(u);
+@@ -1970,6 +1971,15 @@ int unit_watch_pid(Unit *u, pid_t pid) {
+         /* Watch a specific PID. We only support one or two units
+          * watching each PID for now, not more. */
+ 
++        /* Caller might be sure that this PID belongs to this unit only. Let's take this
++         * opportunity to remove any stalled references to this PID as they can be created
++         * easily (when watching a process which is not our direct child). */
++        if (exclusive) {
++                log_unit_debug(u->id, "Cleaning "PID_FMT" from watches.", pid);
++                hashmap_remove2(u->manager->watch_pids1, LONG_TO_PTR(pid), NULL);
++                hashmap_remove2(u->manager->watch_pids2, LONG_TO_PTR(pid), NULL);
++        }
++
+         r = set_ensure_allocated(&u->pids, NULL);
+         if (r < 0)
+                 return r;
+@@ -1985,7 +1995,12 @@ int unit_watch_pid(Unit *u, pid_t pid) {
+                         return r;
+ 
+                 r = hashmap_put(u->manager->watch_pids2, LONG_TO_PTR(pid), u);
+-        }
++                if (r >= 0)
++                        log_unit_debug(u->id, "Watching "PID_FMT" through watch_pids2.", pid);
++                else if (r == -EEXIST)
++                        log_unit_warning(u->id, "Cannot watch "PID_FMT", PID is already watched twice.", pid);
++        } else if (r >= 0)
++                log_unit_debug(u->id, "Watching "PID_FMT" through watch_pids1.", pid);
+ 
+         q = set_put(u->pids, LONG_TO_PTR(pid));
+         if (q < 0)
+@@ -1998,6 +2013,8 @@ void unit_unwatch_pid(Unit *u, pid_t pid) {
+         assert(u);
+         assert(pid >= 1);
+ 
++        log_unit_debug(u->id, "Unwatching "PID_FMT".", pid);
++
+         hashmap_remove_value(u->manager->watch_pids1, LONG_TO_PTR(pid), u);
+         hashmap_remove_value(u->manager->watch_pids2, LONG_TO_PTR(pid), u);
+         set_remove(u->pids, LONG_TO_PTR(pid));
+@@ -2028,7 +2045,9 @@ static int unit_watch_pids_in_path(Unit *u, const char *path) {
+                 pid_t pid;
+ 
+                 while ((r = cg_read_pid(f, &pid)) > 0) {
+-                        r = unit_watch_pid(u, pid);
++                        if (pid_is_my_child(pid) == 0)
++                                log_unit_debug(u->id, "Watching non detached "PID_FMT".", pid);
++                        r = unit_watch_pid(u, pid, false);
+                         if (r < 0 && ret >= 0)
+                                 ret = r;
+                 }
+diff --git a/src/core/unit.h b/src/core/unit.h
+index a6e21d60ce..4a8bd79052 100644
+--- a/src/core/unit.h
++++ b/src/core/unit.h
+@@ -537,7 +537,7 @@ int unit_kill_common(Unit *u, KillWho who, int signo, pid_t main_pid, pid_t cont
+ 
+ void unit_notify(Unit *u, UnitActiveState os, UnitActiveState ns, bool reload_success);
+ 
+-int unit_watch_pid(Unit *u, pid_t pid);
++int unit_watch_pid(Unit *u, pid_t pid, bool exclusive);
+ void unit_unwatch_pid(Unit *u, pid_t pid);
+ int unit_watch_all_pids(Unit *u);
+ void unit_unwatch_all_pids(Unit *u);
+diff --git a/src/shared/util.c b/src/shared/util.c
+index 82c8e433dd..127a64c3c6 100644
+--- a/src/shared/util.c
++++ b/src/shared/util.c
+@@ -641,6 +641,20 @@ int get_parent_of_pid(pid_t pid, pid_t *_ppid) {
+         return 0;
+ }
+ 
++int pid_is_my_child(pid_t pid) {
++        pid_t ppid;
++        int r;
++
++        if (pid <= 1)
++                return false;
++
++        r = get_parent_of_pid(pid, &ppid);
++        if (r < 0)
++                return r;
++
++        return ppid == getpid();
++}
++
+ int fchmod_umask(int fd, mode_t m) {
+         mode_t u;
+         int r;
+diff --git a/src/shared/util.h b/src/shared/util.h
+index 538ca4be2d..6b885d7533 100644
+--- a/src/shared/util.h
++++ b/src/shared/util.h
+@@ -279,6 +279,7 @@ const char* split(const char **state, size_t *l, const char *separator, bool quo
+         for ((state) = (s), (word) = split(&(state), &(length), (separator), (quoted)); (word); (word) = split(&(state), &(length), (separator), (quoted)))
+ 
+ pid_t get_parent_of_pid(pid_t pid, pid_t *ppid);
++int pid_is_my_child(pid_t pid);
+ 
+ char *strappend(const char *s, const char *suffix);
+ char *strnappend(const char *s, const char *suffix, size_t length);

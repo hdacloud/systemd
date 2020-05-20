@@ -1,0 +1,25 @@
+From a9c3cc27f21e3ec11ba47f6f5a2cf719098d366c Mon Sep 17 00:00:00 2001
+From: Frantisek Sumsal <fsumsal@redhat.com>
+Date: Thu, 28 Feb 2019 14:20:31 +0100
+Subject: [PATCH] lgtm: ignore files dropped in upstream
+
+Resolves: #1694605
+---
+ .lgtm.yml | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/.lgtm.yml b/.lgtm.yml
+index 0c8304d689..070a13cd63 100644
+--- a/.lgtm.yml
++++ b/.lgtm.yml
+@@ -7,3 +7,10 @@ extraction:
+                       --disable-gtk-doc --disable-manpages --disable-gtk-doc-html
+                       --enable-compat-libs --disable-sysusers --disable-ldconfig
+                       --enable-lz4 --disable-microhttpd
++path_classifiers:
++  # Any files which have a tag attached are filtered out from results & stats
++  ignored:
++    # Skip files dropped in upstream
++    - src/bootchart/
++    - src/gudev/
++    - src/libsystemd/sd-bus/bus-bloom.c

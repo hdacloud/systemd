@@ -1,0 +1,38 @@
+From 9e1bc4f2d8c24ad1b257e3452212d945e1078a8f Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Zbigniew=20J=C4=99drzejewski-Szmek?= <zbyszek@in.waw.pl>
+Date: Sat, 7 Mar 2015 15:00:22 -0500
+Subject: [PATCH] systemctl: remove dead check
+
+r could never be less than zero.
+
+CID #1271350.
+
+(cherry picked from commit 2558691285b2f7b3078b43b26736fcadf3c6d194)
+
+Resolves: #1694605
+---
+ src/systemctl/systemctl.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/systemctl/systemctl.c b/src/systemctl/systemctl.c
+index 83c418f0b7..a55340f0a4 100644
+--- a/src/systemctl/systemctl.c
++++ b/src/systemctl/systemctl.c
+@@ -4652,7 +4652,7 @@ static int cat(sd_bus *bus, char **args) {
+         _cleanup_strv_free_ char **names = NULL;
+         char **name;
+         bool first = true, avoid_bus_cache;
+-        int r = 0;
++        int r;
+ 
+         assert(args);
+ 
+@@ -4702,7 +4702,7 @@ static int cat(sd_bus *bus, char **args) {
+                 }
+         }
+ 
+-        return r < 0 ? r : 0;
++        return 0;
+ }
+ 
+ static int set_property(sd_bus *bus, char **args) {

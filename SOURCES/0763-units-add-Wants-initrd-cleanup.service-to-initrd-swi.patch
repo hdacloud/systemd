@@ -1,0 +1,31 @@
+From 592fde970f4493b202ed0fc035e3f6785a850a55 Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Tue, 11 Oct 2016 21:36:14 +0900
+Subject: [PATCH] units: add Wants=initrd-cleanup.service to
+ initrd-switch-root.target (#4345)
+
+`systemctl isolate initrd-switch-root.target` called by initrd-cleanup.service
+kills initrd-cleanup.service itself. Then, initrd-cleanup.service failed and
+system goes to emergency shell.
+To prevent this problem, this commit adds `Wants=initrd-cleanup.service` to
+initrd-switch-root.target.
+
+fixes: #4343.
+(cherry picked from commit a8cb1dc3e0fa81affd01c8ed3df35e4c4520a24e)
+
+Related: #1560417
+---
+ units/initrd-switch-root.target | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/units/initrd-switch-root.target b/units/initrd-switch-root.target
+index f34768790b..934d82f667 100644
+--- a/units/initrd-switch-root.target
++++ b/units/initrd-switch-root.target
+@@ -12,5 +12,5 @@ DefaultDependencies=no
+ Requires=initrd-switch-root.service
+ Before=initrd-switch-root.service
+ AllowIsolate=yes
+-Wants=initrd-udevadm-cleanup-db.service initrd-root-fs.target initrd-fs.target systemd-journald.service
++Wants=initrd-udevadm-cleanup-db.service initrd-root-fs.target initrd-fs.target systemd-journald.service initrd-cleanup.service
+ After=initrd-udevadm-cleanup-db.service initrd-root-fs.target initrd-fs.target emergency.service emergency.target

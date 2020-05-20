@@ -1,0 +1,25 @@
+From 5f71ed0c948653fd9037d751f48182cb0c5dfb99 Mon Sep 17 00:00:00 2001
+From: Frantisek Sumsal <fsumsal@redhat.com>
+Date: Wed, 27 Feb 2019 19:01:20 +0100
+Subject: [PATCH] journal: drop redundant condition
+
+Relevant commit: 29bfb683a8c9d03f10db58b4e61351fd9048f270
+
+Resolves: #1694605
+---
+ src/journal/journald-server.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/journal/journald-server.c b/src/journal/journald-server.c
+index 2e1e07eb0e..aaabb2f7ab 100644
+--- a/src/journal/journald-server.c
++++ b/src/journal/journald-server.c
+@@ -345,7 +345,7 @@ static int system_journal_open(Server *s, bool flush_requested) {
+                 if (r >= 0) {
+                         server_fix_perms(s, s->system_journal, 0);
+                         available_space(s, true);
+-                } else if (r < 0) {
++                } else {
+                         if (r != -ENOENT && r != -EROFS)
+                                 log_warning_errno(r, "Failed to open system journal: %m");
+ 

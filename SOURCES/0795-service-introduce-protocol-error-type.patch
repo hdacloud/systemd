@@ -1,0 +1,71 @@
+From c460203ad5165dfb095fcfaa6646708e39d2080e Mon Sep 17 00:00:00 2001
+From: Jouke Witteveen <j.witteveen@gmail.com>
+Date: Tue, 22 Nov 2016 17:39:56 +0100
+Subject: [PATCH] service: introduce protocol error type
+
+Introduce a SERVICE_FAILURE_PROTOCOL error type for when a service does
+not follow the protocol.
+This error type is used when a pid file is expected, but not delivered.
+
+(cherry picked from commit c35755fb878af58b80ac62a501a75f79c90a3763)
+
+Related: #1733998
+---
+ src/core/service.c | 9 +++++----
+ src/core/service.h | 1 +
+ 2 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/src/core/service.c b/src/core/service.c
+index ea71c9e237..84a5aeb072 100644
+--- a/src/core/service.c
++++ b/src/core/service.c
+@@ -2568,9 +2568,9 @@ static void service_notify_cgroup_empty_event(Unit *u) {
+ 
+                         service_unwatch_pid_file(s);
+                         if (s->state == SERVICE_START)
+-                                service_enter_signal(s, SERVICE_FINAL_SIGTERM, SERVICE_FAILURE_RESOURCES);
++                                service_enter_signal(s, SERVICE_FINAL_SIGTERM, SERVICE_FAILURE_PROTOCOL);
+                         else
+-                                service_enter_stop(s, SERVICE_FAILURE_RESOURCES);
++                                service_enter_stop(s, SERVICE_FAILURE_PROTOCOL);
+                 }
+                 break;
+ 
+@@ -2804,7 +2804,7 @@ static void service_sigchld_event(Unit *u, pid_t pid, int code, int status) {
+                                         if (!has_start_post && r < 0) {
+                                                 r = service_demand_pid_file(s);
+                                                 if (r < 0 || !cgroup_good(s))
+-                                                        service_enter_signal(s, SERVICE_FINAL_SIGTERM, SERVICE_FAILURE_RESOURCES);
++                                                        service_enter_signal(s, SERVICE_FINAL_SIGTERM, SERVICE_FAILURE_PROTOCOL);
+                                                 break;
+                                         }
+                                 } else
+@@ -2826,7 +2826,7 @@ static void service_sigchld_event(Unit *u, pid_t pid, int code, int status) {
+                                         if (r < 0) {
+                                                 r = service_demand_pid_file(s);
+                                                 if (r < 0 || !cgroup_good(s))
+-                                                        service_enter_stop(s, SERVICE_FAILURE_RESOURCES);
++                                                        service_enter_stop(s, SERVICE_FAILURE_PROTOCOL);
+                                                 break;
+                                         }
+                                 } else
+@@ -3428,6 +3428,7 @@ DEFINE_STRING_TABLE_LOOKUP(notify_state, NotifyState);
+ static const char* const service_result_table[_SERVICE_RESULT_MAX] = {
+         [SERVICE_SUCCESS] = "success",
+         [SERVICE_FAILURE_RESOURCES] = "resources",
++        [SERVICE_FAILURE_PROTOCOL] = "protocol",
+         [SERVICE_FAILURE_TIMEOUT] = "timeout",
+         [SERVICE_FAILURE_EXIT_CODE] = "exit-code",
+         [SERVICE_FAILURE_SIGNAL] = "signal",
+diff --git a/src/core/service.h b/src/core/service.h
+index e0547a464e..82938a1fc4 100644
+--- a/src/core/service.h
++++ b/src/core/service.h
+@@ -108,6 +108,7 @@ typedef enum NotifyState {
+ typedef enum ServiceResult {
+         SERVICE_SUCCESS,
+         SERVICE_FAILURE_RESOURCES,
++        SERVICE_FAILURE_PROTOCOL,
+         SERVICE_FAILURE_TIMEOUT,
+         SERVICE_FAILURE_EXIT_CODE,
+         SERVICE_FAILURE_SIGNAL,

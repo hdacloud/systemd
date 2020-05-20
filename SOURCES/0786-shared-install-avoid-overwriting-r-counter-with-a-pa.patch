@@ -1,0 +1,37 @@
+From 3d359367291484097c0b496f6d83726e4070d036 Mon Sep 17 00:00:00 2001
+From: Frantisek Sumsal <fsumsal@redhat.com>
+Date: Thu, 28 Feb 2019 11:09:24 +0100
+Subject: [PATCH] shared/install: avoid overwriting 'r' counter with a partial
+ result
+
+We want to store either the first error or the total number of changes in 'r'.
+Instead, we were overwriting this with the return value from
+install_info_traverse().
+
+LGTM complained later in the loop that:
+> Comparison is always true because r >= 0.
+
+Relevant commit: 459500a32cf74edca93ec79ee4cdd9dfcd20eee0
+
+Resolves: #1694605
+---
+ src/shared/install.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/shared/install.c b/src/shared/install.c
+index ea01e4dcc2..f2f968e329 100644
+--- a/src/shared/install.c
++++ b/src/shared/install.c
+@@ -1482,9 +1482,9 @@ static int install_context_apply(
+                 if (q < 0)
+                         return q;
+ 
+-                r = install_info_traverse(scope, c, root_dir, paths, i, flags, NULL);
+-                if (r < 0)
+-                        return r;
++                q = install_info_traverse(scope, c, root_dir, paths, i, flags, NULL);
++                if (q < 0)
++                        return q;
+ 
+                 if (i->type != UNIT_FILE_TYPE_REGULAR)
+                         continue;

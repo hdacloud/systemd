@@ -1,0 +1,41 @@
+From 928f72e2070685886c0266891a74ca266587755a Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Zbigniew=20J=C4=99drzejewski-Szmek?= <zbyszek@in.waw.pl>
+Date: Mon, 30 Jan 2017 13:06:10 -0500
+Subject: [PATCH] systemctl: ignore SIGTERM after switch root
+
+https://bugzilla.redhat.com/show_bug.cgi?id=1414904#c14 and #c15.
+(cherry picked from commit 8a7a9ceab204fb02fd5d93a765b36b31efeb9beb)
+
+Resolves: #1754053
+---
+ src/systemctl/systemctl.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/src/systemctl/systemctl.c b/src/systemctl/systemctl.c
+index 0928e2972a..398727cc7d 100644
+--- a/src/systemctl/systemctl.c
++++ b/src/systemctl/systemctl.c
+@@ -5066,6 +5066,14 @@ static int switch_root(sd_bus *bus, char **args) {
+          * though the switch to the new root has succeed. */
+         argv_cmdline[0] = '@';
+ 
++        /* If we are slow to exit after the root switch, the new systemd instance
++         * will send us a signal to terminate. Just ignore it and exit normally.
++         * This way the unit does not end up as failed.
++         */
++        r = ignore_signals(SIGTERM, -1);
++        if (r < 0)
++                log_warning_errno(r, "Failed to change disposition of SIGTERM to ignore: %m");
++
+         log_debug("Switching root - root: %s; init: %s", root, strna(init));
+ 
+         r = sd_bus_call_method(
+@@ -5078,6 +5086,8 @@ static int switch_root(sd_bus *bus, char **args) {
+                         NULL,
+                         "ss", root, init);
+         if (r < 0) {
++                (void) default_signals(SIGTERM, -1);
++
+                 log_error("Failed to switch root: %s", bus_error_message(&error, r));
+                 return r;
+         }

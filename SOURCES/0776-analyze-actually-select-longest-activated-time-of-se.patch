@@ -1,0 +1,35 @@
+From 91b866591a2fb05a087a040a49a792a3d40a2a06 Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Wed, 27 Jun 2018 13:32:05 +0900
+Subject: [PATCH] analyze: actually select longest activated-time of services
+
+Discovered by LGTM.
+
+(cherry picked from commit e68131526b7a2cfdb8e59bd2ed7a284dba095ac5)
+
+Resolves: #1694605
+---
+ src/analyze/analyze.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/src/analyze/analyze.c b/src/analyze/analyze.c
+index 7116aaa88d..e9ca9ba818 100644
+--- a/src/analyze/analyze.c
++++ b/src/analyze/analyze.c
+@@ -788,14 +788,11 @@ static int list_dependencies_one(sd_bus *bus, const char *name, unsigned int lev
+                 if (times
+                     && times->activated
+                     && times->activated <= boot->finish_time
+-                    && (times->activated >= service_longest
+-                        || service_longest == 0)) {
++                    && times->activated >= service_longest)
+                         service_longest = times->activated;
+-                        break;
+-                }
+         }
+ 
+-        if (service_longest == 0 )
++        if (service_longest == 0)
+                 return r;
+ 
+         STRV_FOREACH(c, deps) {

@@ -1,0 +1,121 @@
+From 94355e0146245c14012ac177461110d0a0c65f10 Mon Sep 17 00:00:00 2001
+From: Lennart Poettering <lennart@poettering.net>
+Date: Wed, 24 Jan 2018 19:54:26 +0100
+Subject: [PATCH] core: add a new unit_needs_console() call
+
+This call determines whether a specific unit currently needs access to
+the console. It's a fancy wrapper around
+exec_context_may_touch_console() ultimately, however for service units
+we'll explicitly exclude the SERVICE_EXITED state from when we report
+true.
+
+(cherry picked from commit bb2c7685454842549bc1fe47adc35cbca2a84190)
+
+Related: #1524359
+---
+ src/core/service.c | 27 +++++++++++++++++++++++++++
+ src/core/unit.c    | 22 ++++++++++++++++++++++
+ src/core/unit.h    |  5 +++++
+ 3 files changed, 54 insertions(+)
+
+diff --git a/src/core/service.c b/src/core/service.c
+index 1ad154e41f..8a8f4be149 100644
+--- a/src/core/service.c
++++ b/src/core/service.c
+@@ -3368,6 +3368,32 @@ static int service_control_pid(Unit *u) {
+         return s->control_pid;
+ }
+ 
++static bool service_needs_console(Unit *u) {
++        Service *s = SERVICE(u);
++
++        assert(s);
++
++        /* We provide our own implementation of this here, instead of relying of the generic implementation
++         * unit_needs_console() provides, since we want to return false if we are in SERVICE_EXITED state. */
++
++        if (!exec_context_may_touch_console(&s->exec_context))
++                return false;
++
++        return IN_SET(s->state,
++                      SERVICE_START_PRE,
++                      SERVICE_START,
++                      SERVICE_START_POST,
++                      SERVICE_RUNNING,
++                      SERVICE_RELOAD,
++                      SERVICE_STOP,
++                      SERVICE_STOP_SIGABRT,
++                      SERVICE_STOP_SIGTERM,
++                      SERVICE_STOP_SIGKILL,
++                      SERVICE_STOP_POST,
++                      SERVICE_FINAL_SIGTERM,
++                      SERVICE_FINAL_SIGKILL);
++}
++
+ static const char* const service_restart_table[_SERVICE_RESTART_MAX] = {
+         [SERVICE_RESTART_NO] = "no",
+         [SERVICE_RESTART_ON_SUCCESS] = "on-success",
+@@ -3489,6 +3515,7 @@ const UnitVTable service_vtable = {
+         .bus_commit_properties = bus_service_commit_properties,
+ 
+         .get_timeout = service_get_timeout,
++        .needs_console = service_needs_console,
+         .can_transient = true,
+ 
+         .status_message_formats = {
+diff --git a/src/core/unit.c b/src/core/unit.c
+index 4069a6f4c4..48358bc026 100644
+--- a/src/core/unit.c
++++ b/src/core/unit.c
+@@ -3699,6 +3699,28 @@ pid_t unit_main_pid(Unit *u) {
+         return 0;
+ }
+ 
++bool unit_needs_console(Unit *u) {
++        ExecContext *ec;
++        UnitActiveState state;
++
++        assert(u);
++
++        state = unit_active_state(u);
++
++        if (UNIT_IS_INACTIVE_OR_FAILED(state))
++                return false;
++
++        if (UNIT_VTABLE(u)->needs_console)
++                return UNIT_VTABLE(u)->needs_console(u);
++
++        /* If this unit type doesn't implement this call, let's use a generic fallback implementation: */
++        ec = unit_get_exec_context(u);
++        if (!ec)
++                return false;
++
++        return exec_context_may_touch_console(ec);
++}
++
+ static const char* const unit_active_state_table[_UNIT_ACTIVE_STATE_MAX] = {
+         [UNIT_ACTIVE] = "active",
+         [UNIT_RELOADING] = "reloading",
+diff --git a/src/core/unit.h b/src/core/unit.h
+index 4a8bd79052..fa7de11645 100644
+--- a/src/core/unit.h
++++ b/src/core/unit.h
+@@ -408,6 +408,9 @@ struct UnitVTable {
+         /* Returns the main PID if there is any defined, or 0. */
+         pid_t (*control_pid)(Unit *u);
+ 
++        /* Returns true if the unit currently needs access to the console */
++        bool (*needs_console)(Unit *u);
++
+         /* This is called for each unit type and should be used to
+          * enumerate existing devices and load them. However,
+          * everything that is loaded here should still stay in
+@@ -627,6 +630,8 @@ pid_t unit_main_pid(Unit *u);
+ const char *unit_active_state_to_string(UnitActiveState i) _const_;
+ UnitActiveState unit_active_state_from_string(const char *s) _pure_;
+ 
++bool unit_needs_console(Unit *u);
++
+ /* Macros which append UNIT= or USER_UNIT= to the message */
+ 
+ #define log_unit_full_errno(unit, level, error, ...) log_object_internal(level, error, __FILE__, __LINE__, __func__, getpid() == 1 ? "UNIT=" : "USER_UNIT=", unit, __VA_ARGS__)

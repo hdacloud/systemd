@@ -1,0 +1,28 @@
+From 443a7bc554b65f9b859db60474439c03b19c79c1 Mon Sep 17 00:00:00 2001
+From: Frantisek Sumsal <fsumsal@redhat.com>
+Date: Wed, 27 Feb 2019 18:35:15 +0100
+Subject: [PATCH] core: drop unnecessary condition
+
+In this case ret is always >= 0 as it still contains the initialization
+value (i.e. 0). Let's drop the unnecessary condition to make LGTM happy.
+
+Relevant commit: efdb02375beb0a940c3320865572913780b4d7de
+
+Resolves: #1694605
+---
+ src/core/unit.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/core/unit.c b/src/core/unit.c
+index cdac192eb6..4069a6f4c4 100644
+--- a/src/core/unit.c
++++ b/src/core/unit.c
+@@ -2054,7 +2054,7 @@ static int unit_watch_pids_in_path(Unit *u, const char *path) {
+                 if (r < 0 && ret >= 0)
+                         ret = r;
+ 
+-        } else if (ret >= 0)
++        } else
+                 ret = r;
+ 
+         r = cg_enumerate_subgroups(SYSTEMD_CGROUP_CONTROLLER, path, &d);

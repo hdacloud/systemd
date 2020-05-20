@@ -1,0 +1,28 @@
+From 9562c6da55b17beb54de3a4f2c3a0ef0592dc53f Mon Sep 17 00:00:00 2001
+From: Susant Sahani <susant@redhat.com>
+Date: Thu, 2 Jul 2015 09:00:02 +0530
+Subject: [PATCH] lldp: set correct state for processing
+
+ldp_receive_frame after correct processing of the packet the state
+should be LLDP_AGENT_RX_WAIT_FOR_FRAME not LLDP_AGENT_RX_UPDATE_INFO.
+
+(cherry picked from commit 9bb1bffe3018aef5e70c411f68863eafdc92fddf)
+
+Resolves: #1694605
+---
+ src/libsystemd-network/sd-lldp.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/src/libsystemd-network/sd-lldp.c b/src/libsystemd-network/sd-lldp.c
+index 19ef2ccdbd..d2f21fd10f 100644
+--- a/src/libsystemd-network/sd-lldp.c
++++ b/src/libsystemd-network/sd-lldp.c
+@@ -136,8 +136,6 @@ static int lldp_receive_frame(sd_lldp *lldp, tlv_packet *tlv) {
+ 
+         lldp->statistics.stats_frames_in_total ++;
+ 
+-        return 0;
+-
+  out:
+         if (r < 0)
+                 log_lldp("Receive frame failed: %s", strerror(-r));

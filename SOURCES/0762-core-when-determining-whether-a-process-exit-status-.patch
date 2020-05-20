@@ -1,0 +1,164 @@
+From 8c9d6639a22d32734d950db37bfb852a1464c621 Mon Sep 17 00:00:00 2001
+From: Lennart Poettering <lennart@poettering.net>
+Date: Mon, 10 Oct 2016 22:07:30 +0200
+Subject: [PATCH] core: when determining whether a process exit status is
+ clean, consider whether it is a command or a daemon
+
+SIGTERM should be considered a clean exit code for daemons (i.e. long-running
+processes, as a daemon without SIGTERM handler may be shut down without issues
+via SIGTERM still) while it should not be considered a clean exit code for
+commands (i.e. short-running processes).
+
+Let's add two different clean checking modes for this, and use the right one at
+the appropriate places.
+
+Fixes: #4275
+(cherry picked from commit 1f0958f640b87175cd547c1e69084cfe54a22e9d)
+
+Resolves: #1560417
+---
+ src/core/busname.c          |  2 +-
+ src/core/mount.c            |  2 +-
+ src/core/service.c          |  2 +-
+ src/core/socket.c           |  2 +-
+ src/core/swap.c             |  2 +-
+ src/remount-fs/remount-fs.c |  2 +-
+ src/shared/exit-status.c    | 13 ++++---------
+ src/shared/exit-status.h    |  7 ++++++-
+ 8 files changed, 16 insertions(+), 16 deletions(-)
+
+diff --git a/src/core/busname.c b/src/core/busname.c
+index 97886f1e05..f5553e5418 100644
+--- a/src/core/busname.c
++++ b/src/core/busname.c
+@@ -849,7 +849,7 @@ static void busname_sigchld_event(Unit *u, pid_t pid, int code, int status) {
+ 
+         n->control_pid = 0;
+ 
+-        if (is_clean_exit(code, status, NULL))
++        if (is_clean_exit(code, status, EXIT_CLEAN_COMMAND, NULL))
+                 f = BUSNAME_SUCCESS;
+         else if (code == CLD_EXITED)
+                 f = BUSNAME_FAILURE_EXIT_CODE;
+diff --git a/src/core/mount.c b/src/core/mount.c
+index 8a25ebd163..bfbfc10731 100644
+--- a/src/core/mount.c
++++ b/src/core/mount.c
+@@ -1203,7 +1203,7 @@ static void mount_sigchld_event(Unit *u, pid_t pid, int code, int status) {
+ 
+         m->control_pid = 0;
+ 
+-        if (is_clean_exit(code, status, NULL))
++        if (is_clean_exit(code, status, EXIT_CLEAN_COMMAND, NULL))
+                 f = MOUNT_SUCCESS;
+         else if (code == CLD_EXITED)
+                 f = MOUNT_FAILURE_EXIT_CODE;
+diff --git a/src/core/service.c b/src/core/service.c
+index 6b61ccac18..f7b859d076 100644
+--- a/src/core/service.c
++++ b/src/core/service.c
+@@ -2632,7 +2632,7 @@ static void service_sigchld_event(Unit *u, pid_t pid, int code, int status) {
+         assert(s);
+         assert(pid >= 0);
+ 
+-        if (UNIT(s)->fragment_path ? is_clean_exit(code, status, &s->success_status) :
++        if (UNIT(s)->fragment_path ? is_clean_exit(code, status, s->type == SERVICE_ONESHOT ? EXIT_CLEAN_COMMAND : EXIT_CLEAN_DAEMON, &s->success_status) :
+                                      is_clean_exit_lsb(code, status, &s->success_status))
+                 f = SERVICE_SUCCESS;
+         else if (code == CLD_EXITED)
+diff --git a/src/core/socket.c b/src/core/socket.c
+index 8489575de6..1e8ae0a6e5 100644
+--- a/src/core/socket.c
++++ b/src/core/socket.c
+@@ -2344,7 +2344,7 @@ static void socket_sigchld_event(Unit *u, pid_t pid, int code, int status) {
+ 
+         s->control_pid = 0;
+ 
+-        if (is_clean_exit(code, status, NULL))
++        if (is_clean_exit(code, status, EXIT_CLEAN_COMMAND, NULL))
+                 f = SOCKET_SUCCESS;
+         else if (code == CLD_EXITED)
+                 f = SOCKET_FAILURE_EXIT_CODE;
+diff --git a/src/core/swap.c b/src/core/swap.c
+index 1f69736aa3..757a8d45c5 100644
+--- a/src/core/swap.c
++++ b/src/core/swap.c
+@@ -972,7 +972,7 @@ static void swap_sigchld_event(Unit *u, pid_t pid, int code, int status) {
+ 
+         s->control_pid = 0;
+ 
+-        if (is_clean_exit(code, status, NULL))
++        if (is_clean_exit(code, status, EXIT_CLEAN_COMMAND, NULL))
+                 f = SWAP_SUCCESS;
+         else if (code == CLD_EXITED)
+                 f = SWAP_FAILURE_EXIT_CODE;
+diff --git a/src/remount-fs/remount-fs.c b/src/remount-fs/remount-fs.c
+index 57b47021e4..db9ae391b8 100644
+--- a/src/remount-fs/remount-fs.c
++++ b/src/remount-fs/remount-fs.c
+@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
+ 
+                 s = hashmap_remove(pids, UINT_TO_PTR(si.si_pid));
+                 if (s) {
+-                        if (!is_clean_exit(si.si_code, si.si_status, NULL)) {
++                        if (!is_clean_exit(si.si_code, si.si_status, EXIT_CLEAN_COMMAND, NULL)) {
+                                 if (si.si_code == CLD_EXITED)
+                                         log_error("/bin/mount for %s exited with exit status %i.", s, si.si_status);
+                                 else
+diff --git a/src/shared/exit-status.c b/src/shared/exit-status.c
+index 90c83a47a8..ab09550d7a 100644
+--- a/src/shared/exit-status.c
++++ b/src/shared/exit-status.c
+@@ -180,22 +180,17 @@ const char* exit_status_to_string(ExitStatus status, ExitStatusLevel level) {
+         return NULL;
+ }
+ 
+-
+-bool is_clean_exit(int code, int status, ExitStatusSet *success_status) {
++bool is_clean_exit(int code, int status, ExitClean clean, ExitStatusSet *success_status) {
+ 
+         if (code == CLD_EXITED)
+                 return status == 0 ||
+                        (success_status &&
+                        set_contains(success_status->status, INT_TO_PTR(status)));
+ 
+-        /* If a daemon does not implement handlers for some of the
+-         * signals that's not considered an unclean shutdown */
++        /* If a daemon does not implement handlers for some of the signals that's not considered an unclean shutdown */
+         if (code == CLD_KILLED)
+                 return
+-                        status == SIGHUP ||
+-                        status == SIGINT ||
+-                        status == SIGTERM ||
+-                        status == SIGPIPE ||
++                        (clean == EXIT_CLEAN_DAEMON && IN_SET(status, SIGHUP, SIGINT, SIGTERM, SIGPIPE)) ||
+                         (success_status &&
+                         set_contains(success_status->signal, INT_TO_PTR(status)));
+ 
+@@ -204,7 +199,7 @@ bool is_clean_exit(int code, int status, ExitStatusSet *success_status) {
+ 
+ bool is_clean_exit_lsb(int code, int status, ExitStatusSet *success_status) {
+ 
+-        if (is_clean_exit(code, status, success_status))
++        if (is_clean_exit(code, status, EXIT_CLEAN_DAEMON, success_status))
+                 return true;
+ 
+         return
+diff --git a/src/shared/exit-status.h b/src/shared/exit-status.h
+index 1d774f25dc..f7953aecb1 100644
+--- a/src/shared/exit-status.h
++++ b/src/shared/exit-status.h
+@@ -95,7 +95,12 @@ typedef struct ExitStatusSet {
+ 
+ const char* exit_status_to_string(ExitStatus status, ExitStatusLevel level) _const_;
+ 
+-bool is_clean_exit(int code, int status, ExitStatusSet *success_status);
++typedef enum ExitClean {
++        EXIT_CLEAN_DAEMON,
++        EXIT_CLEAN_COMMAND,
++} ExitClean;
++
++bool is_clean_exit(int code, int status, ExitClean clean, ExitStatusSet *success_status);
+ bool is_clean_exit_lsb(int code, int status, ExitStatusSet *success_status);
+ 
+ void exit_status_set_free(ExitStatusSet *x);

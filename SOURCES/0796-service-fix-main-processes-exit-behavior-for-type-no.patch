@@ -1,0 +1,76 @@
+From 273d69011bf2a8abfcef71e33e6b6ae3323dfc34 Mon Sep 17 00:00:00 2001
+From: Jouke Witteveen <j.witteveen@gmail.com>
+Date: Sat, 1 Oct 2016 14:06:48 +0200
+Subject: [PATCH] service: fix main processes exit behavior for type notify
+ services
+
+Before this commit, when the main process of a Type=notify service exits the
+service would enter a running state without passing through the startup post
+state. This meant ExecStartPost= from being executed and allowed follow-up
+units to start too early (before the ready notification).
+Additionally, when RemainAfterExit=yes is used on a Type=notify service, the
+exit status of the main process would be disregarded.
+
+After this commit, an unsuccessful exit of the main process of a Type=notify
+service puts the unit in a failed state. A successful exit is inconsequential
+in case RemainAfterExit=yes. Otherwise, when no ready notification has been
+received, the unit is put in a failed state because it has never been active.
+When all processes in the cgroup of a Type=notify service are gone and no ready
+notification has been received yet, the unit is also put in a failed state.
+
+(cherry picked from commit 3d474ef7a687e2052aa303e0f95893b2fc610475)
+
+Related: #1733998
+---
+ src/core/service.c | 24 +++++++++++++++++++-----
+ 1 file changed, 19 insertions(+), 5 deletions(-)
+
+diff --git a/src/core/service.c b/src/core/service.c
+index 84a5aeb072..b6f302ec33 100644
+--- a/src/core/service.c
++++ b/src/core/service.c
+@@ -1531,7 +1531,9 @@ static void service_enter_running(Service *s, ServiceResult f) {
+                 else
+                         service_set_state(s, SERVICE_RUNNING);
+ 
+-        } else if (s->remain_after_exit)
++        } else if (f != SERVICE_SUCCESS)
++                service_enter_signal(s, SERVICE_FINAL_SIGTERM, f);
++        else if (s->remain_after_exit)
+                 service_set_state(s, SERVICE_EXITED);
+         else
+                 service_enter_stop(s, SERVICE_SUCCESS);
+@@ -2561,10 +2563,12 @@ static void service_notify_cgroup_empty_event(Unit *u) {
+ 
+         case SERVICE_START:
+         case SERVICE_START_POST:
+-                /* If we were hoping for the daemon to write its PID file,
+-                 * we can give up now. */
+-                if (s->pid_file_pathspec) {
+-                        log_unit_warning(u->id, "%s never wrote its PID file. Failing.", UNIT(s)->id);
++                if (s->type == SERVICE_NOTIFY)
++                        /* No chance of getting a ready notification anymore */
++                        service_enter_signal(s, SERVICE_FINAL_SIGTERM, SERVICE_FAILURE_PROTOCOL);
++                else if (s->pid_file_pathspec) {
++                        /* Give up hoping for the daemon to write its PID file */
++                        log_unit_warning(u->id, "Daemon never wrote its PID file. Failing.");
+ 
+                         service_unwatch_pid_file(s);
+                         if (s->state == SERVICE_START)
+@@ -2699,6 +2703,16 @@ static void service_sigchld_event(Unit *u, pid_t pid, int code, int status) {
+                                         else
+                                                 service_enter_signal(s, SERVICE_FINAL_SIGTERM, f);
+                                         break;
++                                } else if (s->type == SERVICE_NOTIFY) {
++                                        /* Only enter running through a notification, so that the
++                                         * SERVICE_START state signifies that no ready notification
++                                         * has been received */
++                                        if (f != SERVICE_SUCCESS)
++                                                service_enter_signal(s, SERVICE_FINAL_SIGTERM, f);
++                                        else if (!s->remain_after_exit)
++                                                /* The service has never been active */
++                                                service_enter_signal(s, SERVICE_FINAL_SIGTERM, SERVICE_FAILURE_PROTOCOL);
++                                        break;
+                                 }
+ 
+                                 /* Fall through */

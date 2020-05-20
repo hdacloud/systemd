@@ -1,0 +1,25 @@
+From c8389c4a0b1e2587247824782230d4c132a639ee Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Wed, 27 Jun 2018 13:28:28 +0900
+Subject: [PATCH] sd-bus: fix implicit downcast of bitfield reported by LGTM
+
+(cherry picked from commit affaed1e55685e8e248db1afd50b3e0f466ce5cc)
+
+Resolves: #1694605
+---
+ src/libsystemd/sd-bus/bus-introspect.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/libsystemd/sd-bus/bus-introspect.c b/src/libsystemd/sd-bus/bus-introspect.c
+index d528ab2a04..f77e6abec7 100644
+--- a/src/libsystemd/sd-bus/bus-introspect.c
++++ b/src/libsystemd/sd-bus/bus-introspect.c
+@@ -74,7 +74,7 @@ int introspect_write_child_nodes(struct introspect *i, Set *s, const char *prefi
+         return 0;
+ }
+ 
+-static void introspect_write_flags(struct introspect *i, int type, int flags) {
++static void introspect_write_flags(struct introspect *i, int type, uint64_t flags) {
+         if (flags & SD_BUS_VTABLE_DEPRECATED)
+                 fputs("   <annotation name=\"org.freedesktop.DBus.Deprecated\" value=\"true\"/>\n", i->f);
+ 

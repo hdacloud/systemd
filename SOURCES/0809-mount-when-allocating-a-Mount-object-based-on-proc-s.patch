@@ -1,0 +1,35 @@
+From 58407f55ccfc83eef2bd14e672d13213ef93069d Mon Sep 17 00:00:00 2001
+From: Lennart Poettering <lennart@poettering.net>
+Date: Wed, 28 Nov 2018 14:51:04 +0100
+Subject: [PATCH] mount: when allocating a Mount object based on
+ /proc/self/mountinfo mark it so
+
+Let's set 'from_proc_self_mountinfo' right away, since we know its from
+there. This is important so that when the load queue is dispatched (and
+thus mount_load() called) this
+fact is already known.
+
+(cherry picked from commit 6d7e89b07065b8c49af47aaf1ccc336d017fc3a2)
+Related: #1809159
+---
+ src/core/mount.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/src/core/mount.c b/src/core/mount.c
+index 126038c27f..34c4b548ad 100644
+--- a/src/core/mount.c
++++ b/src/core/mount.c
+@@ -1480,6 +1480,13 @@ static int mount_setup_unit(
+                         }
+                 }
+ 
++                /* This unit was generated because /proc/self/mountinfo reported it. Remember this, so that by the time we load
++                 * the unit file for it (and thus add in extra deps right after) we know what source to attributes the deps
++                 * to.*/
++                MOUNT(u)->from_proc_self_mountinfo = true;
++
++                /* We have only allocated the stub now, let's enqueue this unit for loading now, so that everything else is
++                 * loaded in now. */
+                 unit_add_to_load_queue(u);
+                 changed = true;
+         } else {

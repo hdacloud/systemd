@@ -1,0 +1,27 @@
+From 7872e75d4be31e6ba295c8360e801fd133ee6d76 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Zbigniew=20J=C4=99drzejewski-Szmek?= <zbyszek@in.waw.pl>
+Date: Sun, 29 Jan 2017 12:45:51 -0500
+Subject: [PATCH] units: drop KillMode= from initrd-switch-root.service
+
+The service already has DefaultDeps disabled, so systemd should not try to stop
+it. And if it *does* get stopped, we don't want the zombie process around.
+KillMode=none does not change anything in the killall() phase, and we already
+use argv[0][0] = '@' to protect against that anyway. KillMode=none should not
+be useful in normal operation, so let's leave it out.
+
+(cherry picked from commit 0af9a194ca0243fcb206499116e28612f571bd91)
+
+Related: #1754053
+---
+ units/initrd-switch-root.service.in | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/units/initrd-switch-root.service.in b/units/initrd-switch-root.service.in
+index 82893dafb1..d8e35c79fe 100644
+--- a/units/initrd-switch-root.service.in
++++ b/units/initrd-switch-root.service.in
+@@ -17,4 +17,3 @@ AllowIsolate=yes
+ Type=oneshot
+ # we have to use "--force" here, otherwise systemd would umount /run
+ ExecStart=@rootbindir@/systemctl --no-block --force switch-root /sysroot
+-KillMode=none

@@ -1,0 +1,42 @@
+From 1499ff8f8ddd699a950729f5f3985975ef929c0a Mon Sep 17 00:00:00 2001
+From: Frantisek Sumsal <fsumsal@redhat.com>
+Date: Thu, 28 Feb 2019 14:27:44 +0100
+Subject: [PATCH] lgtm: suppress several constant comparisons
+
+Even though LGTM is right is these cases, fixing it would require
+substantial refactoring in some cases, so it's better to leave them
+here (at least for RHEL 7).
+
+Resolves: #1694605
+rhel-only
+---
+ src/sysv-generator/sysv-generator.c                 | 2 +-
+ src/tty-ask-password-agent/tty-ask-password-agent.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/sysv-generator/sysv-generator.c b/src/sysv-generator/sysv-generator.c
+index fe6fae1510..232436a258 100644
+--- a/src/sysv-generator/sysv-generator.c
++++ b/src/sysv-generator/sysv-generator.c
+@@ -568,7 +568,7 @@ static int load_sysv(SysvStub *s) {
+                                                 }
+                                         }
+ 
+-                                        if (r < 0)
++                                        if (r < 0) // lgtm[cpp/constant-comparison]
+                                                 log_unit_error(s->name,
+                                                                "[%s:%u] Failed to add dependency on %s, ignoring: %s",
+                                                                s->path, line, m, strerror(-r));
+diff --git a/src/tty-ask-password-agent/tty-ask-password-agent.c b/src/tty-ask-password-agent/tty-ask-password-agent.c
+index 47093b850d..1b7bbfa075 100644
+--- a/src/tty-ask-password-agent/tty-ask-password-agent.c
++++ b/src/tty-ask-password-agent/tty-ask-password-agent.c
+@@ -150,7 +150,7 @@ static int ask_password_plymouth(
+ 
+                 p += k;
+ 
+-                if (p < 1)
++                if (p < 1) // lgtm[cpp/constant-comparison]
+                         continue;
+ 
+                 if (buffer[0] == 5) {

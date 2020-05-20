@@ -1,0 +1,33 @@
+From 39ab4de70c6f2b35ec735195803f4bd1eb5892c1 Mon Sep 17 00:00:00 2001
+From: Evgeny Vereshchagin <evvers@ya.ru>
+Date: Thu, 20 Oct 2016 13:18:12 +0000
+Subject: [PATCH] tests: add test that journald keeps fds over termination by
+ signal
+
+This test fails before previous commit, and passes with it.
+
+(cherry picked from commit bff653e3970bb79832568ae86b095ee530b62302)
+(cherry picked from commit ee8f69ae5ddac6f05c56ea7dbcb76fbbb2e355ee)
+Resolves: #1803802
+---
+ test/TEST-04-JOURNAL/test-journal.sh | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/test/TEST-04-JOURNAL/test-journal.sh b/test/TEST-04-JOURNAL/test-journal.sh
+index 701b0cf724..d0b05c46d6 100755
+--- a/test/TEST-04-JOURNAL/test-journal.sh
++++ b/test/TEST-04-JOURNAL/test-journal.sh
+@@ -22,5 +22,13 @@ sleep 3
+ systemctl stop forever-print-hola
+ [[ ! -f "/i-lose-my-logs" ]]
+ 
++# https://github.com/systemd/systemd/issues/4408
++rm -f /i-lose-my-logs
++systemctl start forever-print-hola
++sleep 3
++systemctl kill --signal=SIGKILL systemd-journald
++sleep 3
++[[ ! -f "/i-lose-my-logs" ]]
++
+ touch /testok
+ exit 0

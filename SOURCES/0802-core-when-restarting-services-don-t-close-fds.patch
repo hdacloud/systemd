@@ -1,0 +1,112 @@
+From 017d1bc2a34946336dbafcc1c9c390ea45a2a3bd Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Zbigniew=20J=C4=99drzejewski-Szmek?= <zbyszek@in.waw.pl>
+Date: Sat, 22 Oct 2016 22:16:02 -0400
+Subject: [PATCH] core: when restarting services, don't close fds
+
+We would close all the stored fds in service_release_resources(), which of
+course broke the whole concept of storing fds over service restart.
+
+Fixes #4408.
+
+(cherry picked from commit f0bfbfac43b7faa68ef1bb2ad659c191b9ec85d2)
+(cherry picked from commit 4c271437cd695c31e76adb191013009689a7797c)
+Resolves: #1803802
+---
+ src/core/service.c | 22 +++++++++++++++-------
+ src/core/unit.c    |  6 ++++--
+ src/core/unit.h    |  2 +-
+ 3 files changed, 20 insertions(+), 10 deletions(-)
+
+diff --git a/src/core/service.c b/src/core/service.c
+index e538280bad..3c2f69a003 100644
+--- a/src/core/service.c
++++ b/src/core/service.c
+@@ -258,7 +258,17 @@ static void service_fd_store_unlink(ServiceFDStore *fs) {
+         free(fs);
+ }
+ 
+-static void service_release_resources(Unit *u) {
++static void service_release_fd_store(Service *s) {
++        assert(s);
++
++        log_unit_debug(UNIT(s)->id, "Releasing all stored fds");
++        while (s->fd_store)
++                service_fd_store_unlink(s->fd_store);
++
++        assert(s->n_fd_store == 0);
++}
++
++static void service_release_resources(Unit *u, bool inactive) {
+         Service *s = SERVICE(u);
+ 
+         assert(s);
+@@ -266,12 +276,10 @@ static void service_release_resources(Unit *u) {
+         if (!s->fd_store)
+                 return;
+ 
+-        log_debug("Releasing all resources for %s", u->id);
+-
+-        while (s->fd_store)
+-                service_fd_store_unlink(s->fd_store);
++        log_unit_debug(u->id, "Releasing resources.");
+ 
+-        assert(s->n_fd_store == 0);
++        if (inactive)
++                service_release_fd_store(s);
+ }
+ 
+ static void service_done(Unit *u) {
+@@ -319,7 +327,7 @@ static void service_done(Unit *u) {
+ 
+         s->timer_event_source = sd_event_source_unref(s->timer_event_source);
+ 
+-        service_release_resources(u);
++        service_release_resources(u, true);
+ }
+ 
+ static int on_fd_store_io(sd_event_source *e, int fd, uint32_t revents, void *userdata) {
+diff --git a/src/core/unit.c b/src/core/unit.c
+index 0dc66203a4..22e31a76b3 100644
+--- a/src/core/unit.c
++++ b/src/core/unit.c
+@@ -285,6 +285,7 @@ int unit_set_description(Unit *u, const char *description) {
+ 
+ bool unit_may_gc(Unit *u) {
+         UnitActiveState state;
++        bool inactive;
+         assert(u);
+ 
+         /* Checks whether the unit is ready to be unloaded for garbage collection.
+@@ -302,16 +303,17 @@ bool unit_may_gc(Unit *u) {
+                 return false;
+ 
+         state = unit_active_state(u);
++        inactive = state == UNIT_INACTIVE;
+ 
+         /* If the unit is inactive and failed and no job is queued for
+          * it, then release its runtime resources */
+         if (UNIT_IS_INACTIVE_OR_FAILED(state) &&
+             UNIT_VTABLE(u)->release_resources)
+-                UNIT_VTABLE(u)->release_resources(u);
++                UNIT_VTABLE(u)->release_resources(u, inactive);
+ 
+         /* But we keep the unit object around for longer when it is
+          * referenced or configured to not be gc'ed */
+-        if (state != UNIT_INACTIVE)
++        if (!inactive)
+                 return false;
+ 
+         if (UNIT_VTABLE(u)->no_gc)
+diff --git a/src/core/unit.h b/src/core/unit.h
+index 719fc95260..232be8164f 100644
+--- a/src/core/unit.h
++++ b/src/core/unit.h
+@@ -360,7 +360,7 @@ struct UnitVTable {
+ 
+         /* When the unit is not running and no job for it queued we
+          * shall release its runtime resources */
+-        void (*release_resources)(Unit *u);
++        void (*release_resources)(Unit *u, bool inactive);
+ 
+         /* Return true when this unit is suitable for snapshotting */
+         bool (*check_snapshot)(Unit *u);

@@ -1,0 +1,54 @@
+From e3468af46bd16e3550c25a0770f47f0bf21780f3 Mon Sep 17 00:00:00 2001
+From: Evgeny Vereshchagin <evvers@ya.ru>
+Date: Wed, 30 Dec 2015 03:33:43 +0000
+Subject: [PATCH] tests: add regression test for `systemctl restart
+ systemd-journald`
+
+See https://github.com/systemd/systemd/issues/2236
+
+(cherry picked from commit 3889613ec6bc54b9e02955f62b9d5c5b571c3d4b)
+(cherry picked from commit 4dc893c03fe9c56a3d3070fb8583f5584014aa49)
+Resolves: #1803802
+---
+ test/TEST-04-JOURNAL/test-journal.sh | 8 ++++++++
+ test/TEST-04-JOURNAL/test.sh         | 9 +++++++++
+ 2 files changed, 17 insertions(+)
+
+diff --git a/test/TEST-04-JOURNAL/test-journal.sh b/test/TEST-04-JOURNAL/test-journal.sh
+index c75f396ceb..701b0cf724 100755
+--- a/test/TEST-04-JOURNAL/test-journal.sh
++++ b/test/TEST-04-JOURNAL/test-journal.sh
+@@ -14,5 +14,13 @@ journalctl --flush
+ journalctl -b -o cat -t "$ID" >/output
+ cmp /expected /output
+ 
++# Don't lose streams on restart
++systemctl start forever-print-hola
++sleep 3
++systemctl restart systemd-journald
++sleep 3
++systemctl stop forever-print-hola
++[[ ! -f "/i-lose-my-logs" ]]
++
+ touch /testok
+ exit 0
+diff --git a/test/TEST-04-JOURNAL/test.sh b/test/TEST-04-JOURNAL/test.sh
+index e37cb7d412..6aea67ba4e 100755
+--- a/test/TEST-04-JOURNAL/test.sh
++++ b/test/TEST-04-JOURNAL/test.sh
+@@ -55,6 +55,15 @@ After=multi-user.target
+ [Service]
+ ExecStart=/test-journal.sh
+ Type=oneshot
++EOF
++
++        cat >$initdir/etc/systemd/system/forever-print-hola.service <<EOF
++[Unit]
++Description=ForeverPrintHola service
++
++[Service]
++Type=simple
++ExecStart=/bin/sh -x -c 'while :; do printf "Hola\n" || touch /i-lose-my-logs; sleep 1; done'
+ EOF
+ 
+         cp test-journal.sh $initdir/
