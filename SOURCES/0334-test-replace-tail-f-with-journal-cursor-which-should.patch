@@ -1,8 +1,8 @@
 From b93a2617d49d9636801130d974995cabe6335b71 Mon Sep 17 00:00:00 2001
 From: Frantisek Sumsal <frantisek@sumsal.cz>
 Date: Mon, 1 Jul 2019 09:27:59 +0200
-Subject: [PATCH 334/341] test: replace `tail -f` with journal cursor which
- should be...
+Subject: [PATCH] test: replace `tail -f` with journal cursor which should
+ be...
 
 more reliable
 
@@ -50,6 +50,3 @@ index e15087b137..306a96b517 100755
  }
  
  checkNUMA() {
--- 
-2.21.1
-

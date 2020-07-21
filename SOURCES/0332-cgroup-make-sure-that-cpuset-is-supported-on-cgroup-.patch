@@ -1,8 +1,8 @@
 From 5fc2d94fbf8271bb340e834f832af5d890c267bf Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Michal=20Sekleta=CC=81r?= <msekleta@redhat.com>
 Date: Tue, 3 Mar 2020 11:45:00 +0100
-Subject: [PATCH 332/341] cgroup: make sure that cpuset is supported on cgroup
- v2 and disabled with v1
+Subject: [PATCH] cgroup: make sure that cpuset is supported on cgroup v2 and
+ disabled with v1
 
 Resolves: #1808940
 
@@ -38,6 +38,3 @@ index 6f47c3aacb..92bc1f2543 100644
                          n = cgroup_controller_to_string(c);
                          if (controller_is_accessible(n) >= 0)
                                  mask |= CGROUP_CONTROLLER_TO_MASK(c);
--- 
-2.21.1
-

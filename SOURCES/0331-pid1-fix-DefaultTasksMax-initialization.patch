@@ -1,7 +1,7 @@
 From e809564cfa5af01a26075682d49f81a987c41dd8 Mon Sep 17 00:00:00 2001
 From: Franck Bui <fbui@suse.com>
 Date: Wed, 2 Oct 2019 11:58:16 +0200
-Subject: [PATCH 331/341] pid1: fix DefaultTasksMax initialization
+Subject: [PATCH] pid1: fix DefaultTasksMax initialization
 
 Otherwise DefaultTasksMax is always set to "inifinity".
 
@@ -36,6 +36,3 @@ index d6550ea161..45d09b1e11 100644
          /* Assign configuration defaults */
          reset_arguments();
  
--- 
-2.21.1
-

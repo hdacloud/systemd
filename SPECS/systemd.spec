@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        30%{?dist}
+Release:        31%{?dist}.2
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -395,6 +395,28 @@ Patch0342: 0342-cryptsetup-Treat-key-file-errors-as-a-failed-passwor.patch
 Patch0343: 0343-pid1-fix-the-names-of-AllowedCPUs-and-AllowedMemoryN.patch
 Patch0344: 0344-core-fix-re-realization-of-cgroup-siblings.patch
 Patch0345: 0345-basic-use-comma-as-separator-in-cpuset-cgroup-cpu-ra.patch
+Patch0346: 0346-swap-finish-the-secondary-swap-units-jobs-if-deactiv.patch
+Patch0347: 0347-pid1-add-new-kernel-cmdline-arg-systemd.cpu_affinity.patch
+Patch0348: 0348-sd-journal-close-journal-files-that-were-deleted-by-.patch
+Patch0349: 0349-sd-journal-remove-the-dead-code-and-actually-fix-146.patch
+Patch0350: 0350-test-do-not-use-global-variable-to-pass-error.patch
+Patch0351: 0351-test-install-libraries-required-by-tests.patch
+Patch0352: 0352-test-introduce-install_zoneinfo.patch
+Patch0353: 0353-test-replace-duplicated-Makefile-by-symbolic-link.patch
+Patch0354: 0354-test-add-paths-of-keymaps-in-install_keymaps.patch
+Patch0355: 0355-test-make-install_keymaps-optionally-install-more-ke.patch
+Patch0356: 0356-test-fs-util-skip-some-tests-when-running-in-unprivi.patch
+Patch0357: 0357-test-process-util-skip-several-verifications-when-ru.patch
+Patch0358: 0358-test-execute-also-check-python3-is-installed-or-not.patch
+Patch0359: 0359-test-execute-skip-several-tests-when-running-in-cont.patch
+Patch0360: 0360-test-introduce-test_is_running_from_builddir.patch
+Patch0361: 0361-test-make-test-catalog-relocatable.patch
+Patch0362: 0362-test-parallelize-tasks-in-TEST-24-UNIT-TESTS.patch
+Patch0363: 0363-test-try-to-determine-QEMU_SMP-dynamically.patch
+Patch0364: 0364-test-store-coredumps-in-journal.patch
+Patch0365: 0365-udev-rules-make-tape-changers-also-apprear-in-dev-ta.patch
+Patch0366: 0366-nspawn-move-payload-to-sub-cgroup-first-then-sync-cg.patch
+Patch0367: 0367-nspawn-chown-the-legacy-hierarchy-when-it-s-used-in-.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -1019,6 +1041,34 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Fri May 22 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-31.2
+- test: do not use global variable to pass error (#1836979)
+- test: install libraries required by tests (#1836979)
+- test: introduce install_zoneinfo() (#1836979)
+- test: replace duplicated Makefile by symbolic link (#1836979)
+- test: add paths of keymaps in install_keymaps() (#1836979)
+- test: make install_keymaps() optionally install more keymaps (#1836979)
+- test-fs-util: skip some tests when running in unprivileged container (#1836979)
+- test-process-util: skip several verifications when running in unprivileged container (#1836979)
+- test-execute: also check python3 is installed or not (#1836979)
+- test-execute: skip several tests when running in container (#1836979)
+- test: introduce test_is_running_from_builddir() (#1836979)
+- test: make test-catalog relocatable (#1836979)
+- test: parallelize tasks in TEST-24-UNIT-TESTS (#1836979)
+- test: try to determine QEMU_SMP dynamically (#1836979)
+- test: store coredumps in journal (#1836979)
+- udev-rules: make tape-changers also apprear in /dev/tape/by-path/ (#1836981)
+- nspawn: move payload to sub-cgroup first, then sync cgroup trees (#1837423)
+- nspawn: chown() the legacy hierarchy when it's used in a container (#1837423)
+
+* Mon May 11 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-31.1
+- sd-journal: close journal files that were deleted by journald before we've setup inotify watch (#1826217)
+- sd-journal: remove the dead code and actually fix #14695 (#1826217)
+
+* Mon Apr 27 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-31
+- swap: finish the secondary swap units' jobs if deactivation of the primary swap unit fails (#1821372)
+- pid1: add new kernel cmdline arg systemd.cpu_affinity= (#1827621)
+
 * Wed Apr 15 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-30
 - pid1: fix the names of AllowedCPUs= and AllowedMemoryNodes= (#1824129)
 - core: fix re-realization of cgroup siblings (#1824129)

@@ -1,7 +1,7 @@
 From 90dda340e4adeb1126639a849d4f31ae327fdc4b Mon Sep 17 00:00:00 2001
 From: Frantisek Sumsal <frantisek@sumsal.cz>
 Date: Tue, 25 Jun 2019 23:01:40 +0200
-Subject: [PATCH 333/341] test: introduce TEST-36-NUMAPOLICY
+Subject: [PATCH] test: introduce TEST-36-NUMAPOLICY
 
 (cherry picked from commit 8f65e26508969610ac934d1aadbade8223bfcaac)
 
@@ -378,6 +378,3 @@ index 0000000000..e15087b137
 +echo OK > /testok
 +
 +exit 0
--- 
-2.21.1
-

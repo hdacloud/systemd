@@ -1,7 +1,7 @@
 From d6d43b81df76d571d57f83ceb050c8b4ac4701b8 Mon Sep 17 00:00:00 2001
 From: Frantisek Sumsal <frantisek@sumsal.cz>
 Date: Mon, 1 Jul 2019 13:08:26 +0200
-Subject: [PATCH 335/341] test: support MPOL_LOCAL matching in unpatched strace
+Subject: [PATCH] test: support MPOL_LOCAL matching in unpatched strace
  versions
 
 The MPOL_LOCAL constant is not recognized in current strace versions.
@@ -56,6 +56,3 @@ index 306a96b517..a4134bdeca 100755
  
  echo "systemd-run NUMAPolicy support"
  runUnit='numa-systemd-run-test.service'
--- 
-2.21.1
-

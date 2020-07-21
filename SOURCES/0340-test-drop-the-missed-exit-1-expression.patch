@@ -1,7 +1,7 @@
 From 772f08f8255d7ab921c344ab4243249cbd1c37fc Mon Sep 17 00:00:00 2001
 From: Frantisek Sumsal <frantisek@sumsal.cz>
 Date: Sat, 10 Aug 2019 16:05:07 +0200
-Subject: [PATCH 340/341] test: drop the missed || exit 1 expression
+Subject: [PATCH] test: drop the missed || exit 1 expression
 
 ...as we've already done in the rest of the testsuite, see
 cc469c3dfc398210f38f819d367e68646c71d8da
@@ -33,6 +33,3 @@ index f0a321e7a1..3b3b120423 100755
      setup_nspawn_root
  
      ddebug "umount $TESTDIR/root"
--- 
-2.21.1
-

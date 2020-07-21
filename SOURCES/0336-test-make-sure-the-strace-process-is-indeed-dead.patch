@@ -1,7 +1,7 @@
 From 60813b55f9b5b44b14f38bbc1b8c0d2b30e3f6c7 Mon Sep 17 00:00:00 2001
 From: Frantisek Sumsal <frantisek@sumsal.cz>
 Date: Mon, 1 Jul 2019 19:53:45 +0200
-Subject: [PATCH 336/341] test: make sure the strace process is indeed dead
+Subject: [PATCH] test: make sure the strace process is indeed dead
 
 It may take a few moments for the strace process to properly terminate
 and write all logs to the backing storage
@@ -48,6 +48,3 @@ index a4134bdeca..daed8fcc1c 100755
      stopStrace
  }
  
--- 
-2.21.1
-

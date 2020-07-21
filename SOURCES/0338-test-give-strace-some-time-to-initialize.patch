@@ -1,7 +1,7 @@
 From 66f6f6304d87b2fe0c4f91373c7d1b836de1b054 Mon Sep 17 00:00:00 2001
 From: Frantisek Sumsal <frantisek@sumsal.cz>
 Date: Tue, 23 Jul 2019 00:56:04 +0200
-Subject: [PATCH 338/341] test: give strace some time to initialize
+Subject: [PATCH] test: give strace some time to initialize
 
 The `coproc` implementation seems to be a little bit different in older
 bash versions, so the `strace` is sometimes started AFTER `systemctl
@@ -28,6 +28,3 @@ index 4b715d305a..1c8cf7e6b6 100755
  }
  
  stopStrace() {
--- 
-2.21.1
-

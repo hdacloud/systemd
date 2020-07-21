@@ -1,0 +1,60 @@
+From 464a88eeb63c0e733633c7d8eef3a48f68b8440e Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Wed, 12 Sep 2018 18:18:33 +0900
+Subject: [PATCH] test-execute: also check python3 is installed or not
+
+(cherry picked from commit 738c74d7b163ea18e3c68115c3ed8ceed166cbf7)
+(cherry picked from commit 6750925014bcd2d2289af08cdc5d81b673c36779)
+
+Resolves: #1836979
+---
+ src/test/test-execute.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/src/test/test-execute.c b/src/test/test-execute.c
+index 6c22995b1e..af64427bc7 100644
+--- a/src/test/test-execute.c
++++ b/src/test/test-execute.c
+@@ -317,6 +317,8 @@ static void test_exec_temporaryfilesystem(Manager *m) {
+ 
+ static void test_exec_systemcallfilter(Manager *m) {
+ #if HAVE_SECCOMP
++        int r;
++
+         if (!is_seccomp_available()) {
+                 log_notice("Seccomp not available, skipping %s", __func__);
+                 return;
+@@ -326,6 +328,13 @@ static void test_exec_systemcallfilter(Manager *m) {
+         test(m, "exec-systemcallfilter-not-failing2.service", 0, CLD_EXITED);
+         test(m, "exec-systemcallfilter-failing.service", SIGSYS, CLD_KILLED);
+         test(m, "exec-systemcallfilter-failing2.service", SIGSYS, CLD_KILLED);
++
++        r = find_binary("python3", NULL);
++        if (r < 0) {
++                log_notice_errno(r, "Skipping remaining tests in %s, could not find python3 binary: %m", __func__);
++                return;
++        }
++
+         test(m, "exec-systemcallfilter-with-errno-name.service", errno_from_name("EILSEQ"), CLD_EXITED);
+         test(m, "exec-systemcallfilter-with-errno-number.service", 255, CLD_EXITED);
+ #endif
+@@ -333,11 +342,19 @@ static void test_exec_systemcallfilter(Manager *m) {
+ 
+ static void test_exec_systemcallerrornumber(Manager *m) {
+ #if HAVE_SECCOMP
++        int r;
++
+         if (!is_seccomp_available()) {
+                 log_notice("Seccomp not available, skipping %s", __func__);
+                 return;
+         }
+ 
++        r = find_binary("python3", NULL);
++        if (r < 0) {
++                log_notice_errno(r, "Skipping %s, could not find python3 binary: %m", __func__);
++                return;
++        }
++
+         test(m, "exec-systemcallerrornumber-name.service", errno_from_name("EACCES"), CLD_EXITED);
+         test(m, "exec-systemcallerrornumber-number.service", 255, CLD_EXITED);
+ #endif

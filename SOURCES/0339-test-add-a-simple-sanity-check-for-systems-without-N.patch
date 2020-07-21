@@ -1,8 +1,8 @@
 From 8239ecf0b4b8bbe5b3c17964d230d13cee4d900a Mon Sep 17 00:00:00 2001
 From: Frantisek Sumsal <frantisek@sumsal.cz>
 Date: Mon, 5 Aug 2019 14:38:45 +0200
-Subject: [PATCH 339/341] test: add a simple sanity check for systems without
- NUMA support
+Subject: [PATCH] test: add a simple sanity check for systems without NUMA
+ support
 
 (cherry picked from commit 92f8e978923f962a57d744c5f358520ac06f7892)
 
@@ -389,6 +389,3 @@ index 1c8cf7e6b6..a5ac788178 100755
  
  # Cleanup
  rm -rf $testDir
--- 
-2.21.1
-

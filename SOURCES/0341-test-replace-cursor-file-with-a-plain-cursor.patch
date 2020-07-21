@@ -1,7 +1,7 @@
 From 0bef8805c81eecfe3960bf00b6022837e4979198 Mon Sep 17 00:00:00 2001
 From: Frantisek Sumsal <fsumsal@redhat.com>
 Date: Tue, 3 Mar 2020 15:54:29 +0100
-Subject: [PATCH 341/341] test: replace cursor file with a plain cursor
+Subject: [PATCH] test: replace cursor file with a plain cursor
 
 systemd in RHEL 8 doesn't support the --cursor-file option, so let's
 fall back to a plain cursor string
@@ -57,6 +57,3 @@ index a5ac788178..bffac4ffe6 100755
  }
  
  checkNUMA() {
--- 
-2.21.1
-
