@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        31%{?dist}.2
+Release:        40%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -392,31 +392,98 @@ Patch0339: 0339-test-add-a-simple-sanity-check-for-systems-without-N.patch
 Patch0340: 0340-test-drop-the-missed-exit-1-expression.patch
 Patch0341: 0341-test-replace-cursor-file-with-a-plain-cursor.patch
 Patch0342: 0342-cryptsetup-Treat-key-file-errors-as-a-failed-passwor.patch
-Patch0343: 0343-pid1-fix-the-names-of-AllowedCPUs-and-AllowedMemoryN.patch
-Patch0344: 0344-core-fix-re-realization-of-cgroup-siblings.patch
-Patch0345: 0345-basic-use-comma-as-separator-in-cpuset-cgroup-cpu-ra.patch
-Patch0346: 0346-swap-finish-the-secondary-swap-units-jobs-if-deactiv.patch
-Patch0347: 0347-pid1-add-new-kernel-cmdline-arg-systemd.cpu_affinity.patch
-Patch0348: 0348-sd-journal-close-journal-files-that-were-deleted-by-.patch
-Patch0349: 0349-sd-journal-remove-the-dead-code-and-actually-fix-146.patch
-Patch0350: 0350-test-do-not-use-global-variable-to-pass-error.patch
-Patch0351: 0351-test-install-libraries-required-by-tests.patch
-Patch0352: 0352-test-introduce-install_zoneinfo.patch
-Patch0353: 0353-test-replace-duplicated-Makefile-by-symbolic-link.patch
-Patch0354: 0354-test-add-paths-of-keymaps-in-install_keymaps.patch
-Patch0355: 0355-test-make-install_keymaps-optionally-install-more-ke.patch
-Patch0356: 0356-test-fs-util-skip-some-tests-when-running-in-unprivi.patch
-Patch0357: 0357-test-process-util-skip-several-verifications-when-ru.patch
-Patch0358: 0358-test-execute-also-check-python3-is-installed-or-not.patch
-Patch0359: 0359-test-execute-skip-several-tests-when-running-in-cont.patch
-Patch0360: 0360-test-introduce-test_is_running_from_builddir.patch
-Patch0361: 0361-test-make-test-catalog-relocatable.patch
-Patch0362: 0362-test-parallelize-tasks-in-TEST-24-UNIT-TESTS.patch
-Patch0363: 0363-test-try-to-determine-QEMU_SMP-dynamically.patch
-Patch0364: 0364-test-store-coredumps-in-journal.patch
-Patch0365: 0365-udev-rules-make-tape-changers-also-apprear-in-dev-ta.patch
-Patch0366: 0366-nspawn-move-payload-to-sub-cgroup-first-then-sync-cg.patch
-Patch0367: 0367-nspawn-chown-the-legacy-hierarchy-when-it-s-used-in-.patch
+Patch0343: 0343-swap-finish-the-secondary-swap-units-jobs-if-deactiv.patch
+Patch0344: 0344-resolved-Recover-missing-PrivateTmp-yes-and-ProtectS.patch
+Patch0345: 0345-bus_open-leak-sd_event_source-when-udevadm-trigger.patch
+Patch0346: 0346-core-rework-StopWhenUnneeded-logic.patch
+Patch0347: 0347-pid1-fix-the-names-of-AllowedCPUs-and-AllowedMemoryN.patch
+Patch0348: 0348-core-fix-re-realization-of-cgroup-siblings.patch
+Patch0349: 0349-basic-use-comma-as-separator-in-cpuset-cgroup-cpu-ra.patch
+Patch0350: 0350-core-transition-to-FINAL_SIGTERM-state-after-ExecSto.patch
+Patch0351: 0351-sd-journal-close-journal-files-that-were-deleted-by-.patch
+Patch0352: 0352-sd-journal-remove-the-dead-code-and-actually-fix-146.patch
+Patch0353: 0353-udev-downgrade-message-when-we-fail-to-set-inotify-w.patch
+Patch0354: 0354-logind-check-PolicyKit-before-allowing-VT-switch.patch
+Patch0355: 0355-test-do-not-use-global-variable-to-pass-error.patch
+Patch0356: 0356-test-install-libraries-required-by-tests.patch
+Patch0357: 0357-test-introduce-install_zoneinfo.patch
+Patch0358: 0358-test-replace-duplicated-Makefile-by-symbolic-link.patch
+Patch0359: 0359-test-add-paths-of-keymaps-in-install_keymaps.patch
+Patch0360: 0360-test-make-install_keymaps-optionally-install-more-ke.patch
+Patch0361: 0361-test-fs-util-skip-some-tests-when-running-in-unprivi.patch
+Patch0362: 0362-test-process-util-skip-several-verifications-when-ru.patch
+Patch0363: 0363-test-execute-also-check-python3-is-installed-or-not.patch
+Patch0364: 0364-test-execute-skip-several-tests-when-running-in-cont.patch
+Patch0365: 0365-test-introduce-test_is_running_from_builddir.patch
+Patch0366: 0366-test-make-test-catalog-relocatable.patch
+Patch0367: 0367-test-parallelize-tasks-in-TEST-24-UNIT-TESTS.patch
+Patch0368: 0368-test-try-to-determine-QEMU_SMP-dynamically.patch
+Patch0369: 0369-test-store-coredumps-in-journal.patch
+Patch0370: 0370-pid1-add-new-kernel-cmdline-arg-systemd.cpu_affinity.patch
+Patch0371: 0371-udev-rules-make-tape-changers-also-apprear-in-dev-ta.patch
+Patch0372: 0372-man-be-clearer-that-.timer-time-expressions-need-to-.patch
+Patch0373: 0373-Add-support-for-opening-files-for-appending.patch
+Patch0374: 0374-nspawn-move-payload-to-sub-cgroup-first-then-sync-cg.patch
+Patch0375: 0375-nspawn-chown-the-legacy-hierarchy-when-it-s-used-in-.patch
+Patch0376: 0376-core-move-unit_status_emit_starting_stopping_reloadi.patch
+Patch0377: 0377-job-when-a-job-was-skipped-due-to-a-failed-condition.patch
+Patch0378: 0378-core-split-out-all-logic-that-updates-a-Job-on-a-uni.patch
+Patch0379: 0379-core-make-log-messages-about-units-entering-a-failed.patch
+Patch0380: 0380-core-log-a-recognizable-message-when-a-unit-succeeds.patch
+Patch0381: 0381-tests-always-use-the-right-vtable-wrapper-calls.patch
+Patch0382: 0382-test-execute-allow-filtering-test-cases-by-pattern.patch
+Patch0383: 0383-test-execute-provide-custom-failure-message.patch
+Patch0384: 0384-core-ExecCondition-for-services.patch
+Patch0385: 0385-Drop-support-for-lz4-1.3.0.patch
+Patch0386: 0386-test-compress-add-test-for-short-decompress_startswi.patch
+Patch0387: 0387-journal-adapt-for-new-improved-LZ4_decompress_safe_p.patch
+Patch0388: 0388-fuzz-compress-add-fuzzer-for-compression-and-decompr.patch
+Patch0389: 0389-seccomp-fix-__NR__sysctl-usage.patch
+Patch0390: 0390-tmpfiles-fix-crash-with-NULL-in-arg_root-and-other-f.patch
+Patch0391: 0391-sulogin-shell-Use-force-if-SYSTEMD_SULOGIN_FORCE-set.patch
+Patch0392: 0392-resolvconf-fixes-for-the-compatibility-interface.patch
+Patch0393: 0393-mount-don-t-add-Requires-for-tmp.mount.patch
+Patch0394: 0394-core-coldplug-possible-nop_job.patch
+Patch0395: 0395-core-add-IODeviceLatencyTargetSec.patch
+Patch0396: 0396-time-util-Introduce-parse_sec_def_infinity.patch
+Patch0397: 0397-cgroup-use-structured-initialization.patch
+Patch0398: 0398-core-add-CPUQuotaPeriodSec.patch
+Patch0399: 0399-core-downgrade-CPUQuotaPeriodSec-clamping-logs-to-de.patch
+Patch0400: 0400-sd-bus-avoid-magic-number-in-SASL-length-calculation.patch
+Patch0401: 0401-sd-bus-fix-SASL-reply-to-empty-AUTH.patch
+Patch0402: 0402-sd-bus-skip-sending-formatted-UIDs-via-SASL.patch
+Patch0403: 0403-core-add-MemoryMin.patch
+Patch0404: 0404-core-introduce-cgroup_add_device_allow.patch
+Patch0405: 0405-test-remove-support-for-suffix-in-get_testdata_dir.patch
+Patch0406: 0406-cgroup-Implement-default-propagation-of-MemoryLow-wi.patch
+Patch0407: 0407-cgroup-Create-UNIT_DEFINE_ANCESTOR_MEMORY_LOOKUP.patch
+Patch0408: 0408-unit-Add-DefaultMemoryMin.patch
+Patch0409: 0409-cgroup-Polish-hierarchically-aware-protection-docs-a.patch
+Patch0410: 0410-cgroup-Readd-some-plumbing-for-DefaultMemoryMin.patch
+Patch0411: 0411-cgroup-Support-0-value-for-memory-protection-directi.patch
+Patch0412: 0412-cgroup-Test-that-it-s-possible-to-set-memory-protect.patch
+Patch0413: 0413-cgroup-Check-ancestor-memory-min-for-unified-memory-.patch
+Patch0414: 0414-cgroup-Respect-DefaultMemoryMin-when-setting-memory..patch
+Patch0415: 0415-cgroup-Mark-memory-protections-as-explicitly-set-in-.patch
+Patch0416: 0416-meson-allow-setting-the-version-string-during-config.patch
+Patch0417: 0417-core-don-t-consider-SERVICE_SKIP_CONDITION-for-abnor.patch
+Patch0418: 0418-selinux-do-preprocessor-check-only-in-selinux-access.patch
+Patch0419: 0419-basic-cgroup-util-introduce-cg_get_keyed_attribute_f.patch
+Patch0420: 0420-shared-add-generic-logic-for-waiting-for-a-unit-to-e.patch
+Patch0421: 0421-shared-fix-assert-call.patch
+Patch0422: 0422-shared-Don-t-try-calling-NULL-callback-in-bus_wait_f.patch
+Patch0423: 0423-shared-add-NULL-callback-check-in-one-more-place.patch
+Patch0424: 0424-core-introduce-support-for-cgroup-freezer.patch
+Patch0425: 0425-core-cgroup-fix-return-value-of-unit_cgorup_freezer_.patch
+Patch0426: 0426-core-fix-the-return-value-in-order-to-make-sure-we-d.patch
+Patch0427: 0427-test-add-test-for-cgroup-v2-freezer-support.patch
+Patch0428: 0428-fix-mis-merge.patch
+Patch0429: 0429-tests-sleep-a-bit-and-give-kernel-time-to-perform-th.patch
+Patch0430: 0430-device-make-sure-we-emit-PropertiesChanged-signal-on.patch
+Patch0431: 0431-device-don-t-emit-PropetiesChanged-needlessly.patch
+Patch0432: 0432-units-add-generic-boot-complete.target.patch
+Patch0433: 0433-man-document-new-boot-complete.target-unit.patch
+Patch0434: 0434-core-make-sure-to-restore-the-control-command-id-too.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -677,6 +744,7 @@ CONFIGURE_OPTS=(
         -Dnetworkd=false
         -Dtimesyncd=false
         -Ddefault-hierarchy=legacy
+        -Dversion-tag=%{version}-%{release}
 )
 
 # Don't ship /var/log/README. The relationship between journal and syslog should be documented
@@ -786,6 +854,9 @@ install -D -t %{buildroot}/usr/lib/systemd/ %{SOURCE3}
 # No tmp-on-tmpfs by default in RHEL. bz#876122 bz#1578772
 rm -f %{buildroot}%{_prefix}/lib/systemd/system/local-fs.target.wants/tmp.mount
 
+# bz#1844465
+rm -f %{buildroot}/etc/systemd/system/dbus-org.freedesktop.resolve1.service
+
 %find_lang %{name}
 
 # Split files in build root into rpms. See split-files.py for the
@@ -793,7 +864,7 @@ rm -f %{buildroot}%{_prefix}/lib/systemd/system/local-fs.target.wants/tmp.mount
 # here.
 python3 %{SOURCE2} %buildroot <<EOF
 %ghost %config(noreplace) /etc/crypttab
-%ghost /etc/udev/hwdb.bin
+%ghost %verify (not mode) /etc/udev/hwdb.bin
 /etc/inittab
 /etc/yum/protected.d/systemd.conf
 /usr/lib/systemd/purge-nobody-user
@@ -801,16 +872,16 @@ python3 %{SOURCE2} %buildroot <<EOF
 %ghost %config(noreplace) /etc/X11/xorg.conf.d/00-keyboard.conf
 %ghost %attr(0664,root,utmp) /var/run/utmp
 %ghost %attr(0664,root,utmp) /var/log/wtmp
-%ghost %attr(0600,root,utmp) /var/log/btmp
+%ghost %attr(0660,root,utmp) /var/log/btmp
 %ghost %config(noreplace) /etc/hostname
 %ghost %config(noreplace) /etc/localtime
 %ghost %config(noreplace) /etc/locale.conf
-%ghost %config(noreplace) /etc/machine-id
+%ghost %config(noreplace) %attr(0444,root,root) /etc/machine-id
 %ghost %config(noreplace) /etc/machine-info
-%config(noreplace) %{_sysconfdir}/rc.d/rc.local
+%verify(owner group) %config(noreplace) %{_sysconfdir}/rc.d/rc.local
 %{_sysconfdir}/rc.local
-%ghost %dir /var/cache/private
-%ghost %dir /var/lib/private
+%ghost %dir %attr(0700,root,root) /var/cache/private
+%ghost %dir %attr(0700,root,root) /var/lib/private
 %ghost %dir /var/lib/private/systemd
 %ghost %dir /var/lib/private/systemd/journal-upload
 %ghost /var/lib/private/systemd/journal-upload/state
@@ -819,11 +890,11 @@ python3 %{SOURCE2} %buildroot <<EOF
 %ghost %dir /var/lib/systemd/coredump
 %ghost /var/lib/systemd/journal-upload
 %ghost %dir /var/lib/systemd/linger
-%ghost /var/lib/systemd/random-seed
+%ghost %attr(0600,root,root) /var/lib/systemd/random-seed
 %ghost %dir /var/lib/systemd/rfkill
-%ghost %dir /var/log/journal
+%ghost %verify (not mode group md5 mtime) %dir /var/log/journal
 %ghost %dir /var/log/journal/remote
-%ghost %dir /var/log/private
+%ghost %dir %attr(0700,root,root) /var/log/private
 EOF
 
 %check
@@ -1041,54 +1112,130 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
-* Fri May 22 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-31.2
-- test: do not use global variable to pass error (#1836979)
-- test: install libraries required by tests (#1836979)
-- test: introduce install_zoneinfo() (#1836979)
-- test: replace duplicated Makefile by symbolic link (#1836979)
-- test: add paths of keymaps in install_keymaps() (#1836979)
-- test: make install_keymaps() optionally install more keymaps (#1836979)
-- test-fs-util: skip some tests when running in unprivileged container (#1836979)
-- test-process-util: skip several verifications when running in unprivileged container (#1836979)
-- test-execute: also check python3 is installed or not (#1836979)
-- test-execute: skip several tests when running in container (#1836979)
-- test: introduce test_is_running_from_builddir() (#1836979)
-- test: make test-catalog relocatable (#1836979)
-- test: parallelize tasks in TEST-24-UNIT-TESTS (#1836979)
-- test: try to determine QEMU_SMP dynamically (#1836979)
-- test: store coredumps in journal (#1836979)
-- udev-rules: make tape-changers also apprear in /dev/tape/by-path/ (#1836981)
-- nspawn: move payload to sub-cgroup first, then sync cgroup trees (#1837423)
-- nspawn: chown() the legacy hierarchy when it's used in a container (#1837423)
+* Fri Aug 28 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-40
+- units: add generic boot-complete.target (#1872243)
+- man: document new "boot-complete.target" unit (#1872243)
+- core: make sure to restore the control command id, too (#1829867)
 
-* Mon May 11 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-31.1
-- sd-journal: close journal files that were deleted by journald before we've setup inotify watch (#1826217)
-- sd-journal: remove the dead code and actually fix #14695 (#1826217)
+* Thu Aug 06 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-39
+- device: make sure we emit PropertiesChanged signal once we set sysfs (#1793533)
+- device: don't emit PropetiesChanged needlessly (#1793533)
 
-* Mon Apr 27 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-31
-- swap: finish the secondary swap units' jobs if deactivation of the primary swap unit fails (#1821372)
-- pid1: add new kernel cmdline arg systemd.cpu_affinity= (#1827621)
+* Tue Aug 04 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-38
+- spec: fix rpm verification (#1702300)
 
-* Wed Apr 15 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-30
-- pid1: fix the names of AllowedCPUs= and AllowedMemoryNodes= (#1824129)
-- core: fix re-realization of cgroup siblings (#1824129)
-- basic: use comma as separator in cpuset cgroup cpu ranges (#1824129)
+* Wed Jul 08 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-37
+- spec: don't package /etc/systemd/system/dbus-org.freedesktop.resolve1.service (#1844465)
 
-* Mon Mar 23 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-29
-- cryptsetup: Treat key file errors as a failed password attempt (#1763155)
+* Fri Jun 26 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-36
+- core: don't consider SERVICE_SKIP_CONDITION for abnormal or failure restarts (#1737283)
+- selinux: do preprocessor check only in selinux-access.c (#1830861)
+- basic/cgroup-util: introduce cg_get_keyed_attribute_full() (#1830861)
+- shared: add generic logic for waiting for a unit to enter some state (#1830861)
+- shared: fix assert call (#1830861)
+- shared: Don't try calling NULL callback in bus_wait_for_units_clear (#1830861)
+- shared: add NULL callback check in one more place (#1830861)
+- core: introduce support for cgroup freezer (#1830861)
+- core/cgroup: fix return value of unit_cgorup_freezer_action() (#1830861)
+- core: fix the return value in order to make sure we don't dipatch method return too early (#1830861)
+- test: add test for cgroup v2 freezer support (#1830861)
+- fix mis-merge (#1848421)
+- tests: sleep a bit and give kernel time to perform the action after manual freeze/thaw (#1848421)
 
-* Wed Mar 11 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-28
+* Fri Jun 26 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-35
+- spec: fix rpm verification (#1702300)
+
+* Thu Jun 18 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-34
+- spec: fix rpm verification (#1702300)
+
+* Tue Jun 09 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-33
+- tmpfiles: fix crash with NULL in arg_root and other fixes and tests (#1836024)
+- sulogin-shell: Use force if SYSTEMD_SULOGIN_FORCE set (#1625929)
+- resolvconf: fixes for the compatibility interface (#1835594)
+- mount: don't add Requires for tmp.mount (#1748840)
+- core: coldplug possible nop_job (#1829798)
+- core: add IODeviceLatencyTargetSec (#1831519)
+- time-util: Introduce parse_sec_def_infinity (#1770379)
+- cgroup: use structured initialization (#1770379)
+- core: add CPUQuotaPeriodSec= (#1770379)
+- core: downgrade CPUQuotaPeriodSec= clamping logs to debug (#1770379)
+- sd-bus: avoid magic number in SASL length calculation (#1838081)
+- sd-bus: fix SASL reply to empty AUTH (#1838081)
+- sd-bus: skip sending formatted UIDs via SASL (#1838081)
+- core: add MemoryMin (#1763435)
+- core: introduce cgroup_add_device_allow() (#1763435)
+- test: remove support for suffix in get_testdata_dir() (#1763435)
+- cgroup: Implement default propagation of MemoryLow with DefaultMemoryLow (#1763435)
+- cgroup: Create UNIT_DEFINE_ANCESTOR_MEMORY_LOOKUP (#1763435)
+- unit: Add DefaultMemoryMin (#1763435)
+- cgroup: Polish hierarchically aware protection docs a bit (#1763435)
+- cgroup: Readd some plumbing for DefaultMemoryMin (#1763435)
+- cgroup: Support 0-value for memory protection directives (#1763435)
+- cgroup: Test that it's possible to set memory protection to 0 again (#1763435)
+- cgroup: Check ancestor memory min for unified memory config (#1763435)
+- cgroup: Respect DefaultMemoryMin when setting memory.min (#1763435)
+- cgroup: Mark memory protections as explicitly set in transient units (#1763435)
+- meson: allow setting the version string during configuration (#1804252)
+
+* Thu Jun 04 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-32
 - pid1: fix DefaultTasksMax initialization (#1809037)
-- cgroup: make sure that cpuset is supported on cgroup  v2 and disabled with v1 (#1808940)
+- cgroup: make sure that cpuset is supported on cgroup v2 and disabled with v1 (#1808940)
 - test: introduce TEST-36-NUMAPOLICY (#1808940)
-- test: replace `tail -f` with journal cursor which  should be more reliable (#1808940)
-- test: support MPOL_LOCAL matching in unpatched strace  versions (#1808940)
+- test: replace `tail -f` with journal cursor which should be... (#1808940)
+- test: support MPOL_LOCAL matching in unpatched strace versions (#1808940)
 - test: make sure the strace process is indeed dead (#1808940)
 - test: skip the test on systems without NUMA support (#1808940)
 - test: give strace some time to initialize (#1808940)
-- test: add a simple sanity check for systems without  NUMA support (#1808940)
+- test: add a simple sanity check for systems without NUMA support (#1808940)
 - test: drop the missed || exit 1 expression (#1808940)
 - test: replace cursor file with a plain cursor (#1808940)
+- cryptsetup: Treat key file errors as a failed password attempt (#1763155)
+- swap: finish the secondary swap units' jobs if deactivation of the primary swap unit fails (#1749622)
+- resolved: Recover missing PrivateTmp=yes and ProtectSystem=strict (#1810869)
+- bus_open leak sd_event_source when udevadm trigger。 (#1798504)
+- core: rework StopWhenUnneeded= logic (#1798046)
+- pid1: fix the names of AllowedCPUs= and AllowedMemoryNodes= (#1818054)
+- core: fix re-realization of cgroup siblings (#1818054)
+- basic: use comma as separator in cpuset cgroup cpu ranges (#1818054)
+- core: transition to FINAL_SIGTERM state after ExecStopPost= (#1766479)
+- sd-journal: close journal files that were deleted by journald before we've setup inotify watch (#1796128)
+- sd-journal: remove the dead code and actually fix #14695 (#1796128)
+- udev: downgrade message when we fail to set inotify watch up (#1808051)
+- logind: check PolicyKit before allowing VT switch (#1797679)
+- test: do not use global variable to pass error (#1823767)
+- test: install libraries required by tests (#1823767)
+- test: introduce install_zoneinfo() (#1823767)
+- test: replace duplicated Makefile by symbolic link (#1823767)
+- test: add paths of keymaps in install_keymaps() (#1823767)
+- test: make install_keymaps() optionally install more keymaps (#1823767)
+- test-fs-util: skip some tests when running in unprivileged container (#1823767)
+- test-process-util: skip several verifications when running in unprivileged container (#1823767)
+- test-execute: also check python3 is installed or not (#1823767)
+- test-execute: skip several tests when running in container (#1823767)
+- test: introduce test_is_running_from_builddir() (#1823767)
+- test: make test-catalog relocatable (#1823767)
+- test: parallelize tasks in TEST-24-UNIT-TESTS (#1823767)
+- test: try to determine QEMU_SMP dynamically (#1823767)
+- test: store coredumps in journal (#1823767)
+- pid1: add new kernel cmdline arg systemd.cpu_affinity= (#1812894)
+- udev-rules: make tape-changers also apprear in /dev/tape/by-path/ (#1820112)
+- man: be clearer that .timer time expressions need to be reset to override them (#1816908)
+- Add support for opening files for appending (#1809175)
+- nspawn: move payload to sub-cgroup first, then sync cgroup trees (#1837094)
+- core: move unit_status_emit_starting_stopping_reloading() and related calls to job.c (#1737283)
+- job: when a job was skipped due to a failed condition, log about it (#1737283)
+- core: split out all logic that updates a Job on a unit's unit_notify() invocation (#1737283)
+- core: make log messages about units entering a 'failed' state recognizable (#1737283)
+- core: log a recognizable message when a unit succeeds, too (#1737283)
+- tests: always use the right vtable wrapper calls (#1737283)
+- test-execute: allow filtering test cases by pattern (#1737283)
+- test-execute: provide custom failure message (#1737283)
+- core: ExecCondition= for services (#1737283)
+- Drop support for lz4 < 1.3.0 (#1843871)
+- test-compress: add test for short decompress_startswith calls (#1843871)
+- journal: adapt for new improved LZ4_decompress_safe_partial() (#1843871)
+- fuzz-compress: add fuzzer for compression and decompression (#1843871)
+- seccomp: fix __NR__sysctl usage (#1843871)
 
 * Fri Feb 21 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-27
 - cgroup: introduce support for cgroup v2 CPUSET controller (#1724617)
