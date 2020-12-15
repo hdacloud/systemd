@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        41%{?dist}
+Release:        41%{?dist}.1
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -485,6 +485,7 @@ Patch0432: 0432-units-add-generic-boot-complete.target.patch
 Patch0433: 0433-man-document-new-boot-complete.target-unit.patch
 Patch0434: 0434-core-make-sure-to-restore-the-control-command-id-too.patch
 Patch0435: 0435-cgroup-freezer-action-must-be-NOP-when-cgroup-v2-fre.patch
+Patch0436: 0436-logind-don-t-print-warning-when-user-.service-templa.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -1113,6 +1114,9 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Fri Nov 06 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-41.1
+- logind: don't print warning when user@.service template is masked (#1894152)
+
 * Wed Oct 07 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-41
 - cgroup: freezer action must be NOP when cgroup v2 freezer is not available (#1868831)
 
