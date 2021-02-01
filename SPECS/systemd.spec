@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        43%{?dist}
+Release:        44%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -545,6 +545,54 @@ Patch0492: 0492-introduce-setsockopt_int-helper.patch
 Patch0493: 0493-socket-util-add-generic-socket_pass_pktinfo-helper.patch
 Patch0494: 0494-core-add-new-PassPacketInfo-socket-unit-property.patch
 Patch0495: 0495-resolved-tweak-cmsg-calculation.patch
+Patch0496: 0496-ci-PowerTools-repo-was-renamed-to-powertools-in-RHEL.patch
+Patch0497: 0497-ci-use-quay.io-instead-of-Docker-Hub-to-avoid-rate-l.patch
+Patch0498: 0498-ci-move-jobs-from-Travis-CI-to-GH-Actions.patch
+Patch0499: 0499-unit-make-UNIT-cast-function-deal-with-NULL-pointers.patch
+Patch0500: 0500-use-link-to-RHEL-8-docs.patch
+Patch0501: 0501-cgroup-Also-set-blkio.bfq.weight.patch
+Patch0502: 0502-units-make-sure-initrd-cleanup.service-terminates-be.patch
+Patch0503: 0503-core-reload-SELinux-label-cache-on-daemon-reload.patch
+Patch0504: 0504-selinux-introduce-mac_selinux_create_file_prepare_at.patch
+Patch0505: 0505-selinux-add-trigger-for-policy-reload-to-refresh-int.patch
+Patch0506: 0506-udev-net_id-give-RHEL-8.4-naming-scheme-a-name.patch
+Patch0507: 0507-basic-stat-util-make-mtime-check-stricter-and-use-en.patch
+Patch0508: 0508-udev-make-algorithm-that-selects-highest-priority-de.patch
+Patch0509: 0509-test-create-dev-null-in-test-udev.pl.patch
+Patch0510: 0510-test-missing-die.patch
+Patch0511: 0511-udev-test-remove-a-check-for-whether-the-test-is-run.patch
+Patch0512: 0512-udev-test-skip-the-test-only-if-it-can-t-setup-its-e.patch
+Patch0513: 0513-udev-test-fix-test-skip-condition.patch
+Patch0514: 0514-udev-test-fix-missing-directory-test-run.patch
+Patch0515: 0515-udev-test-check-if-permitted-to-create-block-device-.patch
+Patch0516: 0516-test-udev-add-a-testcase-of-too-long-line.patch
+Patch0517: 0517-test-udev-use-proper-semantics-for-too-long-line-wit.patch
+Patch0518: 0518-test-udev-add-more-tests-for-line-continuations-and-.patch
+Patch0519: 0519-test-udev-add-more-tests-for-line-continuation.patch
+Patch0520: 0520-test-udev-fix-alignment-and-drop-unnecessary-white-s.patch
+Patch0521: 0521-test-udev-test.pl-cleanup-if-skipping-test.patch
+Patch0522: 0522-test-add-test-cases-for-empty-string-match.patch
+Patch0523: 0523-test-add-test-case-for-multi-matches-when-use.patch
+Patch0524: 0524-udev-test-do-not-rely-on-mail-group-being-defined.patch
+Patch0525: 0525-test-udev-test.pl-allow-multiple-devices-per-test.patch
+Patch0526: 0526-test-udev-test.pl-create-rules-only-once.patch
+Patch0527: 0527-test-udev-test.pl-allow-concurrent-additions-and-rem.patch
+Patch0528: 0528-test-udev-test.pl-use-computed-devnode-name.patch
+Patch0529: 0529-test-udev-test.pl-test-correctness-of-symlink-target.patch
+Patch0530: 0530-test-udev-test.pl-allow-checking-multiple-symlinks.patch
+Patch0531: 0531-test-udev-test.pl-fix-wrong-test-descriptions.patch
+Patch0532: 0532-test-udev-test.pl-last_rule-is-unsupported.patch
+Patch0533: 0533-test-udev-test.pl-Make-some-tests-a-little-harder.patch
+Patch0534: 0534-test-udev-test.pl-remove-bogus-rules-from-magic-subs.patch
+Patch0535: 0535-test-udev-test.pl-merge-space-and-var-with-space-tes.patch
+Patch0536: 0536-test-udev-test.pl-merge-import-parent-tests-into-one.patch
+Patch0537: 0537-test-udev-test.pl-count-good-results.patch
+Patch0538: 0538-tests-udev-test.pl-add-multiple-device-test.patch
+Patch0539: 0539-test-udev-test.pl-add-repeat-count.patch
+Patch0540: 0540-test-udev-test.pl-generator-for-large-list-of-block-.patch
+Patch0541: 0541-test-udev-test.pl-suppress-umount-error-message-at-s.patch
+Patch0542: 0542-test-udev_test.pl-add-expected-good-count.patch
+Patch0543: 0543-test-udev-test-gracefully-exit-when-imports-fail.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -1173,6 +1221,56 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Thu Jan 28 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-44
+- ci: PowerTools repo was renamed to powertools in RHEL 8.3 (#1871827)
+- ci: use quay.io instead of Docker Hub to avoid rate limits (#1871827)
+- ci: move jobs from Travis CI to GH Actions (#1871827)
+- unit: make UNIT() cast function deal with NULL pointers (#1871827)
+- use link to RHEL-8 docs (#1623116)
+- cgroup: Also set blkio.bfq.weight (#1657810)
+- units: make sure initrd-cleanup.service terminates before switching to rootfs (#1657810)
+- core: reload SELinux label cache on daemon-reload (#1888912)
+- selinux: introduce mac_selinux_create_file_prepare_at() (#1888912)
+- selinux: add trigger for policy reload to refresh internal selabel cache (#1888912)
+- udev/net_id: give RHEL-8.4 naming scheme a name (#1827462)
+- basic/stat-util: make mtime check stricter and use entire timestamp (#1642728)
+- udev: make algorithm that selects highest priority devlink less susceptible to race conditions (#1642728)
+- test: create /dev/null in test-udev.pl (#1642728)
+- test: missing "die" (#1642728)
+- udev-test: remove a check for whether the test is run in a container (#1642728)
+- udev-test: skip the test only if it can't setup its environment (#1642728)
+- udev-test: fix test skip condition (#1642728)
+- udev-test: fix missing directory test/run (#1642728)
+- udev-test: check if permitted to create block device nodes (#1642728)
+- test-udev: add a testcase of too long line (#1642728)
+- test-udev: use proper semantics for too long line with continuation (#1642728)
+- test-udev: add more tests for line continuations and comments (#1642728)
+- test-udev: add more tests for line continuation (#1642728)
+- test-udev: fix alignment and drop unnecessary white spaces (#1642728)
+- test/udev-test.pl: cleanup if skipping test (#1642728)
+- test: add test cases for empty string match (#1642728)
+- test: add test case for multi matches when use "||" (#1642728)
+- udev-test: do not rely on "mail" group being defined (#1642728)
+- test/udev-test.pl: allow multiple devices per test (#1642728)
+- test/udev-test.pl: create rules only once (#1642728)
+- test/udev-test.pl: allow concurrent additions and removals (#1642728)
+- test/udev-test.pl: use computed devnode name (#1642728)
+- test/udev-test.pl: test correctness of symlink targets (#1642728)
+- test/udev-test.pl: allow checking multiple symlinks (#1642728)
+- test/udev-test.pl: fix wrong test descriptions (#1642728)
+- test/udev-test.pl: last_rule is unsupported (#1642728)
+- test/udev-test.pl: Make some tests a little harder (#1642728)
+- test/udev-test.pl: remove bogus rules from magic subsys test (#1642728)
+- test/udev-test.pl: merge "space and var with space" tests (#1642728)
+- test/udev-test.pl: merge import parent tests into one (#1642728)
+- test/udev-test.pl: count "good" results (#1642728)
+- tests/udev-test.pl: add multiple device test (#1642728)
+- test/udev-test.pl: add repeat count (#1642728)
+- test/udev-test.pl: generator for large list of block devices (#1642728)
+- test/udev-test.pl: suppress umount error message at startup (#1642728)
+- test/udev_test.pl: add "expected good" count (#1642728)
+- test/udev-test: gracefully exit when imports fail (#1642728)
+
 * Thu Nov 26 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-43
 - man: mention System Administrator's Guide in systemctl manpage (#1623116)
 - udev: introduce udev net_id "naming schemes" (#1827462)
