@@ -23,60 +23,6 @@
 %global system_unit_dir %{pkgdir}/system
 %global user_unit_dir %{pkgdir}/user
 
-%if 0%{?facebook}
-%if 0%{?el7}
-### The version of meson and redhat-rpm-config is not in sync in C7.
-### Copied from the 'redhat-rpm-config-123-1' version of /usr/lib/rpm/redhat/macros
-### to support the building of systemd via meson that uses the
-### set_build_flags macro.
-%global _ld_symbols_flags              %{?_strict_symbol_defs_build:-Wl,-z,defs}
-
-#==============================================================================
-# ---- compiler flags.
-
-# C compiler flags.  This is traditionally called CFLAGS in makefiles.
-# Historically also available as %%{optflags}, and %%build sets the
-# environment variable RPM_OPT_FLAGS to this value.
-%global build_cflags %{optflags}
-
-# C++ compiler flags.  This is traditionally called CXXFLAGS in makefiles.
-%global build_cxxflags %{optflags}
-
-# Fortran compiler flags.  Makefiles use both FFLAGS and FCFLAGS as
-# the corresponding variable names.
-%global build_fflags %{optflags} -I%{_fmoddir}
-
-# Link editor flags.  This is usually called LDFLAGS in makefiles.
-# (Some makefiles use LFLAGS instead.)  The default value assumes that
-# the flags, while intended for ld, are still passed through the gcc
-# compiler driver.  At the beginning of %%build, the environment
-# variable RPM_LD_FLAGS to this value.
-%global build_ldflags -Wl,-z,relro %{_ld_symbols_flags} %{_hardened_ldflags}
-
-# Expands to shell code to seot the compiler/linker environment
-# variables CFLAGS, CXXFLAGS, FFLAGS, FCFLAGS, LDFLAGS if they have
-# not been set already.  RPM_OPT_FLAGS and RPM_LD_FLAGS have already
-# been set implicitly at the start of the %%build section.
-%global set_build_flags \
-  CFLAGS="${CFLAGS:-%{build_cflags}}" ; export CFLAGS ; \
-  CXXFLAGS="${CXXFLAGS:-%{build_cxxflags}}" ; export CXXFLAGS ; \
-  FFLAGS="${FFLAGS:-%{build_fflags}}" ; export FFLAGS ; \
-  FCFLAGS="${FCFLAGS:-%{build_fflags}}" ; export FCFLAGS ; \
-  LDFLAGS="${LDFLAGS:-%{build_ldflags}}" ; export LDFLAGS;
-
-### Copied from the rpm-4.14.2-36 version of /usr/lib/rpm/platform/x86_64-linux/macros
-### to support the building of systemd via meson that uses the
-### _smp_build_ncpus macro
-%global _smp_build_ncpus %([ -z "$RPM_BUILD_NCPUS" ] \\\
-	&& RPM_BUILD_NCPUS="`/usr/bin/getconf _NPROCESSORS_ONLN`"; \\\
-        ncpus_max=%{?_smp_ncpus_max}; \\\
-        if [ -n "$ncpus_max" ] && [ "$ncpus_max" -gt 0 ] && [ "$RPM_BUILD_NCPUS" -gt "$ncpus_max" ]; then RPM_BUILD_NCPUS="$ncpus_max"; fi; \\\
-        echo "$RPM_BUILD_NCPUS";)
-
-%global _smp_mflags -j%{_smp_build_ncpus}
-%endif
-%endif
-
 # Bootstrap may be needed to break intercircular dependencies with
 # cryptsetup, e.g. when re-building cryptsetup on a json-c SONAME-bump.
 %bcond_with    bootstrap
@@ -85,7 +31,7 @@
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 Version:        246.1
-Release:        1.fb6
+Release:        2%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -132,8 +78,6 @@ Patch0003:      0002-test-path-do-not-fail-the-test-if-we-fail-to-start-s.patch
 
 Patch0004:      0001-test-acl-util-output-more-debug-info.patch
 Patch0005:      0001-Do-not-assert-in-test_add_acls_for_user.patch
-
-Patch1001:      FB--Add-FusionIO-device--dev-fio-persistante-storage-udev-rule.patch
 
 Patch1002:      16838_16857_improve_path_search.patch
 Patch1003:      16940_cleanup_socket_econn_handling.patch
@@ -194,13 +138,8 @@ BuildRequires:  gperf
 BuildRequires:  gawk
 BuildRequires:  tree
 BuildRequires:  hostname
-%if 0%{?el7}
-BuildRequires:  python34-devel
-BuildRequires:  python34-lxml
-%else
 BuildRequires:  python3-devel
 BuildRequires:  python3-lxml
-%endif
 BuildRequires:  python3
 %global __python3 /usr/bin/python3
 %if 0%{?have_gnu_efi}
@@ -460,19 +399,15 @@ CONFIGURE_OPTS=(
         -Dman=true
         -Dversion-tag=v%{version}-%{release}
         -Ddocdir=%{_pkgdocdir}
+        -Ddefault-hierarchy=legacy
 )
 
 %if 0%{?facebook}
-%if 0%{?el7}
-%global _hierarchy legacy
-%else
-%global _hierarchy unified
-%endif
 CONFIGURE_OPTS+=(
         -Dntp-servers='1.ntp.vip.facebook.com 2.ntp.vip.facebook.com 3.ntp.vip.facebook.com 4.ntp.vip.facebook.com'
         -Ddns-servers='10.127.255.51 10.191.255.51 2401:db00:eef0:a53:: 2401:db00:eef0:b53::'
         -Dsupport-url='https://www.facebook.com/groups/prodos.users/'
-        -Ddefault-hierarchy=%{_hierarchy}
+        -Ddefault-hierarchy=unified
         -Dcontainer-uid-base-min=10485760
         -Dp11kit=false
         -Duserdb=false
@@ -881,6 +816,13 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Fri Feb  5 2021 Davide Cavalca <dcavalca@fb.com> - 246.1-2
+- Initial Hyperscale SIG package
+- Update release to use %%dist macro
+- Drop el7 logic
+- Explicitly default non-FB built to the legacy hierarchy
+- Drop no longer needed FB FusionIO patch
+
 * Mon Jan 25 2021 Anita Zhang <anitazha@fb.com> - 246.1-1.fb6
 - Backport PR #16803 to fix ConditionEnvironment=
 
