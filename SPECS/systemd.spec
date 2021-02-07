@@ -402,6 +402,12 @@ CONFIGURE_OPTS=(
         -Ddefault-hierarchy=legacy
 )
 
+# FIXME: temporary hack to unbreak the build, as with audit link fails on
+# test-emergency-action (https://pagure.io/centos-sig-hyperscale/sig/issue/13)
+CONFIGURE_OPTS+=(
+        -Daudit=false
+)
+
 %if 0%{?facebook}
 CONFIGURE_OPTS+=(
         -Dntp-servers='1.ntp.vip.facebook.com 2.ntp.vip.facebook.com 3.ntp.vip.facebook.com 4.ntp.vip.facebook.com'
@@ -816,12 +822,13 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
-* Fri Feb  5 2021 Davide Cavalca <dcavalca@fb.com> - 246.1-2
+* Sun Feb  7 2021 Davide Cavalca <dcavalca@fb.com> - 246.1-2
 - Initial Hyperscale SIG package
 - Update release to use %%dist macro
 - Drop el7 logic
 - Explicitly default non-FB built to the legacy hierarchy
 - Drop no longer needed FB FusionIO patch
+- Temporarily disable audit support while debugging a link issue
 
 * Mon Jan 25 2021 Anita Zhang <anitazha@fb.com> - 246.1-1.fb6
 - Backport PR #16803 to fix ConditionEnvironment=
