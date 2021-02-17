@@ -1,15 +1,4 @@
-# Meson settings
-%global _vpath_srcdir .
-%global _vpath_builddir %{_target_platform}
-%global __global_cflags  %{optflags}
-%global __global_cxxflags  %{optflags}
-%global __global_fflags  %{optflags} -I%_fmoddir
-%global __global_fcflags %{optflags} -I%_fmoddir
-%global __global_ldflags -Wl,-z,relro %{_hardened_ldflags}
-
-%define _python_bytecompile_errors_terminate_build 0
-
-#global commit 7f56c26d1041e686efa72b339250a98fb6ee8f00
+#global commit 551dd873b0bdfb9e7e47431b2933c8b910228f0c
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
 %global stable 1
@@ -27,11 +16,12 @@
 # cryptsetup, e.g. when re-building cryptsetup on a json-c SONAME-bump.
 %bcond_with    bootstrap
 %bcond_without tests
+%bcond_without lto
 
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
-Version:        246.1
-Release:        2%{?dist}
+Version:        247.3
+Release:        1%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -73,22 +63,19 @@ i=1; for j in 00*patch; do printf "Patch%04d:      %s\n" $i $j; i=$((i+1));done|
 GIT_DIR=../../src/systemd/.git git diffab -M v233..master@{2017-06-15} -- hwdb/[67]* hwdb/parse_hwdb.py > hwdb.patch
 %endif
 
-Patch0002:      0001-Revert-test-path-increase-timeout.patch
-Patch0003:      0002-test-path-do-not-fail-the-test-if-we-fail-to-start-s.patch
+# Backports of patches from upstream (0000–0499)
+# 18211: Fixes ExecCondition= dependency bug
+Patch0000:      https://github.com/systemd/systemd/pull/18211.patch
+# 17872: Fixes using PrivateUsers=yes with other sandboxing properties
+Patch0001:      https://github.com/systemd/systemd/pull/17872.patch
+%if 0%{?facebook}
+# 17495: Fixes BPF pinning post-coldplug
+Patch0002:      https://github.com/systemd/systemd/pull/17495.patch
+%endif
 
-Patch0004:      0001-test-acl-util-output-more-debug-info.patch
-Patch0005:      0001-Do-not-assert-in-test_add_acls_for_user.patch
-
-Patch1002:      16838_16857_improve_path_search.patch
-Patch1003:      16940_cleanup_socket_econn_handling.patch
-Patch1004:      17031_propagate_start_limit_hit.patch
-Patch1005:      17082_nspawn_tty_tweaks.patch
-
-Patch1006:      0001-bpf-pid1-Pin-reference-to-BPF-programs-for-post-cold.patch
-Patch1007:      0002-core-clean-up-inactive-failed-service-scope-s-cgroup.patch
-Patch1008:      0003-timer-add-new-feature-FixedRandomDelay.patch
-
-Patch1009:      16803_fix_asserts_conditions.patch
+# Downstream-only patches (0500–9999)
+# https://github.com/systemd/systemd/pull/17050
+Patch0501:      https://github.com/systemd/systemd/pull/17050/commits/f58b96d3e8d1cb0dd3666bc74fa673918b586612.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -140,8 +127,6 @@ BuildRequires:  tree
 BuildRequires:  hostname
 BuildRequires:  python3-devel
 BuildRequires:  python3-lxml
-BuildRequires:  python3
-%global __python3 /usr/bin/python3
 %if 0%{?have_gnu_efi}
 BuildRequires:  gnu-efi gnu-efi-devel
 %endif
@@ -151,6 +136,8 @@ BuildRequires:  gettext
 # We use RUNNING_ON_VALGRIND in tests, so the headers need to be available
 BuildRequires:  valgrind-devel
 BuildRequires:  pkgconfig(bash-completion)
+BuildRequires:  perl
+BuildRequires:  perl(IPC::SysV)
 
 Requires(post): coreutils
 Requires(post): sed
@@ -176,14 +163,31 @@ Obsoletes:      system-setup-keyboard < 0.9
 Provides:       system-setup-keyboard = 0.9
 # systemd-sysv-convert was removed in f20: https://fedorahosted.org/fpc/ticket/308
 Obsoletes:      systemd-sysv < 206
+%if 0%{?facebook} == 0
 # self-obsoletes so that dnf will install new subpackages on upgrade (#1260394)
-Obsoletes:      %{name} < 229-5
+Obsoletes:      %{name} < 246.6-2
+Conflicts:      initscripts < 9.56.1
+%endif
 Provides:       systemd-sysv = 206
 %if 0%{?fedora}
 Conflicts:      fedora-release < 23-0.12
 %endif
 Obsoletes:      timedatex < 0.6-3
 Provides:       timedatex = 0.6-3
+Conflicts:      %{name}-standalone-tmpfiles < %{version}-%{release}^
+Obsoletes:      %{name}-standalone-tmpfiles < %{version}-%{release}^
+Conflicts:      %{name}-standalone-sysusers < %{version}-%{release}^
+Obsoletes:      %{name}-standalone-sysusers < %{version}-%{release}^
+
+# Recommends to replace normal Requires deps for stuff that is dlopen()ed
+Recommends:     libcryptsetup.so.12()(64bit)
+Recommends:     libcryptsetup.so.12(CRYPTSETUP_2.0)(64bit)
+Recommends:     libidn2.so.0()(64bit)
+Recommends:     libidn2.so.0(IDN2_0.0.0)(64bit)
+Recommends:     libpcre2-8.so.0()(64bit)
+Recommends:     libpwquality.so.1()(64bit)
+Recommends:     libpwquality.so.1(LIBPWQUALITY_1.0)(64bit)
+Recommends:     libqrencode.so.4()(64bit)
 
 %description
 systemd is a system and service manager that runs as PID 1 and starts
@@ -263,16 +267,14 @@ Requires(preun):  systemd
 Requires(postun): systemd
 Requires(post): grep
 Requires:       kmod >= 18-4
-%if 0%{?facebook}
-# obsolete parent package so that dnf will install new subpackage on upgrade (#1260394)
-Obsoletes:      %{name} < 229-5
-%else
+%if 0%{?facebook} == 0
 # https://bodhi.fedoraproject.org/updates/FEDORA-2020-dd43dd05b1
 Obsoletes:      systemd < 245.6-1
 %endif
 Provides:       udev = %{version}
 Provides:       udev%{_isa} = %{version}
 Obsoletes:      udev < 183
+
 # https://bugzilla.redhat.com/show_bug.cgi?id=1377733#c9
 Suggests:       systemd-bootchart
 # https://bugzilla.redhat.com/show_bug.cgi?id=1408878
@@ -281,6 +283,10 @@ Requires:       kbd
 # https://bugzilla.redhat.com/show_bug.cgi?id=1753381
 Provides:       u2f-hidraw-policy = 1.0.2-40
 Obsoletes:      u2f-hidraw-policy < 1.0.2-40
+
+# Recommends to replace normal Requires deps for stuff that is dlopen()ed
+Recommends:     libcryptsetup.so.12()(64bit)
+Recommends:     libcryptsetup.so.12(CRYPTSETUP_2.0)(64bit)
 
 %description udev
 This package contains systemd-udev and the rules and hardware database
@@ -341,16 +347,17 @@ They can be useful to test systemd internals.
 %{!?ntpvendor: echo 'NTP vendor zone is not set!'; exit 1}
 
 CONFIGURE_OPTS=(
+        -Dmode=release
         -Dsysvinit-path=/etc/rc.d/init.d
         -Drc-local=/etc/rc.d/rc.local
         -Dntp-servers='0.%{ntpvendor}.pool.ntp.org 1.%{ntpvendor}.pool.ntp.org 2.%{ntpvendor}.pool.ntp.org 3.%{ntpvendor}.pool.ntp.org'
+        -Ddns-servers=
         -Duser-path=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin
         -Dservice-watchdog=
         -Ddev-kvm-mode=0666
         -Dkmod=true
         -Dxkbcommon=true
         -Dblkid=true
-        -Dfdisk=true
         -Dseccomp=true
         -Dima=true
         -Dselinux=true
@@ -364,6 +371,7 @@ CONFIGURE_OPTS=(
         -Dpam=true
         -Dacl=true
         -Dsmack=true
+        -Dopenssl=true
         -Dgcrypt=true
         -Daudit=true
         -Delfutils=true
@@ -373,8 +381,6 @@ CONFIGURE_OPTS=(
         -Dlibcryptsetup=false
 %endif
         -Delfutils=true
-        -Dpwquality=true
-        -Dqrencode=true
         -Dgnutls=true
         -Dmicrohttpd=true
         -Dlibidn2=true
@@ -392,20 +398,38 @@ CONFIGURE_OPTS=(
         -Dusers-gid=100
         -Dnobody-user=nobody
         -Dnobody-group=nobody
+        -Dcompat-mutable-uid-boundaries=true
         -Dsplit-usr=false
         -Dsplit-bin=true
+%if %{with lto}
         -Db_lto=true
+%else
+        -Db_lto=false
+%endif
         -Db_ndebug=false
         -Dman=true
         -Dversion-tag=v%{version}-%{release}
         -Ddocdir=%{_pkgdocdir}
-        -Ddefault-hierarchy=legacy
-)
-
-# FIXME: temporary hack to unbreak the build, as with audit link fails on
-# test-emergency-action (https://pagure.io/centos-sig-hyperscale/sig/issue/13)
-CONFIGURE_OPTS+=(
-        -Daudit=false
+        -Dfallback-hostname=fedora
+        -Ddefault-dnssec=no
+        # https://bugzilla.redhat.com/show_bug.cgi?id=1867830
+        -Ddefault-mdns=no
+        -Ddefault-llmnr=resolve
+        # CentOS is missing newer deps required to include these
+        # But also these aren't as relevant for the hyperscale use case
+        -Dp11kit=false
+        -Duserdb=false
+        -Dhomed=false
+        -Drepart=false
+        -Dfdisk=false
+        -Dpwquality=false
+        -Dqrencode=false
+        -Dlibfido2=false
+        # Old version of PAM might not support files in /usr/lib/pam.d/ so
+        # stick with the old /etc/pam.d
+        -Dpamconfdir=/etc/pam.d
+        # Standalone binaries are only relevant on non-systemd systems
+        -Dstandalone-binaries=false
 )
 
 %if 0%{?facebook}
@@ -415,11 +439,11 @@ CONFIGURE_OPTS+=(
         -Dsupport-url='https://www.facebook.com/groups/prodos.users/'
         -Ddefault-hierarchy=unified
         -Dcontainer-uid-base-min=10485760
-        -Dp11kit=false
-        -Duserdb=false
-        -Dhomed=false
-        -Drepart=false
 )
+%endif
+
+%if %{without lto}
+%global _lto_cflags %nil
 %endif
 
 export LANG=en_US.UTF-8
@@ -528,7 +552,7 @@ install -m 0755 -D -t %{buildroot}%{_rpmconfigdir}/ %{SOURCE24}
 # Split files in build root into rpms. See split-files.py for the
 # rules towards the end, anything which is an exception needs a line
 # here.
-%{__python3} %{SOURCE2} %buildroot <<EOF
+python3 %{SOURCE2} %buildroot <<EOF
 %ghost %config(noreplace) /etc/crypttab
 %ghost /etc/udev/hwdb.bin
 /etc/inittab
@@ -632,6 +656,8 @@ chmod g+s /{run,var}/log/journal/{,${machine_id}} &>/dev/null || :
 # Apply ACL to the journal directory
 setfacl -Rnm g:wheel:rx,d:g:wheel:rx,g:adm:rx,d:g:adm:rx /var/log/journal/ &>/dev/null || :
 
+[ $1 -eq 1 ] || exit 0
+
 # We reset the enablement of all services upon initial installation
 # https://bugzilla.redhat.com/show_bug.cgi?id=1118740#c23
 # This will fix up enablement of any preset services that got installed
@@ -639,9 +665,26 @@ setfacl -Rnm g:wheel:rx,d:g:wheel:rx,g:adm:rx,d:g:adm:rx /var/log/journal/ &>/de
 # https://bugzilla.redhat.com/show_bug.cgi?id=1647172.
 # We also do this for user units, see
 # https://fedoraproject.org/wiki/Changes/Systemd_presets_for_user_units.
-if [ $1 -eq 1 ] ; then
-        systemctl preset-all &>/dev/null || :
-        systemctl --global preset-all &>/dev/null || :
+systemctl preset-all &>/dev/null || :
+systemctl --global preset-all &>/dev/null || :
+
+# Create /etc/resolv.conf symlink.
+# We would also create it using tmpfiles, but let's do this here
+# too before NetworkManager gets a chance. (systemd-tmpfiles invocation above
+# does not do this, because it's marked with ! and we don't specify --boot.)
+# https://bugzilla.redhat.com/show_bug.cgi?id=1873856
+#
+# If systemd is not running, don't overwrite the symlink because that
+# will immediately break DNS resolution, since systemd-resolved is
+# also not running (https://bugzilla.redhat.com/show_bug.cgi?id=1891847).
+#
+# Also don't creat the symlink to the stub when the stub is disabled (#1891847 again).
+if test -d /run/systemd/system/ &&
+   systemctl -q is-enabled systemd-resolved.service &>/dev/null &&
+   ! mountpoint /etc/resolv.conf &>/dev/null &&
+   ! systemd-analyze cat-config systemd/resolved.conf 2>/dev/null | \
+        grep -qE '^DNSStubListener\s*=\s*([nN][oO]?|[fF]|[fF][aA][lL][sS][eE]|0|[oO][fF][fF])$'; then
+  ln -fsv ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
 fi
 
 %preun
@@ -663,10 +706,14 @@ fi
 # This is for upgrades from previous versions before systemd-resolved became the default.
 systemctl --no-reload preset systemd-resolved.service &>/dev/null || :
 
-if systemctl is-enabled systemd-resolved.service &>/dev/null; then
+if systemctl -q is-enabled systemd-resolved.service &>/dev/null; then
+  systemctl -q is-enabled NetworkManager.service 2>/dev/null && \
+  ! test -L /etc/resolv.conf 2>/dev/null && \
+  ! mountpoint /etc/resolv.conf &>/dev/null && \
   grep -q 'Generated by NetworkManager' /etc/resolv.conf 2>/dev/null && \
   echo -e '/etc/resolv.conf was generated by NetworkManager.\nRemoving it to let systemd-resolved manage this file.' && \
-  mv -v /etc/resolv.conf /etc/resolv.conf.orig-with-nm || :
+  mv -v /etc/resolv.conf /etc/resolv.conf.orig-with-nm && \
+  ln -sv ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf 2>/dev/null || :
 
   systemctl start systemd-resolved.service &>/dev/null || :
 fi
@@ -685,7 +732,7 @@ function mod_nss() {
         # Add nss-resolve to hosts
         grep -E -q '^hosts:.* resolve' "$1" ||
         sed -i.bak -r -e '
-                s/^(hosts):(.*) files( mdns4_minimal .NOTFOUND=return.)? dns myhostname/\1:\2 resolve [!UNAVAIL=return] myhostname files\3 dns/
+                s/^(hosts):(.*) files( mdns4_minimal .NOTFOUND=return.)? dns myhostname/\1:\2 files\3 resolve [!UNAVAIL=return] myhostname dns/
                 ' "$1" &>/dev/null || :
     fi
 }
@@ -739,8 +786,12 @@ if [ -f %{_localstatedir}/lib/systemd/clock ] ; then
 fi
 
 udevadm hwdb --update &>/dev/null
+
 %systemd_post %udev_services
-/usr/lib/systemd/systemd-random-seed save 2>&1
+
+# Try to save the random seed, but don't complain if /dev/urandom is unavailable
+/usr/lib/systemd/systemd-random-seed save 2>&1 | \
+    grep -v 'Failed to open /dev/urandom' || :
 
 # Replace obsolete keymaps
 # https://bugzilla.redhat.com/show_bug.cgi?id=1151958
@@ -760,14 +811,11 @@ getent group systemd-journal-remote &>/dev/null || groupadd -r systemd-journal-r
 getent passwd systemd-journal-remote &>/dev/null || useradd -r -l -g systemd-journal-remote -d %{_localstatedir}/log/journal/remote -s /sbin/nologin -c "Journal Remote" systemd-journal-remote &>/dev/null || :
 
 %post journal-remote
-%systemd_post systemd-journal-gatewayd.socket systemd-journal-gatewayd.service
-%systemd_post systemd-journal-remote.socket systemd-journal-remote.service
-%systemd_post systemd-journal-upload.service
+%systemd_post systemd-journal-gatewayd.socket systemd-journal-gatewayd.service systemd-journal-remote.socket systemd-journal-remote.service systemd-journal-upload.service
+%firewalld_reload
 
 %preun journal-remote
-%systemd_preun systemd-journal-gatewayd.socket systemd-journal-gatewayd.service
-%systemd_preun systemd-journal-remote.socket systemd-journal-remote.service
-%systemd_preun systemd-journal-upload.service
+%systemd_preun systemd-journal-gatewayd.socket systemd-journal-gatewayd.service systemd-journal-remote.socket systemd-journal-remote.service systemd-journal-upload.service
 if [ $1 -eq 1 ] ; then
     if [ -f %{_localstatedir}/lib/systemd/journal-upload/state -a ! -L %{_localstatedir}/lib/systemd/journal-upload ] ; then
         mkdir -p %{_localstatedir}/lib/private/systemd/journal-upload
@@ -777,9 +825,7 @@ if [ $1 -eq 1 ] ; then
 fi
 
 %postun journal-remote
-%systemd_postun_with_restart systemd-journal-gatewayd.service
-%systemd_postun_with_restart systemd-journal-remote.service
-%systemd_postun_with_restart systemd-journal-upload.service
+%systemd_postun_with_restart systemd-journal-gatewayd.service systemd-journal-remote.service systemd-journal-upload.service
 
 %global _docdir_fmt %{name}
 
@@ -822,6 +868,12 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Wed Feb 17 2021 Anita Zhang <anitazha@fb.com> - 247.3-1
+- New release for 247
+- Backport PR #18211 (Fixes ExecCondition= dependency bug)
+- Backport PR #17872 (Fixes PrivateUsers=yes with other sandboxing properties)
+- FB only backport PR #17495 (Fixes BPF pinning post-coldplug)
+
 * Sun Feb  7 2021 Davide Cavalca <dcavalca@fb.com> - 246.1-2
 - Initial Hyperscale SIG package
 - Update release to use %%dist macro
@@ -830,8 +882,42 @@ fi
 - Drop no longer needed FB FusionIO patch
 - Temporarily disable audit support while debugging a link issue
 
-* Mon Jan 25 2021 Anita Zhang <anitazha@fb.com> - 246.1-1.fb6
-- Backport PR #16803 to fix ConditionEnvironment=
+* Tue Feb  2 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 247.3-1
+- Minor stable release
+- Fixes #1895937, #1813219, #1903106.
+
+* Wed Jan 27 2021 Fedora Release Engineering <releng@fedoraproject.org>
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_34_Mass_Rebuild
+
+* Wed Jan 13 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 247.2-2
+- Fix bfq patch again (#1813219)
+
+* Wed Dec 23 2020 Jonathan Underwood <jonathan.underwood@gmail.com> - 247.2-2
+- Add patch to enable crypttab to support disabling of luks read and
+  write workqueues (corresponding to
+  https://github.com/systemd/systemd/pull/18062/).
+
+* Wed Dec 16 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 247.2-1
+- Minor stable release
+- Fixes #1908071.
+
+* Tue Dec  8 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 247.1-3
+- Rebuild with fallback hostname change reverted.
+
+* Fri Dec  4 2020 Bastien Nocera <bnocera@redhat.com> - 247.1-2
+- Unset fallback-hostname as plenty of applications expected localhost
+  to mean "default hostname" without ever standardising it (#1892235)
+
+* Tue Dec  1 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 247.1-1
+- Latest stable release
+- Fixes #1902819.
+- Files to configure networking with systemd-networkd in a VM or container are
+  moved to systemd-networkd subpackage. (They were previously in the -container
+  subpackage, which is for container/VM management.)
+
+* Thu Nov 26 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 247-1
+- Update to the latest version
+- #1900878 should be fixed
 
 * Thu Nov 19 2020 Chris Down <cdown@fb.com> - 246.1-1.fb5
 - Updated version of PR #17495 to fix program leak
@@ -841,11 +927,67 @@ fi
 - Backport PR #17422 to clean up cgroups more reliably after exit
 - Backport PR #17497 to add FixedRandomDelay= support
 
+* Tue Oct 20 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 247~rc2
+- New upstream pre-release. See
+  https://github.com/systemd/systemd/blob/v247-rc1/NEWS.
+  Many smaller and bigger improvements and features are introduced.
+  (#1885101, #1890632, #1879216)
+
+  A backwards-incompatible change affects PCI network devices which
+  are connected through a bridge which is itself associated with a
+  slot. When more than one device was associated with the same slot,
+  one of the devices would pseudo-randomly get named after the slot.
+  That name is now not generated at all. This changed behaviour is
+  causes the net naming scheme to be changed to "v247". To restore
+  previous behaviour, specify net.naming-scheme=v245.
+
+  systemd-oomd is built, but should not be considered "production
+  ready" at this point. Testing and bug reports are welcome.
+
+* Wed Sep 30 2020 Dusty Mabe <dusty@dustymabe.com> - 246.6-3
+- Try to make files in subpackages (especially the networkd subpackage)
+  more appropriate.
+
+* Thu Sep 24 2020 Filipe Brandenburger <filbranden@gmail.com> - 246.6-2
+- Build a package with standalone binaries for non-systemd systems.
+  For now, only systemd-sysusers is included.
+
+* Thu Sep 24 2020 Christian Glombek <lorbus@fedoraproject.org> - 246.6-2
+- Split out networkd sub-package and add to main package as recommended dependency
+
+* Sun Sep 20 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 246.6-1
+- Update to latest stable release (various minor fixes: manager,
+  networking, bootct, kernel-install, systemd-dissect, systemd-homed,
+  fstab-generator, documentation) (#1876905)
+- Do not fail in test because of kernel bug (#1803070)
+
 * Fri Sep 18 2020 Anita Zhang <anitazha@fb.com> - 246.1-1.fb3
 - Backport PR #16838 and #16857 to improve $PATH handling
 - Backport PR #16940 to fix ECONN handling in sockets
 - Backport PR #17031 to fix rate limiting on units in restart loop
 - Backport PR #17082 to get nspawn TTY tweaks
+
+* Sun Sep 13 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 246.5-1
+- Update to latest stable release (a bunch of small network-related
+  fixes in systemd-networkd and socket handling, documentation updates,
+  a bunch of fixes for error handling).
+- Also remove existing file when creating /etc/resolv.conf symlink
+  upon installation (#1873856 again)
+
+* Wed Sep  2 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 246.4-1
+- Update to latest stable version: a rework of how the unit cache mtime works
+  (hopefully #1872068, #1871327, #1867930), plus various fixes to
+  systemd-resolved, systemd-dissect, systemd-analyze, systemd-ask-password-agent,
+  systemd-networkd, systemd-homed, systemd-machine-id-setup, presets for
+  instantiated units, documentation and shell completions.
+- Create /etc/resolv.conf symlink upon installation (#1873856)
+- Move nss-mdns before nss-resolve in /etc/nsswitch.conf and disable
+  mdns by default in systemd-resolved (#1867830)
+
+* Wed Aug 26 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 246.3-1
+- Update to bugfix version (some networkd fixes, minor documentation
+  fixes, relax handling of various error conditions, other fixlets for
+  bugs without bugzilla numbers).
 
 * Tue Aug 18 2020 Anita Zhang <anitazha@fb.com> - 246.1-1.fb2
 - Gate "Obsoletes: systemd < 245.6-1" out due to dependency issues on Facebook
