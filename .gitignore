@@ -1,1 +1,5 @@
-SOURCES/systemd-246.1.tar.gz
+BUILD/
+BUILDROOT/
+RPMS/
+SOURCES/*.tar.gz
+SRPMS/
