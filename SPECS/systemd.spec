@@ -889,6 +889,9 @@ fi
 * Wed Jan 27 2021 Fedora Release Engineering <releng@fedoraproject.org>
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_34_Mass_Rebuild
 
+* Mon Jan 25 2021 Anita Zhang <anitazha@fb.com> - 246.1-1.fb6
+- Backport PR #16803 to fix ConditionEnvironment=
+
 * Wed Jan 13 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 247.2-2
 - Fix bfq patch again (#1813219)
 
