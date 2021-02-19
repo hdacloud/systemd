@@ -21,7 +21,7 @@
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 Version:        247.3
-Release:        1%{?dist}
+Release:        2%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -76,6 +76,8 @@ Patch0002:      https://github.com/systemd/systemd/pull/17495.patch
 # Downstream-only patches (0500–9999)
 # https://github.com/systemd/systemd/pull/17050
 Patch0501:      https://github.com/systemd/systemd/pull/17050/commits/f58b96d3e8d1cb0dd3666bc74fa673918b586612.patch
+# workaround for https://pagure.io/centos-sig-hyperscale/sig/issue/13
+Patch0502:      disable-broken-tests-for-binutils-bug.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -868,11 +870,16 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Fri Feb 19 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-2
+- Disable some tests to workaround a binutils bug triggered by enabling audit
+- Refresh patches
+
 * Wed Feb 17 2021 Anita Zhang <anitazha@fb.com> - 247.3-1
 - New release for 247
 - Backport PR #18211 (Fixes ExecCondition= dependency bug)
 - Backport PR #17872 (Fixes PrivateUsers=yes with other sandboxing properties)
 - FB only backport PR #17495 (Fixes BPF pinning post-coldplug)
+- Reenable audit support
 
 * Sun Feb  7 2021 Davide Cavalca <dcavalca@fb.com> - 246.1-2
 - Initial Hyperscale SIG package
