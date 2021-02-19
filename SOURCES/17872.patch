@@ -1,8 +1,7 @@
-From 963a018bade094e38a71bf1b7e10d37b44225836 Mon Sep 17 00:00:00 2001
+From 5b98412c6f0cb9e63a7c8f795064d2043cc0baaa Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Sun, 6 Dec 2020 22:29:43 +0900
-Subject: [PATCH 2/3] core/namespace: use existing /proc when not enough
- priviledge
+Subject: [PATCH] core/namespace: use existing /proc when not enough priviledge
 
 Fixes #17860.
 ---
@@ -10,7 +9,7 @@ Fixes #17860.
  1 file changed, 34 insertions(+), 27 deletions(-)
 
 diff --git a/src/core/namespace.c b/src/core/namespace.c
-index cdf427a6ea..8560ad9a75 100644
+index cdf427a6ea9..8560ad9a754 100644
 --- a/src/core/namespace.c
 +++ b/src/core/namespace.c
 @@ -859,25 +859,15 @@ static int mount_sysfs(const MountEntry *m) {
@@ -97,6 +96,3 @@ index cdf427a6ea..8560ad9a75 100644
  
          return 1;
  }
--- 
-2.29.2
-

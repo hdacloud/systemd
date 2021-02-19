@@ -1,8 +1,7 @@
-From 5adb2f01405d7cb7ba3cf9d4ee035f57952f79a6 Mon Sep 17 00:00:00 2001
+From 4e42210d40f96e185a55d43041dd6b962ea830dd Mon Sep 17 00:00:00 2001
 From: Chris Down <chris@chrisdown.name>
 Date: Thu, 29 Oct 2020 12:03:52 +0000
-Subject: [PATCH 3/3] bpf: pid1: Pin reference to BPF programs for
- post-coldplug
+Subject: [PATCH] bpf: pid1: Pin reference to BPF programs for post-coldplug
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -75,47 +74,47 @@ approach with reference pinning is immediately tangible.
  6 files changed, 189 insertions(+), 7 deletions(-)
 
 diff --git a/src/core/bpf-firewall.c b/src/core/bpf-firewall.c
-index 99783aca22..c205ba1b19 100644
+index 0f588b6ca5f..6283f15737b 100644
 --- a/src/core/bpf-firewall.c
 +++ b/src/core/bpf-firewall.c
-@@ -702,8 +702,7 @@ int bpf_firewall_install(Unit *u) {
+@@ -698,8 +698,7 @@ int bpf_firewall_install(Unit *u) {
          if (r < 0)
                  return log_unit_error_errno(u, r, "Failed to determine cgroup path: %m");
-
+ 
 -        flags = (supported == BPF_FIREWALL_SUPPORTED_WITH_MULTI &&
 -                 (u->type == UNIT_SLICE || unit_cgroup_delegate(u))) ? BPF_F_ALLOW_MULTI : 0;
 +        flags = (supported == BPF_FIREWALL_SUPPORTED_WITH_MULTI) ? BPF_F_ALLOW_MULTI : 0;
-
+ 
          /* Unref the old BPF program (which will implicitly detach it) right before attaching the new program, to
           * minimize the time window when we don't account for IP traffic. */
-@@ -711,8 +710,7 @@ int bpf_firewall_install(Unit *u) {
+@@ -707,8 +706,7 @@ int bpf_firewall_install(Unit *u) {
          u->ip_bpf_ingress_installed = bpf_program_unref(u->ip_bpf_ingress_installed);
-
+ 
          if (u->ip_bpf_egress) {
 -                r = bpf_program_cgroup_attach(u->ip_bpf_egress, BPF_CGROUP_INET_EGRESS, path,
 -                                              flags | (set_isempty(u->ip_bpf_custom_egress) ? 0 : BPF_F_ALLOW_MULTI));
 +                r = bpf_program_cgroup_attach(u->ip_bpf_egress, BPF_CGROUP_INET_EGRESS, path, flags);
                  if (r < 0)
                          return log_unit_error_errno(u, r, "Attaching egress BPF program to cgroup %s failed: %m", path);
-
-@@ -721,8 +719,7 @@ int bpf_firewall_install(Unit *u) {
+ 
+@@ -717,8 +715,7 @@ int bpf_firewall_install(Unit *u) {
          }
-
+ 
          if (u->ip_bpf_ingress) {
 -                r = bpf_program_cgroup_attach(u->ip_bpf_ingress, BPF_CGROUP_INET_INGRESS, path,
 -                                              flags | (set_isempty(u->ip_bpf_custom_ingress) ? 0 : BPF_F_ALLOW_MULTI));
 +                r = bpf_program_cgroup_attach(u->ip_bpf_ingress, BPF_CGROUP_INET_INGRESS, path, flags);
                  if (r < 0)
                          return log_unit_error_errno(u, r, "Attaching ingress BPF program to cgroup %s failed: %m", path);
-
+ 
 diff --git a/src/core/main.c b/src/core/main.c
-index a280b756ff..2ace4cb89c 100644
+index eaa56aca2a4..0edf8c0abad 100644
 --- a/src/core/main.c
 +++ b/src/core/main.c
 @@ -1144,6 +1144,14 @@ static int prepare_reexecute(
          if (!fds)
                  return log_oom();
-
+ 
 +        /* We need existing BPF programs to survive reload, otherwise there will be a period where no BPF
 +         * program is active during task execution within a cgroup. This would be bad since this may have
 +         * security or reliability implications: devices we should filter won't be filtered, network activity
@@ -130,13 +129,13 @@ index a280b756ff..2ace4cb89c 100644
 @@ -1159,6 +1167,7 @@ static int prepare_reexecute(
          if (r < 0)
                  return log_error_errno(r, "Failed to disable O_CLOEXEC for serialization fds: %m");
-
+ 
 +        TAKE_PTR(m_unpin);
          *ret_f = TAKE_PTR(f);
          *ret_fds = TAKE_PTR(fds);
-
+ 
 diff --git a/src/core/manager.c b/src/core/manager.c
-index a1d6f7cc10..b373d27844 100644
+index 4b215a61766..c330a02bf79 100644
 --- a/src/core/manager.c
 +++ b/src/core/manager.c
 @@ -65,6 +65,7 @@
@@ -147,10 +146,10 @@ index a1d6f7cc10..b373d27844 100644
  #include "signal-util.h"
  #include "socket-util.h"
  #include "special.h"
-@@ -3217,6 +3218,79 @@ static void manager_serialize_gid_refs(Manager *m, FILE *f) {
+@@ -3213,6 +3214,79 @@ static void manager_serialize_gid_refs(Manager *m, FILE *f) {
          manager_serialize_uid_refs_internal(m, f, &m->gid_refs, "destroy-ipc-gid");
  }
-
+ 
 +static int serialize_limbo_bpf_program(FILE *f, FDSet *fds, BPFProgram *p) {
 +        int copy;
 +        _cleanup_free_ char *ap = NULL;
@@ -227,40 +226,40 @@ index a1d6f7cc10..b373d27844 100644
  int manager_serialize(
                  Manager *m,
                  FILE *f,
-@@ -3226,6 +3300,7 @@ int manager_serialize(
+@@ -3222,6 +3296,7 @@ int manager_serialize(
          const char *t;
          Unit *u;
          int r;
 +        BPFProgram *p;
-
+ 
          assert(m);
          assert(f);
-@@ -3270,6 +3345,9 @@ int manager_serialize(
+@@ -3266,6 +3341,9 @@ int manager_serialize(
                  (void) serialize_dual_timestamp(f, joined, m->timestamps + q);
          }
-
+ 
 +        SET_FOREACH(p, m->bpf_limbo_progs)
 +                (void) serialize_limbo_bpf_program(f, fds, p);
 +
          if (!switching_root)
                  (void) serialize_strv(f, "env", m->client_environment);
-
-@@ -3588,7 +3666,10 @@ int manager_deserialize(Manager *m, FILE *f, FDSet *fds) {
+ 
+@@ -3584,7 +3662,10 @@ int manager_deserialize(Manager *m, FILE *f, FDSet *fds) {
                          else
                                  m->n_failed_jobs += n;
-
+ 
 -                } else if ((val = startswith(l, "taint-usr="))) {
 +                } else if ((val = startswith(l, "bpf-limbo=")))
 +                        deserialize_limbo_bpf_program(m, fds, val);
 +
 +                else if ((val = startswith(l, "taint-usr="))) {
                          int b;
-
+ 
                          b = parse_boolean(val);
-@@ -3764,6 +3845,65 @@ int manager_deserialize(Manager *m, FILE *f, FDSet *fds) {
+@@ -3760,6 +3841,65 @@ int manager_deserialize(Manager *m, FILE *f, FDSet *fds) {
          return manager_deserialize_units(m, f, fds);
  }
-
+ 
 +Manager* manager_pin_all_cgroup_bpf_programs(Manager *m) {
 +        int r;
 +        Unit *u;
@@ -323,10 +322,10 @@ index a1d6f7cc10..b373d27844 100644
  int manager_reload(Manager *m) {
          _cleanup_(manager_reloading_stopp) Manager *reloading = NULL;
          _cleanup_fdset_free_ FDSet *fds = NULL;
-@@ -3783,6 +3923,13 @@ int manager_reload(Manager *m) {
+@@ -3779,6 +3919,13 @@ int manager_reload(Manager *m) {
          /* We are officially in reload mode from here on. */
          reloading = manager_reloading_start(m);
-
+ 
 +        /* We need existing BPF programs to survive reload, otherwise there will be a period where no BPF
 +         * program is active during task execution within a cgroup. This would be bad since this may have
 +         * security or reliability implications: devices we should filter won't be filtered, network activity
@@ -337,10 +336,10 @@ index a1d6f7cc10..b373d27844 100644
          r = manager_serialize(m, f, fds, false);
          if (r < 0)
                  return r;
-@@ -3807,6 +3954,12 @@ int manager_reload(Manager *m) {
+@@ -3803,6 +3950,12 @@ int manager_reload(Manager *m) {
          m->uid_refs = hashmap_free(m->uid_refs);
          m->gid_refs = hashmap_free(m->gid_refs);
-
+ 
 +        /* The only canonical reference left to the dynamically allocated parts of these BPF programs is
 +         * going to be on the other side of manager_deserialize, so the freeable parts can now be freed. The
 +         * program itself will be detached as part of manager_vacuum. */
@@ -350,8 +349,8 @@ index a1d6f7cc10..b373d27844 100644
          r = lookup_paths_init(&m->lookup_paths, m->unit_file_scope, 0, NULL);
          if (r < 0)
                  log_warning_errno(r, "Failed to initialize path lookup table, ignoring: %m");
-@@ -4741,6 +4894,12 @@ static void manager_vacuum(Manager *m) {
-
+@@ -4737,6 +4890,12 @@ static void manager_vacuum(Manager *m) {
+ 
          /* Release any runtimes no longer referenced */
          exec_runtime_vacuum(m);
 +
@@ -361,10 +360,10 @@ index a1d6f7cc10..b373d27844 100644
 +        (void) manager_dispatch_cgroup_realize_queue(m);
 +        manager_unpin_all_cgroup_bpf_programs(m);
  }
-
+ 
  int manager_dispatch_user_lookup_fd(sd_event_source *source, int fd, uint32_t revents, void *userdata) {
 diff --git a/src/core/manager.h b/src/core/manager.h
-index 19df889dd8..2c4a2b6063 100644
+index 19df889dd89..2c4a2b60632 100644
 --- a/src/core/manager.h
 +++ b/src/core/manager.h
 @@ -438,6 +438,8 @@ struct Manager {
@@ -374,12 +373,12 @@ index 19df889dd8..2c4a2b6063 100644
 +
 +        Set *bpf_limbo_progs;
  };
-
+ 
  static inline usec_t manager_default_timeout_abort_usec(Manager *m) {
 @@ -479,6 +481,10 @@ int manager_add_job_by_name(Manager *m, JobType type, const char *name, JobMode
  int manager_add_job_by_name_and_warn(Manager *m, JobType type, const char *name, JobMode mode, Set *affected_jobs,  Job **ret);
  int manager_propagate_reload(Manager *m, Unit *unit, JobMode mode, sd_bus_error *e);
-
+ 
 +Manager* manager_pin_all_cgroup_bpf_programs(Manager *m);
 +void manager_unpin_all_cgroup_bpf_programs(Manager *m);
 +DEFINE_TRIVIAL_CLEANUP_FUNC(Manager*, manager_unpin_all_cgroup_bpf_programs);
@@ -388,13 +387,13 @@ index 19df889dd8..2c4a2b6063 100644
  void manager_dump_jobs(Manager *s, FILE *f, const char *prefix);
  void manager_dump(Manager *s, FILE *f, const char *prefix);
 diff --git a/src/shared/bpf-program.c b/src/shared/bpf-program.c
-index 10239142af..549490da6c 100644
+index 10239142af3..549490da6ce 100644
 --- a/src/shared/bpf-program.c
 +++ b/src/shared/bpf-program.c
 @@ -209,6 +209,16 @@ int bpf_program_cgroup_detach(BPFProgram *p) {
          return 0;
  }
-
+ 
 +void bpf_program_skeletonize(BPFProgram *p) {
 +        assert(p);
 +
@@ -409,7 +408,7 @@ index 10239142af..549490da6c 100644
          union bpf_attr attr;
          int fd;
 diff --git a/src/shared/bpf-program.h b/src/shared/bpf-program.h
-index eef77f9d8e..5957a6ce30 100644
+index eef77f9d8e1..5957a6ce300 100644
 --- a/src/shared/bpf-program.h
 +++ b/src/shared/bpf-program.h
 @@ -28,6 +28,7 @@ struct BPFProgram {
@@ -417,9 +416,6 @@ index eef77f9d8e..5957a6ce30 100644
  BPFProgram *bpf_program_unref(BPFProgram *p);
  BPFProgram *bpf_program_ref(BPFProgram *p);
 +void bpf_program_skeletonize(BPFProgram *p);
-
+ 
  int bpf_program_add_instructions(BPFProgram *p, const struct bpf_insn *insn, size_t count);
  int bpf_program_load_kernel(BPFProgram *p, char *log_buf, size_t log_size);
---
-2.29.2
-
