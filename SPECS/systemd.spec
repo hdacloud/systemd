@@ -21,7 +21,7 @@
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 Version:        247.3
-Release:        2%{?dist}
+Release:        3%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -176,10 +176,10 @@ Conflicts:      fedora-release < 23-0.12
 %endif
 Obsoletes:      timedatex < 0.6-3
 Provides:       timedatex = 0.6-3
-Conflicts:      %{name}-standalone-tmpfiles < %{version}-%{release}^
-Obsoletes:      %{name}-standalone-tmpfiles < %{version}-%{release}^
-Conflicts:      %{name}-standalone-sysusers < %{version}-%{release}^
-Obsoletes:      %{name}-standalone-sysusers < %{version}-%{release}^
+Conflicts:      %{name}-standalone-tmpfiles < %{version}-%{release}
+Obsoletes:      %{name}-standalone-tmpfiles < %{version}-%{release}
+Conflicts:      %{name}-standalone-sysusers < %{version}-%{release}
+Obsoletes:      %{name}-standalone-sysusers < %{version}-%{release}
 
 # Recommends to replace normal Requires deps for stuff that is dlopen()ed
 Recommends:     libcryptsetup.so.12()(64bit)
@@ -870,6 +870,9 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Wed Feb 24 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-3
+- Remove careinversion usage to make the package usable on older mock versions
+
 * Fri Feb 19 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-2
 - Disable some tests to workaround a binutils bug triggered by enabling audit
 - Refresh patches
