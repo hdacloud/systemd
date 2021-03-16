@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        44%{?dist}
+Release:        45%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -593,6 +593,26 @@ Patch0540: 0540-test-udev-test.pl-generator-for-large-list-of-block-.patch
 Patch0541: 0541-test-udev-test.pl-suppress-umount-error-message-at-s.patch
 Patch0542: 0542-test-udev_test.pl-add-expected-good-count.patch
 Patch0543: 0543-test-udev-test-gracefully-exit-when-imports-fail.patch
+Patch0544: 0544-Revert-test-add-test-cases-for-empty-string-match-an.patch
+Patch0545: 0545-test-sys-script.py-add-missing-DEVNAME-entries-to-ue.patch
+Patch0546: 0546-sd-event-split-out-helper-functions-for-reshuffling-.patch
+Patch0547: 0547-sd-event-split-out-enable-and-disable-codepaths-from.patch
+Patch0548: 0548-sd-event-mention-that-two-debug-logged-events-are-ig.patch
+Patch0549: 0549-sd-event-split-clock-data-allocation-out-of-sd_event.patch
+Patch0550: 0550-sd-event-split-out-code-to-add-remove-timer-event-so.patch
+Patch0551: 0551-sd-event-fix-delays-assert-brain-o-17790.patch
+Patch0552: 0552-sd-event-let-s-suffix-last_run-last_log-with-_usec.patch
+Patch0553: 0553-sd-event-refuse-running-default-event-loops-in-any-o.patch
+Patch0554: 0554-sd-event-ref-event-loop-while-in-sd_event_prepare-ot.patch
+Patch0555: 0555-sd-event-follow-coding-style-with-naming-return-para.patch
+Patch0556: 0556-sd-event-remove-earliest_index-latest_index-into-com.patch
+Patch0557: 0557-sd-event-update-state-at-the-end-in-event_source_ena.patch
+Patch0558: 0558-sd-event-increase-n_enabled_child_sources-just-once.patch
+Patch0559: 0559-sd-event-add-ability-to-ratelimit-event-sources.patch
+Patch0560: 0560-test-add-ratelimiting-test.patch
+Patch0561: 0561-core-prevent-excessive-proc-self-mountinfo-parsing.patch
+Patch0562: 0562-udev-run-link_update-with-increased-retry-count-in-s.patch
+Patch0563: 0563-pam-systemd-use-secure_getenv-rather-than-getenv.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -1221,6 +1241,28 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Thu Mar 11 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-45
+- Revert "test: add test cases for empty string match" and "test: add test case for multi matches when use ||" (#1931947)
+- test/sys-script.py: add missing DEVNAME entries to uevents (#1931947)
+- sd-event: split out helper functions for reshuffling prioqs (#1819868)
+- sd-event: split out enable and disable codepaths from sd_event_source_set_enabled() (#1819868)
+- sd-event: mention that two debug logged events are ignored (#1819868)
+- sd-event: split clock data allocation out of sd_event_add_time() (#1819868)
+- sd-event: split out code to add/remove timer event sources to earliest/latest prioq (#1819868)
+- sd-event: fix delays assert brain-o (#17790) (#1819868)
+- sd-event: let's suffix last_run/last_log with "_usec" (#1819868)
+- sd-event: refuse running default event loops in any other thread than the one they are default for (#1819868)
+- sd-event: ref event loop while in sd_event_prepare() ot sd_event_run() (#1819868)
+- sd-event: follow coding style with naming return parameter (#1819868)
+- sd-event: remove earliest_index/latest_index into common part of event source objects (#1819868)
+- sd-event: update state at the end in event_source_enable (#1819868)
+- sd-event: increase n_enabled_child_sources just once (#1819868)
+- sd-event: add ability to ratelimit event sources (#1819868)
+- test: add ratelimiting test (#1819868)
+- core: prevent excessive /proc/self/mountinfo parsing (#1819868)
+- udev: run link_update() with increased retry count in second invocation (#1931947)
+- pam-systemd: use secure_getenv() rather than getenv() (#1687514)
+
 * Thu Jan 28 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-44
 - ci: PowerTools repo was renamed to powertools in RHEL 8.3 (#1871827)
 - ci: use quay.io instead of Docker Hub to avoid rate limits (#1871827)
