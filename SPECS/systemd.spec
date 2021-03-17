@@ -16,12 +16,12 @@
 # cryptsetup, e.g. when re-building cryptsetup on a json-c SONAME-bump.
 %bcond_with    bootstrap
 %bcond_without tests
-%bcond_without lto
+%bcond_with    lto
 
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 Version:        247.3
-Release:        3%{?dist}
+Release:        4%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -71,13 +71,17 @@ Patch0001:      https://github.com/systemd/systemd/pull/17872.patch
 %if 0%{?facebook}
 # 17495: Fixes BPF pinning post-coldplug
 Patch0002:      https://github.com/systemd/systemd/pull/17495.patch
+# 18886: systemd-shutdown logs to /dev/console not stderr
+Patch0003:      https://github.com/systemd/systemd/pull/18886.patch
 %endif
+# Commit to make #18955 apply cleanly
+Patch0004:      https://github.com/systemd/systemd/commit/fa67d9c0d652dc41574b546f542909e9c8157237.patch
+#18955: Fixes fstab parsing
+Patch0005:      https://github.com/systemd/systemd/pull/18955.patch
 
 # Downstream-only patches (0500–9999)
 # https://github.com/systemd/systemd/pull/17050
 Patch0501:      https://github.com/systemd/systemd/pull/17050/commits/f58b96d3e8d1cb0dd3666bc74fa673918b586612.patch
-# workaround for https://pagure.io/centos-sig-hyperscale/sig/issue/13
-Patch0502:      disable-broken-tests-for-binutils-bug.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -870,6 +874,11 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Wed Mar 17 2021 Anita Zhang <anitazha@fb.com> - 247.3-4
+- Backport PR #18955 (Fixes fstab parsing)
+- FB only backport PR #18886 (systemd-shutdown logs to /dev/console not stderr)
+- Reenable tests by disabling LTO (work around binutils bug)
+
 * Wed Feb 24 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-3
 - Remove careinversion usage to make the package usable on older mock versions
 
