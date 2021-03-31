@@ -1,0 +1,39 @@
+policy_module(systemd_hs,0.0.1)
+
+# systemd overrides for 247
+gen_require(`
+	type avahi_t;
+	type init_t;
+	type init_var_run_t;
+	type kmsg_device_t;
+	type policykit_auth_t;
+	type policykit_t;
+	type proc_kmsg_t;
+	type system_dbusd_t;
+	type systemd_hostnamed_t;
+	type systemd_localed_t;
+	type systemd_logind_t;
+	type systemd_machined_t;
+	type security_t;
+	type syslogd_t;
+	type user_tmp_t;
+	type xdm_t;
+')
+
+allow avahi_t init_var_run_t:dir read;
+allow init_t kmsg_device_t:chr_file mounton;
+allow init_t proc_kmsg_t:file { getattr mounton };
+allow init_t systemd_machined_t:unix_stream_socket connectto;
+allow policykit_auth_t init_var_run_t:dir read;
+allow policykit_auth_t systemd_machined_t:unix_stream_socket connectto;
+allow policykit_t systemd_machined_t:unix_stream_socket connectto;
+allow syslogd_t user_tmp_t:lnk_file read;
+allow system_dbusd_t systemd_machined_t:unix_stream_socket connectto;
+allow systemd_hostnamed_t security_t:file map;
+allow systemd_localed_t security_t:file map;
+allow systemd_logind_t self:netlink_selinux_socket create;
+allow systemd_logind_t self:netlink_selinux_socket bind;
+allow systemd_logind_t security_t:file map;
+allow systemd_logind_t systemd_machined_t:unix_stream_socket connectto;
+allow systemd_machined_t init_var_run_t:sock_file create;
+allow xdm_t systemd_machined_t:unix_stream_socket connectto;

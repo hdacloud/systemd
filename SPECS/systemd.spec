@@ -17,11 +17,16 @@
 %bcond_with    bootstrap
 %bcond_without tests
 %bcond_with    lto
+%if 0%{?facebook}
+%bcond_with selinux
+%else
+%bcond_without selinux
+%endif
 
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 Version:        247.3
-Release:        4%{?dist}
+Release:        5%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -56,6 +61,10 @@ Source21:       macros.sysusers
 Source22:       sysusers.attr
 Source23:       sysusers.prov
 Source24:       sysusers.generate-pre.sh
+
+# Needed for selinux subpackage
+Source100:      Makefile.selinux
+Source101:      systemd_hs.te
 
 %if 0
 GIT_DIR=../../src/systemd/.git git format-patch-ab --no-signature -M -N v235..v235-stable
@@ -194,6 +203,11 @@ Recommends:     libpcre2-8.so.0()(64bit)
 Recommends:     libpwquality.so.1()(64bit)
 Recommends:     libpwquality.so.1(LIBPWQUALITY_1.0)(64bit)
 Recommends:     libqrencode.so.4()(64bit)
+
+%if %{with selinux}
+# Force the SELinux module to be installed
+Requires:       %{name}-selinux = %{version}-%{release}
+%endif
 
 %description
 systemd is a system and service manager that runs as PID 1 and starts
@@ -345,8 +359,32 @@ License:       LGPLv2+
 "Installed tests" that are usually run as part of the build system.
 They can be useful to test systemd internals.
 
+%if %{with selinux}
+%package selinux
+Summary:        SELinux module for systemd
+BuildArch:      noarch
+BuildRequires:  bzip2
+BuildRequires:  make
+BuildRequires:  selinux-policy
+BuildRequires:  selinux-policy-devel
+Requires(post): selinux-policy-base >= %{_selinux_policy_version}
+Requires(post): policycoreutils
+Requires(post): policycoreutils-python-utils
+Requires(pre):  libselinux-utils
+Requires(post): libselinux-utils
+
+%description selinux
+This package provides the SELinux policy module to ensure systemd
+runs properly under an environment with SELinux enabled.
+%endif
+
 %prep
 %autosetup -n %{?commit:%{name}%{?stable:-stable}-%{commit}}%{!?commit:%{name}%{?stable:-stable}-%{github_version}} -p1
+
+%if %{with selinux}
+mkdir selinux
+cp %SOURCE100 %SOURCE101 selinux
+%endif
 
 %build
 %define ntpvendor %(source /etc/os-release; echo ${ID})
@@ -456,6 +494,11 @@ export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 %meson "${CONFIGURE_OPTS[@]}"
 %meson_build
+
+%if %{with selinux}
+cd selinux
+%{__make} -f Makefile.selinux SHARE="%{_datadir}" TARGETS="systemd_hs"
+%endif
 
 %install
 export LANG=en_US.UTF-8
@@ -591,6 +634,13 @@ python3 %{SOURCE2} %buildroot <<EOF
 %ghost %dir /var/log/journal/remote
 %ghost %attr(0700,root,root) %dir /var/log/private
 EOF
+
+%if %{with selinux}
+install -d -p %{buildroot}%{_datadir}/selinux/devel/include/contrib
+install -p -m 0644 selinux/systemd_hs.if %{buildroot}%{_datadir}/selinux/devel/include/contrib
+install -d -p %{buildroot}%{_datadir}/selinux/packages
+install -p -m 0644 selinux/systemd_hs.pp.bz2 %{buildroot}%{_datadir}/selinux/packages
+%endif
 
 %check
 %if %{with tests}
@@ -833,6 +883,25 @@ fi
 %postun journal-remote
 %systemd_postun_with_restart systemd-journal-gatewayd.service systemd-journal-remote.service systemd-journal-upload.service
 
+%if %{with selinux}
+%pre selinux
+%selinux_relabel_pre
+
+%post selinux
+%selinux_modules_install %{_datadir}/selinux/packages/systemd_hs.pp.bz2
+%selinux_relabel_post
+
+%posttrans selinux
+%selinux_relabel_post
+
+%postun selinux
+%selinux_modules_uninstall systemd_hs
+
+if [ $1 -eq 0 ]; then
+    %selinux_relabel_post
+fi
+%endif
+
 %global _docdir_fmt %{name}
 
 %files -f %{name}.lang -f .file-list-rest
@@ -873,7 +942,16 @@ fi
 
 %files tests -f .file-list-tests
 
+%if %{with selinux}
+%files selinux
+%{_datadir}/selinux/devel/include/contrib/systemd_hs.if
+%{_datadir}/selinux/packages/systemd_hs.pp.bz2
+%endif
+
 %changelog
+* Wed Mar 31 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-5
+- Add selinux subpackage
+
 * Wed Mar 17 2021 Anita Zhang <anitazha@fb.com> - 247.3-4
 - Backport PR #18955 (Fixes fstab parsing)
 - FB only backport PR #18886 (systemd-shutdown logs to /dev/console not stderr)
