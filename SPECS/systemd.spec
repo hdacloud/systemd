@@ -26,7 +26,7 @@
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 Version:        247.3
-Release:        5%{?dist}
+Release:        6%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -77,20 +77,28 @@ GIT_DIR=../../src/systemd/.git git diffab -M v233..master@{2017-06-15} -- hwdb/[
 Patch0000:      https://github.com/systemd/systemd/pull/18211.patch
 # 17872: Fixes using PrivateUsers=yes with other sandboxing properties
 Patch0001:      https://github.com/systemd/systemd/pull/17872.patch
-%if 0%{?facebook}
-# 17495: Fixes BPF pinning post-coldplug
-Patch0002:      https://github.com/systemd/systemd/pull/17495.patch
-# 18886: systemd-shutdown logs to /dev/console not stderr
-Patch0003:      https://github.com/systemd/systemd/pull/18886.patch
-%endif
 # Commit to make #18955 apply cleanly
 Patch0004:      https://github.com/systemd/systemd/commit/fa67d9c0d652dc41574b546f542909e9c8157237.patch
 #18955: Fixes fstab parsing
 Patch0005:      https://github.com/systemd/systemd/pull/18955.patch
 
+%if 0%{?facebook}
+# 17495: Fixes BPF pinning post-coldplug
+Patch0101:      https://github.com/systemd/systemd/pull/17495.patch
+# 18886: systemd-shutdown logs to /dev/console not stderr
+Patch0102:      https://github.com/systemd/systemd/pull/18886.patch
+#18621: FB variant of quieting "proc: Bad value for 'hidepid'" messages
+Patch0103:      18621-fb.patch
+%else
+#18621: Quiet "proc: Bad value for 'hidepid'" messages
+Patch0103:      https://github.com/systemd/systemd/pull/18621.patch
+%endif
+
 # Downstream-only patches (0500–9999)
 # https://github.com/systemd/systemd/pull/17050
 Patch0501:      https://github.com/systemd/systemd/pull/17050/commits/f58b96d3e8d1cb0dd3666bc74fa673918b586612.patch
+# Downgrade sysv-generator messages from warning to info
+Patch0502:      0001-sysv-generator-downgrade-log-warning-about-autogener.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -949,6 +957,10 @@ fi
 %endif
 
 %changelog
+* Wed Mar 31 2021 Anita Zhang <anitazha@fb.com> - 247.3-6
+- Backport PR#18621 (Ignore attempts at hidepid and subset for older kernels)
+- Downgrade sysv-generator warning about missing native systemd unit
+
 * Wed Mar 31 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-5
 - Add selinux subpackage
 
