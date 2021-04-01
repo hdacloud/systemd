@@ -26,7 +26,7 @@
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 Version:        247.3
-Release:        7%{?dist}
+Release:        8%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -65,6 +65,7 @@ Source24:       sysusers.generate-pre.sh
 # Needed for selinux subpackage
 Source100:      Makefile.selinux
 Source101:      systemd_hs.te
+Source102:      systemd_hs.if
 
 %if 0
 GIT_DIR=../../src/systemd/.git git format-patch-ab --no-signature -M -N v235..v235-stable
@@ -391,7 +392,7 @@ runs properly under an environment with SELinux enabled.
 
 %if %{with selinux}
 mkdir selinux
-cp %SOURCE100 %SOURCE101 selinux
+cp %SOURCE100 %SOURCE101 %SOURCE102 selinux
 %endif
 
 %build
@@ -957,6 +958,10 @@ fi
 %endif
 
 %changelog
+* Thu Apr  1 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-8
+- Backport https://github.com/SELinuxProject/refpolicy/pull/308 to fix
+  systemd-hostnamed and systemd-localed when SELinux is enabled.
+
 * Thu Apr  1 2021 Anita Zhang <anitazha@fb.com> - 247.3-7
 - Downgrade sysv-generator warning even more (to debug)
 
