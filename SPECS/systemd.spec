@@ -26,7 +26,7 @@
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 Version:        247.3
-Release:        6%{?dist}
+Release:        7%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -97,7 +97,7 @@ Patch0103:      https://github.com/systemd/systemd/pull/18621.patch
 # Downstream-only patches (0500–9999)
 # https://github.com/systemd/systemd/pull/17050
 Patch0501:      https://github.com/systemd/systemd/pull/17050/commits/f58b96d3e8d1cb0dd3666bc74fa673918b586612.patch
-# Downgrade sysv-generator messages from warning to info
+# Downgrade sysv-generator messages from warning to debug
 Patch0502:      0001-sysv-generator-downgrade-log-warning-about-autogener.patch
 
 %ifarch %{ix86} x86_64 aarch64
@@ -957,6 +957,9 @@ fi
 %endif
 
 %changelog
+* Thu Apr  1 2021 Anita Zhang <anitazha@fb.com> - 247.3-7
+- Downgrade sysv-generator warning even more (to debug)
+
 * Wed Mar 31 2021 Anita Zhang <anitazha@fb.com> - 247.3-6
 - Backport PR#18621 (Ignore attempts at hidepid and subset for older kernels)
 - Downgrade sysv-generator warning about missing native systemd unit
