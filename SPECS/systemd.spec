@@ -16,7 +16,7 @@
 # cryptsetup, e.g. when re-building cryptsetup on a json-c SONAME-bump.
 %bcond_with    bootstrap
 %bcond_without tests
-%bcond_with    lto
+%bcond_without lto
 %if 0%{?facebook}
 %bcond_with selinux
 %else
@@ -26,7 +26,7 @@
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 Version:        247.3
-Release:        8%{?dist}
+Release:        9%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -489,8 +489,7 @@ CONFIGURE_OPTS=(
 CONFIGURE_OPTS+=(
         -Dntp-servers='1.ntp.vip.facebook.com 2.ntp.vip.facebook.com 3.ntp.vip.facebook.com 4.ntp.vip.facebook.com'
         -Ddns-servers='10.127.255.51 10.191.255.51 2401:db00:eef0:a53:: 2401:db00:eef0:b53::'
-        -Dsupport-url='https://www.facebook.com/groups/prodos.users/'
-        -Ddefault-hierarchy=unified
+        -Dsupport-url='https://www.facebook.com/groups/systemd.and.friends/'
         -Dcontainer-uid-base-min=10485760
 )
 %endif
@@ -958,6 +957,10 @@ fi
 %endif
 
 %changelog
+* Thu Apr  7 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-9
+- Reenable LTO now that binutils has been fixed
+- Update FB configure options
+
 * Thu Apr  1 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-8
 - Backport https://github.com/SELinuxProject/refpolicy/pull/308 to fix
   systemd-hostnamed and systemd-localed when SELinux is enabled.
