@@ -957,7 +957,7 @@ fi
 %endif
 
 %changelog
-* Thu Apr  7 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-9
+* Wed Apr  7 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-9
 - Reenable LTO now that binutils has been fixed
 - Update FB configure options
 
