@@ -1,4 +1,4 @@
-#global commit 551dd873b0bdfb9e7e47431b2933c8b910228f0c
+#global commit c4b843473a75fb38ed5bf54e9d3cfb1cb3719efa
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
 %global stable 1
@@ -25,8 +25,8 @@
 
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
-Version:        247.3
-Release:        10%{?dist}
+Version:        248.2
+Release:        1.1%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -74,28 +74,25 @@ GIT_DIR=../../src/systemd/.git git diffab -M v233..master@{2017-06-15} -- hwdb/[
 %endif
 
 # Backports of patches from upstream (0000–0499)
-# 18211: Fixes ExecCondition= dependency bug
-Patch0000:      https://github.com/systemd/systemd/pull/18211.patch
-# 17872: Fixes using PrivateUsers=yes with other sandboxing properties
-Patch0001:      https://github.com/systemd/systemd/pull/17872.patch
-# Commit to make #18955 apply cleanly
-Patch0004:      https://github.com/systemd/systemd/commit/fa67d9c0d652dc41574b546f542909e9c8157237.patch
-#18955: Fixes fstab parsing
-Patch0005:      https://github.com/systemd/systemd/pull/18955.patch
+#
+# Any patches which are "in preparation" upstream should be listed
+# here, rather than in the next section. Packit CI will drop any
+# patches in this range before applying upstream pull requests.
 
 %if 0%{?facebook}
-# 17495: Fixes BPF pinning post-coldplug
-Patch0101:      https://github.com/systemd/systemd/pull/17495.patch
-# 18886: systemd-shutdown logs to /dev/console not stderr
-Patch0102:      https://github.com/systemd/systemd/pull/18886.patch
-#18621: FB variant of quieting "proc: Bad value for 'hidepid'" messages
-Patch0103:      18621-fb.patch
+# PR 13496: Extend bpf cgroup program support
+Patch0100:      13496-fb.patch
+# PR 18621: FB variant of quieting "proc: Bad value for 'hidepid'" messages
+Patch0101:      18621-fb.patch
+# PR 17495: Fixes BPF pinning post-coldplug
+Patch0102:      17495-rebased.patch
 %else
-#18621: Quiet "proc: Bad value for 'hidepid'" messages
-Patch0103:      https://github.com/systemd/systemd/pull/18621.patch
+# PR 18621: Quiet "proc: Bad value for 'hidepid'" messages
+Patch0101:      https://github.com/systemd/systemd/pull/18621.patch
 %endif
 
 # Downstream-only patches (0500–9999)
+
 # https://github.com/systemd/systemd/pull/17050
 Patch0501:      https://github.com/systemd/systemd/pull/17050/commits/f58b96d3e8d1cb0dd3666bc74fa673918b586612.patch
 # Downgrade sysv-generator messages from warning to debug
@@ -142,6 +139,9 @@ BuildRequires:  qrencode-devel
 BuildRequires:  libmicrohttpd-devel
 BuildRequires:  libxkbcommon-devel
 BuildRequires:  iptables-devel
+BuildRequires:  pkgconfig(tss2-esys)
+BuildRequires:  pkgconfig(tss2-rc)
+BuildRequires:  pkgconfig(tss2-mu)
 BuildRequires:  libxslt
 BuildRequires:  docbook-style-xsl
 BuildRequires:  pkgconfig
@@ -176,6 +176,7 @@ Requires:       dbus >= 1.9.18
 Requires:       %{name}-pam = %{version}-%{release}
 Requires:       %{name}-rpm-macros = %{version}-%{release}
 Requires:       %{name}-libs = %{version}-%{release}
+%{?fedora:Recommends:     %{name}-networkd = %{version}-%{release}}
 Recommends:     diffutils
 Requires:       util-linux
 Recommends:     libxkbcommon%{?_isa}
@@ -442,6 +443,7 @@ CONFIGURE_OPTS=(
         -Defi=true
         -Dgnu-efi=%{?have_gnu_efi:true}%{?!have_gnu_efi:false}
         -Dtpm=true
+        -Dtpm2=true
         -Dhwdb=true
         -Dsysusers=true
         -Ddefault-kill-user-processes=false
@@ -462,12 +464,18 @@ CONFIGURE_OPTS=(
         -Db_ndebug=false
         -Dman=true
         -Dversion-tag=v%{version}-%{release}
-        -Ddocdir=%{_pkgdocdir}
+%if 0%{?fedora}
         -Dfallback-hostname=fedora
+%else
+        -Dfallback-hostname=localhost
+%endif
         -Ddefault-dnssec=no
         # https://bugzilla.redhat.com/show_bug.cgi?id=1867830
         -Ddefault-mdns=no
         -Ddefault-llmnr=resolve
+        -Doomd=true
+        # Need to set this for CentOS build
+        -Ddocdir=%{_pkgdocdir}
         # CentOS is missing newer deps required to include these
         # But also these aren't as relevant for the hyperscale use case
         -Dp11kit=false
@@ -501,6 +509,14 @@ CONFIGURE_OPTS+=(
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 %meson "${CONFIGURE_OPTS[@]}"
+
+new_triggers=%{_vpath_builddir}/src/rpm/triggers.systemd.sh
+if ! diff -u %{SOURCE1} ${new_triggers}; then
+   echo -e "\n\n\nWARNING: triggers.systemd in Source1 is different!"
+   echo -e "      cp $PWD/${new_triggers} %{SOURCE1}\n\n\n"
+   sleep 5
+fi
+
 %meson_build
 
 %if %{with selinux}
@@ -618,11 +634,11 @@ python3 %{SOURCE2} %buildroot <<EOF
 %ghost %config(noreplace) /etc/X11/xorg.conf.d/00-keyboard.conf
 %ghost %attr(0664,root,utmp) /run/utmp
 %ghost %attr(0664,root,utmp) /var/log/wtmp
-%ghost %attr(0600,root,utmp) /var/log/btmp
+%ghost %attr(0660,root,utmp) /var/log/btmp
 %ghost %config(noreplace) /etc/hostname
 %ghost %config(noreplace) /etc/localtime
 %ghost %config(noreplace) /etc/locale.conf
-%ghost %config(noreplace) /etc/machine-id
+%ghost %attr(0444,root,root) %config(noreplace) /etc/machine-id
 %ghost %config(noreplace) /etc/machine-info
 %ghost %attr(0700,root,root) %dir /var/cache/private
 %ghost %attr(0700,root,root) %dir /var/lib/private
@@ -638,7 +654,7 @@ python3 %{SOURCE2} %buildroot <<EOF
 %ghost %dir /var/lib/systemd/linger
 %ghost /var/lib/systemd/random-seed
 %ghost %dir /var/lib/systemd/rfkill
-%ghost %dir /var/log/journal
+%ghost %dir %attr(2755, root, systemd-journal) %verify(not mode) /var/log/journal
 %ghost %dir /var/log/journal/remote
 %ghost %attr(0700,root,root) %dir /var/log/private
 EOF
@@ -680,6 +696,9 @@ getent passwd systemd-network &>/dev/null || useradd -r -u 192 -l -g systemd-net
 getent group systemd-resolve &>/dev/null || groupadd -r -g 193 systemd-resolve 2>&1 || :
 getent passwd systemd-resolve &>/dev/null || useradd -r -u 193 -l -g systemd-resolve -d / -s /sbin/nologin -c "systemd Resolver" systemd-resolve &>/dev/null || :
 
+getent group systemd-oom &>/dev/null || groupadd -r systemd-oom 2>&1 || :
+getent passwd systemd-oom &>/dev/null || useradd -r -l -g systemd-oom -d / -s /sbin/nologin -c "systemd Userspace OOM Killer" systemd-oom &>/dev/null || :
+
 %post
 systemd-machine-id-setup &>/dev/null || :
 
@@ -703,13 +722,13 @@ systemctl daemon-reexec &>/dev/null || {
   fi
 }
 
-journalctl --update-catalog &>/dev/null || :
-systemd-tmpfiles --create &>/dev/null || :
+if [ $1 -eq 1 ]; then
+   # create /var/log/journal only on initial installation,
+   # and only if it's writable (it won't be in rpm-ostree).
+   [ -w %{_localstatedir} ] && mkdir -p %{_localstatedir}/log/journal
 
-# create /var/log/journal only on initial installation,
-# and only if it's writable (it won't be in rpm-ostree).
-if [ $1 -eq 1 ] && [ -w %{_localstatedir} ]; then
-    mkdir -p %{_localstatedir}/log/journal
+   [ -w %{_localstatedir} ] && journalctl --update-catalog || :
+   systemd-tmpfiles --create &>/dev/null || :
 fi
 
 # Make sure new journal files will be owned by the "systemd-journal" group
@@ -749,21 +768,6 @@ if test -d /run/systemd/system/ &&
    ! systemd-analyze cat-config systemd/resolved.conf 2>/dev/null | \
         grep -qE '^DNSStubListener\s*=\s*([nN][oO]?|[fF]|[fF][aA][lL][sS][eE]|0|[oO][fF][fF])$'; then
   ln -fsv ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
-fi
-
-%preun
-if [ $1 -eq 0 ] ; then
-        systemctl disable --quiet \
-                remote-fs.target \
-                getty@.service \
-                serial-getty@.service \
-                console-getty.service \
-                debug-shell.service \
-                systemd-networkd.service \
-                systemd-networkd-wait-online.service \
-                systemd-resolved.service \
-                systemd-homed.service \
-                >/dev/null || :
 fi
 
 %post libs
@@ -844,9 +848,9 @@ grep -q -E '^KEYMAP="?fi-latin[19]"?' /etc/vconsole.conf 2>/dev/null &&
 %systemd_preun %udev_services
 
 %postun udev
-# Only restart systemd-udev, to run the upgraded dameon.
+# Restart some services.
 # Others are either oneshot services, or sockets, and restarting them causes issues (#1378974)
-%systemd_postun_with_restart systemd-udevd.service
+%systemd_postun_with_restart systemd-udevd.service systemd-timesyncd.service
 
 %pre journal-remote
 getent group systemd-journal-remote &>/dev/null || groupadd -r systemd-journal-remote 2>&1 || :
@@ -854,7 +858,6 @@ getent passwd systemd-journal-remote &>/dev/null || useradd -r -l -g systemd-jou
 
 %post journal-remote
 %systemd_post systemd-journal-gatewayd.socket systemd-journal-gatewayd.service systemd-journal-remote.socket systemd-journal-remote.service systemd-journal-upload.service
-%firewalld_reload
 
 %preun journal-remote
 %systemd_preun systemd-journal-gatewayd.socket systemd-journal-gatewayd.service systemd-journal-remote.socket systemd-journal-remote.service systemd-journal-upload.service
@@ -935,12 +938,29 @@ fi
 %endif
 
 %changelog
+* Mon May 10 2021 Anita Zhang <anitazha@fb.com> - 248.2-1.1
+- New release for 248
+- Drop patches merged in 248.2
+- FB only backport PR #13496 (Extend bpf cgroup program support)
+
+* Fri May  7 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248.2-1
+- Pull in some more patches from upstream (#1944646, #1885090, #1941340)
+- Adjust modes of some %%ghost files (#1956059)
+
+* Thu May  6 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248.1-1
+- Latest stable version: a long list of minor correctness fixes all around
+  (#1955475, #911766, #1958167, #1952919)
+- Enable tpm2-tss dependency (#1949505)
+
 * Wed Apr 14 2021 Anita Zhang <anitazha@fb.com> - 247.3-10
 - Remove systemd-resolved enablement
 
 * Wed Apr  7 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-9
 - Reenable LTO now that binutils has been fixed
 - Update FB configure options
+
+* Tue Apr  6 2021 Adam Williamson <awilliam@redhat.com> - 248-2
+- Re-enable resolved caching, we hope all major bugs are resolved now
 
 * Thu Apr  1 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-8
 - Backport https://github.com/SELinuxProject/refpolicy/pull/308 to fix
@@ -949,6 +969,13 @@ fi
 * Thu Apr  1 2021 Anita Zhang <anitazha@fb.com> - 247.3-7
 - Downgrade sysv-generator warning even more (to debug)
 
+* Wed Mar 31 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248-1
+- Latest upstream release, see
+  https://github.com/systemd/systemd/blob/v248/NEWS.
+- The changes since -rc4 are rather small, various fixes all over the place.
+  A fix to how systemd-oomd selects a candidate to kill, and more debug logging
+  to make this more transparent.
+
 * Wed Mar 31 2021 Anita Zhang <anitazha@fb.com> - 247.3-6
 - Backport PR#18621 (Ignore attempts at hidepid and subset for older kernels)
 - Downgrade sysv-generator warning about missing native systemd unit
@@ -956,17 +983,74 @@ fi
 * Wed Mar 31 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-5
 - Add selinux subpackage
 
+* Tue Mar 30 2021 Anita Zhang <the.anitazha@gmail.com> - 248~rc4-6
+- Increase oomd user memory pressure limit to 50% (#1941170)
+
+* Fri Mar 26 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248~rc4-5
+- Do not preset systemd-networkd.service and systemd-networkd-wait-online.service
+  on upgrades from before systemd-networkd was split out (#1943263)
+- In nsswitch.conf, move nss-myhostname to the front, before nss-mdns4 (#1943199)
+
+* Wed Mar 24 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248~rc4-4
+- Revert patch that seems to cause problems with dns resolution
+  (see comments on https://bodhi.fedoraproject.org/updates/FEDORA-2021-1c1a870ceb)
+
+* Mon Mar 22 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248~rc4-3
+- Fix hang when processing timers during DST switch in Europe/Dublin timezone (#1941335)
+- Fix returning combined IPv4/IPv6 responses from systemd-resolved cache (#1940715)
+  (But note that the disablement of caching added previously is
+  retained until we can do more testing.)
+- Minor fix to interface naming by udev
+- Fix for systemd-repart --size
+
+* Fri Mar 19 2021 Adam Williamson <awilliam@redhat.com> - 248~rc4-2
+- Disable resolved cache via config snippet (#1940715)
+
+* Thu Mar 18 2021 Yu Watanabe <yuwatana@redhat.com> - 248~rc4-1
+- Latest upstream prerelease, see
+  https://github.com/systemd/systemd/blob/v248-rc4/NEWS.
+- A bunch of documentation updates, and correctness fixes.
+
 * Wed Mar 17 2021 Anita Zhang <anitazha@fb.com> - 247.3-4
 - Backport PR #18955 (Fixes fstab parsing)
 - FB only backport PR #18886 (systemd-shutdown logs to /dev/console not stderr)
 - Reenable tests by disabling LTO (work around binutils bug)
 
+* Tue Mar 16 2021 Adam Williamson <awilliam@redhat.com> - 248~rc3-2
+- Backport PR #19009 to fix CNAME redirect resolving some more (#1933433)
+
+* Thu Mar 11 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248~rc3-1
+- Latest upstream prerelease, see
+  https://github.com/systemd/systemd/blob/v248-rc3/NEWS.
+- A bunch of documentation updates, correctness fixes, and systemd-networkd
+  features.
+- Resolves #1933137, #1935084, #1933873, #1931181, #1933335, #1935062, #1927148.
+
+* Thu Mar 11 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248~rc2-5
+- Fix crash in pid1 during daemon-reexec (#1931034)
+
+* Fri Mar 05 2021 Adam Williamson <awilliam@redhat.com> - 248~rc2-3
+- Fix stub resolver CNAME chain resolving (#1933433)
+
+* Mon Mar 01 2021 Josh Boyer <jwboyer@fedoraproject.org> - 248~rc2-2
+- Don't set the fallback hostname to Fedora on non-Fedora OSes
+
 * Wed Feb 24 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-3
 - Remove careinversion usage to make the package usable on older mock versions
+
+* Tue Feb 23 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248~rc2-1
+- Latest upstream prelease, just a bunch of small fixes.
+- Fixes #1931957.
+
+* Tue Feb 23 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248~rc1-2
+- Rebuild with the newest scriptlets
 
 * Fri Feb 19 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-2
 - Disable some tests to workaround a binutils bug triggered by enabling audit
 - Refresh patches
+
+* Wed Feb 17 2021 Michel Alexandre Salim <salimma@fedoraproject.org> - 247.3-3
+- Increase oomd user memory pressure limit to 10% (#1929856)
 
 * Wed Feb 17 2021 Anita Zhang <anitazha@fb.com> - 247.3-1
 - New release for 247
@@ -982,6 +1066,13 @@ fi
 - Explicitly default non-FB built to the legacy hierarchy
 - Drop no longer needed FB FusionIO patch
 - Temporarily disable audit support while debugging a link issue
+
+* Fri Feb  5 2021 Anita Zhang <the.anitazha@gmail.com> - 247.3-2
+- Changes for https://fedoraproject.org/wiki/Changes/EnableSystemdOomd.
+- Backports consist primarily of PR #18361, #18444, and #18401 (plus some
+  additional ones to handle merge conflicts).
+- Create systemd-oomd-defaults subpackage to install unit drop-ins that will
+  configure systemd-oomd to monitor and act.
 
 * Tue Feb  2 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 247.3-1
 - Minor stable release

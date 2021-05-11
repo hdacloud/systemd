@@ -1,4 +1,4 @@
-From 4e42210d40f96e185a55d43041dd6b962ea830dd Mon Sep 17 00:00:00 2001
+From 945960a5e4fa339e3d747d695c0e0996c2336e02 Mon Sep 17 00:00:00 2001
 From: Chris Down <chris@chrisdown.name>
 Date: Thu, 29 Oct 2020 12:03:52 +0000
 Subject: [PATCH] bpf: pid1: Pin reference to BPF programs for post-coldplug
@@ -65,53 +65,19 @@ approach with reference pinning is immediately tangible.
 
 [keszybz: use _cleanup_ for unpin, use FOREACH_POINTER]
 ---
- src/core/bpf-firewall.c  |   9 +--
  src/core/main.c          |   9 +++
- src/core/manager.c       | 161 ++++++++++++++++++++++++++++++++++++++-
- src/core/manager.h       |   6 ++
+ src/core/manager.c       | 163 ++++++++++++++++++++++++++++++++++++++-
+ src/core/manager.h       |   5 ++
+ src/core/unit.h          |   8 +-
  src/shared/bpf-program.c |  10 +++
  src/shared/bpf-program.h |   1 +
- 6 files changed, 189 insertions(+), 7 deletions(-)
+ 6 files changed, 191 insertions(+), 5 deletions(-)
 
-diff --git a/src/core/bpf-firewall.c b/src/core/bpf-firewall.c
-index 0f588b6ca5f..6283f15737b 100644
---- a/src/core/bpf-firewall.c
-+++ b/src/core/bpf-firewall.c
-@@ -698,8 +698,7 @@ int bpf_firewall_install(Unit *u) {
-         if (r < 0)
-                 return log_unit_error_errno(u, r, "Failed to determine cgroup path: %m");
- 
--        flags = (supported == BPF_FIREWALL_SUPPORTED_WITH_MULTI &&
--                 (u->type == UNIT_SLICE || unit_cgroup_delegate(u))) ? BPF_F_ALLOW_MULTI : 0;
-+        flags = (supported == BPF_FIREWALL_SUPPORTED_WITH_MULTI) ? BPF_F_ALLOW_MULTI : 0;
- 
-         /* Unref the old BPF program (which will implicitly detach it) right before attaching the new program, to
-          * minimize the time window when we don't account for IP traffic. */
-@@ -707,8 +706,7 @@ int bpf_firewall_install(Unit *u) {
-         u->ip_bpf_ingress_installed = bpf_program_unref(u->ip_bpf_ingress_installed);
- 
-         if (u->ip_bpf_egress) {
--                r = bpf_program_cgroup_attach(u->ip_bpf_egress, BPF_CGROUP_INET_EGRESS, path,
--                                              flags | (set_isempty(u->ip_bpf_custom_egress) ? 0 : BPF_F_ALLOW_MULTI));
-+                r = bpf_program_cgroup_attach(u->ip_bpf_egress, BPF_CGROUP_INET_EGRESS, path, flags);
-                 if (r < 0)
-                         return log_unit_error_errno(u, r, "Attaching egress BPF program to cgroup %s failed: %m", path);
- 
-@@ -717,8 +715,7 @@ int bpf_firewall_install(Unit *u) {
-         }
- 
-         if (u->ip_bpf_ingress) {
--                r = bpf_program_cgroup_attach(u->ip_bpf_ingress, BPF_CGROUP_INET_INGRESS, path,
--                                              flags | (set_isempty(u->ip_bpf_custom_ingress) ? 0 : BPF_F_ALLOW_MULTI));
-+                r = bpf_program_cgroup_attach(u->ip_bpf_ingress, BPF_CGROUP_INET_INGRESS, path, flags);
-                 if (r < 0)
-                         return log_unit_error_errno(u, r, "Attaching ingress BPF program to cgroup %s failed: %m", path);
- 
 diff --git a/src/core/main.c b/src/core/main.c
-index eaa56aca2a4..0edf8c0abad 100644
+index 3ee8d0a869..cb065dbc6e 100644
 --- a/src/core/main.c
 +++ b/src/core/main.c
-@@ -1144,6 +1144,14 @@ static int prepare_reexecute(
+@@ -1164,6 +1164,14 @@ static int prepare_reexecute(
          if (!fds)
                  return log_oom();
  
@@ -120,13 +86,13 @@ index eaa56aca2a4..0edf8c0abad 100644
 +         * security or reliability implications: devices we should filter won't be filtered, network activity
 +         * we should filter won't be filtered, etc. We pin all the existing devices by bumping their
 +         * refcount, and then storing them to later have it decremented. */
-+        _cleanup_(manager_unpin_all_cgroup_bpf_programsp) Manager *m_unpin =
++        _cleanup_(manager_unpin_all_cgroup_bpf_programs) Manager *m_unpin =
 +                manager_pin_all_cgroup_bpf_programs(m);
 +
          r = manager_serialize(m, f, fds, switching_root);
          if (r < 0)
                  return r;
-@@ -1159,6 +1167,7 @@ static int prepare_reexecute(
+@@ -1179,6 +1187,7 @@ static int prepare_reexecute(
          if (r < 0)
                  return log_error_errno(r, "Failed to disable O_CLOEXEC for serialization fds: %m");
  
@@ -135,7 +101,7 @@ index eaa56aca2a4..0edf8c0abad 100644
          *ret_fds = TAKE_PTR(fds);
  
 diff --git a/src/core/manager.c b/src/core/manager.c
-index 4b215a61766..c330a02bf79 100644
+index 688e6881c3..44a92e7577 100644
 --- a/src/core/manager.c
 +++ b/src/core/manager.c
 @@ -65,6 +65,7 @@
@@ -146,8 +112,8 @@ index 4b215a61766..c330a02bf79 100644
  #include "signal-util.h"
  #include "socket-util.h"
  #include "special.h"
-@@ -3213,6 +3214,79 @@ static void manager_serialize_gid_refs(Manager *m, FILE *f) {
-         manager_serialize_uid_refs_internal(m, f, &m->gid_refs, "destroy-ipc-gid");
+@@ -3203,6 +3204,79 @@ static void manager_serialize_gid_refs(Manager *m, FILE *f) {
+         manager_serialize_uid_refs_internal(f, m->gid_refs, "destroy-ipc-gid");
  }
  
 +static int serialize_limbo_bpf_program(FILE *f, FDSet *fds, BPFProgram *p) {
@@ -226,7 +192,7 @@ index 4b215a61766..c330a02bf79 100644
  int manager_serialize(
                  Manager *m,
                  FILE *f,
-@@ -3222,6 +3296,7 @@ int manager_serialize(
+@@ -3212,6 +3286,7 @@ int manager_serialize(
          const char *t;
          Unit *u;
          int r;
@@ -234,7 +200,7 @@ index 4b215a61766..c330a02bf79 100644
  
          assert(m);
          assert(f);
-@@ -3266,6 +3341,9 @@ int manager_serialize(
+@@ -3256,6 +3331,9 @@ int manager_serialize(
                  (void) serialize_dual_timestamp(f, joined, m->timestamps + q);
          }
  
@@ -244,7 +210,7 @@ index 4b215a61766..c330a02bf79 100644
          if (!switching_root)
                  (void) serialize_strv(f, "env", m->client_environment);
  
-@@ -3584,7 +3662,10 @@ int manager_deserialize(Manager *m, FILE *f, FDSet *fds) {
+@@ -3571,7 +3649,10 @@ int manager_deserialize(Manager *m, FILE *f, FDSet *fds) {
                          else
                                  m->n_failed_jobs += n;
  
@@ -256,7 +222,7 @@ index 4b215a61766..c330a02bf79 100644
                          int b;
  
                          b = parse_boolean(val);
-@@ -3760,6 +3841,65 @@ int manager_deserialize(Manager *m, FILE *f, FDSet *fds) {
+@@ -3747,6 +3828,67 @@ int manager_deserialize(Manager *m, FILE *f, FDSet *fds) {
          return manager_deserialize_units(m, f, fds);
  }
  
@@ -314,15 +280,17 @@ index 4b215a61766..c330a02bf79 100644
 +                bpf_program_skeletonize(p);
 +}
 +
-+void manager_unpin_all_cgroup_bpf_programs(Manager *m) {
-+        log_debug("Unpinning %d BPF programs", set_size(m->bpf_limbo_progs));
-+        set_clear_with_destructor(m->bpf_limbo_progs, bpf_program_unref);
++void manager_unpin_all_cgroup_bpf_programs(Manager **m) {
++        if (m && *m) {
++                log_debug("Unpinning %d BPF programs", set_size((*m)->bpf_limbo_progs));
++                set_clear_with_destructor((*m)->bpf_limbo_progs, bpf_program_unref);
++        }
 +}
 +
  int manager_reload(Manager *m) {
          _cleanup_(manager_reloading_stopp) Manager *reloading = NULL;
          _cleanup_fdset_free_ FDSet *fds = NULL;
-@@ -3779,6 +3919,13 @@ int manager_reload(Manager *m) {
+@@ -3766,6 +3908,13 @@ int manager_reload(Manager *m) {
          /* We are officially in reload mode from here on. */
          reloading = manager_reloading_start(m);
  
@@ -336,7 +304,7 @@ index 4b215a61766..c330a02bf79 100644
          r = manager_serialize(m, f, fds, false);
          if (r < 0)
                  return r;
-@@ -3803,6 +3950,12 @@ int manager_reload(Manager *m) {
+@@ -3790,6 +3939,12 @@ int manager_reload(Manager *m) {
          m->uid_refs = hashmap_free(m->uid_refs);
          m->gid_refs = hashmap_free(m->gid_refs);
  
@@ -349,7 +317,7 @@ index 4b215a61766..c330a02bf79 100644
          r = lookup_paths_init(&m->lookup_paths, m->unit_file_scope, 0, NULL);
          if (r < 0)
                  log_warning_errno(r, "Failed to initialize path lookup table, ignoring: %m");
-@@ -4737,6 +4890,12 @@ static void manager_vacuum(Manager *m) {
+@@ -4721,6 +4876,12 @@ static void manager_vacuum(Manager *m) {
  
          /* Release any runtimes no longer referenced */
          exec_runtime_vacuum(m);
@@ -358,12 +326,12 @@ index 4b215a61766..c330a02bf79 100644
 +         * should be in action now. We first need to make sure all entries in the cgroup realize queue are
 +         * complete, otherwise BPF firewalls/etc may not have been set up yet. */
 +        (void) manager_dispatch_cgroup_realize_queue(m);
-+        manager_unpin_all_cgroup_bpf_programs(m);
++        manager_unpin_all_cgroup_bpf_programs(&m);
  }
  
  int manager_dispatch_user_lookup_fd(sd_event_source *source, int fd, uint32_t revents, void *userdata) {
 diff --git a/src/core/manager.h b/src/core/manager.h
-index 19df889dd89..2c4a2b60632 100644
+index f58982a364..16bcdc1277 100644
 --- a/src/core/manager.h
 +++ b/src/core/manager.h
 @@ -438,6 +438,8 @@ struct Manager {
@@ -375,22 +343,40 @@ index 19df889dd89..2c4a2b60632 100644
  };
  
  static inline usec_t manager_default_timeout_abort_usec(Manager *m) {
-@@ -479,6 +481,10 @@ int manager_add_job_by_name(Manager *m, JobType type, const char *name, JobMode
+@@ -479,6 +481,9 @@ int manager_add_job_by_name(Manager *m, JobType type, const char *name, JobMode
  int manager_add_job_by_name_and_warn(Manager *m, JobType type, const char *name, JobMode mode, Set *affected_jobs,  Job **ret);
  int manager_propagate_reload(Manager *m, Unit *unit, JobMode mode, sd_bus_error *e);
  
 +Manager* manager_pin_all_cgroup_bpf_programs(Manager *m);
-+void manager_unpin_all_cgroup_bpf_programs(Manager *m);
-+DEFINE_TRIVIAL_CLEANUP_FUNC(Manager*, manager_unpin_all_cgroup_bpf_programs);
++void manager_unpin_all_cgroup_bpf_programs(Manager **m);
 +
  void manager_dump_units(Manager *s, FILE *f, const char *prefix);
  void manager_dump_jobs(Manager *s, FILE *f, const char *prefix);
  void manager_dump(Manager *s, FILE *f, const char *prefix);
+diff --git a/src/core/unit.h b/src/core/unit.h
+index 6de529af92..7c9cc47f92 100644
+--- a/src/core/unit.h
++++ b/src/core/unit.h
+@@ -927,10 +927,10 @@ int unit_thaw_vtable_common(Unit *u);
+ #define log_unit_full_errno(unit, level, error, ...)                    \
+         ({                                                              \
+                 const Unit *_u = (unit);                                \
+-                const int _l = (level);                                 \
+-                (log_get_max_level() < LOG_PRI(_l) || (_u && !unit_log_level_test(_u, _l))) ? -ERRNO_VALUE(error) : \
+-                        _u ? log_object_internal(_l, error, PROJECT_FILE, __LINE__, __func__, _u->manager->unit_log_field, _u->id, _u->manager->invocation_log_field, _u->invocation_id_string, ##__VA_ARGS__) : \
+-                                log_internal(_l, error, PROJECT_FILE, __LINE__, __func__, ##__VA_ARGS__); \
++                const int _v = (level);                                 \
++                (log_get_max_level() < LOG_PRI(_v) || (_u && !unit_log_level_test(_u, _v))) ? -ERRNO_VALUE(error) : \
++                        _u ? log_object_internal(_v, error, PROJECT_FILE, __LINE__, __func__, _u->manager->unit_log_field, _u->id, _u->manager->invocation_log_field, _u->invocation_id_string, ##__VA_ARGS__) : \
++                                log_internal(_v, error, PROJECT_FILE, __LINE__, __func__, ##__VA_ARGS__); \
+         })
+ 
+ #define log_unit_full(unit, level, ...) (void) log_unit_full_errno(unit, level, 0, __VA_ARGS__)
 diff --git a/src/shared/bpf-program.c b/src/shared/bpf-program.c
-index 10239142af3..549490da6ce 100644
+index a8a34521fd..314b48b229 100644
 --- a/src/shared/bpf-program.c
 +++ b/src/shared/bpf-program.c
-@@ -209,6 +209,16 @@ int bpf_program_cgroup_detach(BPFProgram *p) {
+@@ -104,6 +104,16 @@ int bpf_program_new_from_bpffs_path(const char *path, BPFProgram **ret) {
          return 0;
  }
  
@@ -404,18 +390,21 @@ index 10239142af3..549490da6ce 100644
 +        free(p->attached_path);
 +}
 +
- int bpf_map_new(enum bpf_map_type type, size_t key_size, size_t value_size, size_t max_entries, uint32_t flags) {
-         union bpf_attr attr;
-         int fd;
+ static BPFProgram *bpf_program_free(BPFProgram *p) {
+         assert(p);
+ 
 diff --git a/src/shared/bpf-program.h b/src/shared/bpf-program.h
-index eef77f9d8e1..5957a6ce300 100644
+index 86fd338c93..dcaeb6cde7 100644
 --- a/src/shared/bpf-program.h
 +++ b/src/shared/bpf-program.h
-@@ -28,6 +28,7 @@ struct BPFProgram {
- int bpf_program_new(uint32_t prog_type, BPFProgram **ret);
- BPFProgram *bpf_program_unref(BPFProgram *p);
+@@ -29,6 +29,7 @@ int bpf_program_new(uint32_t prog_type, BPFProgram **ret);
+ int bpf_program_new_from_bpffs_path(const char *path, BPFProgram **ret);
  BPFProgram *bpf_program_ref(BPFProgram *p);
+ BPFProgram *bpf_program_unref(BPFProgram *p);
 +void bpf_program_skeletonize(BPFProgram *p);
  
  int bpf_program_add_instructions(BPFProgram *p, const struct bpf_insn *insn, size_t count);
  int bpf_program_load_kernel(BPFProgram *p, char *log_buf, size_t log_size);
+-- 
+2.30.2
+
