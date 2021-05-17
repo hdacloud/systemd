@@ -26,7 +26,7 @@
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 Version:        248.2
-Release:        1.1%{?dist}
+Release:        1.2%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -56,6 +56,10 @@ Source9:        20-yama-ptrace.conf
 Source10:       systemd-udev-trigger-no-reload.conf
 Source11:       20-grubby.install
 Source12:       systemd-user
+
+Source14:       10-oomd-defaults.conf
+Source15:       10-oomd-root-slice-defaults.conf
+Source16:       10-oomd-user-service-defaults.conf
 
 Source21:       macros.sysusers
 Source22:       sysusers.attr
@@ -360,6 +364,15 @@ and to write journal files from serialized journal contents.
 This package contains systemd-journal-gatewayd,
 systemd-journal-remote, and systemd-journal-upload.
 
+%package oomd-defaults
+Summary:        Configuration files for systemd-oomd
+Requires:       %{name}%{?_isa} = %{version}-%{release}
+License:        LGPLv2+
+
+%description oomd-defaults
+A set of drop-in files for systemd units to enable action from systemd-oomd,
+a userspace out-of-memory (OOM) killer.
+
 %package tests
 Summary:       Internal unit tests for systemd
 Requires:      %{name}%{?_isa} = %{version}-%{release}
@@ -611,6 +624,11 @@ EOF
 install -Dm0755 -t %{buildroot}%{_prefix}/lib/kernel/install.d/ %{SOURCE11}
 
 install -D -t %{buildroot}/usr/lib/systemd/ %{SOURCE3}
+
+# systemd-oomd default configuration
+install -Dm0644 -t %{buildroot}%{_prefix}/lib/systemd/oomd.conf.d/ %{SOURCE14}
+install -Dm0644 -t %{buildroot}%{system_unit_dir}/-.slice.d/ %{SOURCE15}
+install -Dm0644 -t %{buildroot}%{system_unit_dir}/user@.service.d/ %{SOURCE16}
 
 sed -i 's|#!/usr/bin/env python3|#!%{__python3}|' %{buildroot}/usr/lib/systemd/tests/run-unit-tests.py
 
@@ -929,6 +947,8 @@ fi
 
 %files journal-remote -f .file-list-remote
 
+%files oomd-defaults -f .file-list-oomd-defaults
+
 %files tests -f .file-list-tests
 
 %if %{with selinux}
@@ -938,6 +958,9 @@ fi
 %endif
 
 %changelog
+* Mon May 17 2021 Davide Cavalca <dcavalca@centosproject.org> - 248.2-1.2
+- Add systemd-oomd-defaults subpackage from Fedora
+
 * Mon May 10 2021 Anita Zhang <anitazha@fb.com> - 248.2-1.1
 - New release for 248
 - Drop patches merged in 248.2
