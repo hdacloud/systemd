@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        41%{?dist}.2
+Release:        45%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -486,7 +486,133 @@ Patch0433: 0433-man-document-new-boot-complete.target-unit.patch
 Patch0434: 0434-core-make-sure-to-restore-the-control-command-id-too.patch
 Patch0435: 0435-cgroup-freezer-action-must-be-NOP-when-cgroup-v2-fre.patch
 Patch0436: 0436-logind-don-t-print-warning-when-user-.service-templa.patch
-Patch0437: 0437-fix-typo-in-ProtectSystem-option.patch
+Patch0437: 0437-build-use-simple-project-version-in-pkgconfig-files.patch
+Patch0438: 0438-basic-virt-try-the-proc-1-sched-hack-also-for-PID1.patch
+Patch0439: 0439-seccomp-rework-how-the-S-UG-ID-filter-is-installed.patch
+Patch0440: 0440-vconsole-setup-downgrade-log-message-when-setting-fo.patch
+Patch0441: 0441-units-fix-systemd.special-man-page-reference-in-syst.patch
+Patch0442: 0442-units-drop-reference-to-sushell-man-page.patch
+Patch0443: 0443-sd-bus-break-the-loop-in-bus_ensure_running-if-the-b.patch
+Patch0444: 0444-core-add-new-API-for-enqueing-a-job-with-returning-t.patch
+Patch0445: 0445-systemctl-replace-switch-statement-by-table-of-struc.patch
+Patch0446: 0446-systemctl-reindent-table.patch
+Patch0447: 0447-systemctl-Only-wait-when-there-s-something-to-wait-f.patch
+Patch0448: 0448-systemctl-clean-up-start_unit_one-error-handling.patch
+Patch0449: 0449-systemctl-split-out-extra-args-generation-into-helpe.patch
+Patch0450: 0450-systemctl-add-new-show-transaction-switch.patch
+Patch0451: 0451-test-add-some-basic-testing-that-systemctl-start-T-d.patch
+Patch0452: 0452-man-document-the-new-systemctl-show-transaction-opti.patch
+Patch0453: 0453-socket-New-option-FlushPending-boolean-to-flush-sock.patch
+Patch0454: 0454-core-remove-support-for-API-bus-started-outside-our-.patch
+Patch0455: 0455-mount-setup-fix-segfault-in-mount_cgroup_controllers.patch
+Patch0456: 0456-dbus-execute-make-transfer-of-CPUAffinity-endian-saf.patch
+Patch0457: 0457-core-add-support-for-setting-CPUAffinity-to-special-.patch
+Patch0458: 0458-basic-user-util-always-use-base-10-for-user-group-nu.patch
+Patch0459: 0459-parse-util-sometimes-it-is-useful-to-check-if-a-stri.patch
+Patch0460: 0460-basic-parse-util-add-safe_atoux64.patch
+Patch0461: 0461-parse-util-allow-tweaking-how-to-parse-integers.patch
+Patch0462: 0462-parse-util-allow-0-as-alternative-to-0-and-0.patch
+Patch0463: 0463-parse-util-make-return-parameter-optional-in-safe_at.patch
+Patch0464: 0464-parse-util-rewrite-parse_mode-on-top-of-safe_atou_fu.patch
+Patch0465: 0465-user-util-be-stricter-in-parse_uid.patch
+Patch0466: 0466-strv-add-new-macro-STARTSWITH_SET.patch
+Patch0467: 0467-parse-util-also-parse-integers-prefixed-with-0b-and-.patch
+Patch0468: 0468-tests-beef-up-integer-parsing-tests.patch
+Patch0469: 0469-shared-user-util-add-compat-forms-of-user-name-check.patch
+Patch0470: 0470-shared-user-util-emit-a-warning-on-names-with-dots.patch
+Patch0471: 0471-user-util-Allow-names-starting-with-a-digit.patch
+Patch0472: 0472-shared-user-util-allow-usernames-with-dots-in-specif.patch
+Patch0473: 0473-user-util-switch-order-of-checks-in-valid_user_group.patch
+Patch0474: 0474-user-util-rework-how-we-validate-user-names.patch
+Patch0475: 0475-man-mention-System-Administrator-s-Guide-in-systemct.patch
+Patch0476: 0476-udev-introduce-udev-net_id-naming-schemes.patch
+Patch0477: 0477-meson-make-net.naming-scheme-default-configurable.patch
+Patch0478: 0478-man-describe-naming-schemes-in-a-new-man-page.patch
+Patch0479: 0479-udev-net_id-parse-_SUN-ACPI-index-as-a-signed-intege.patch
+Patch0480: 0480-udev-net_id-don-t-generate-slot-based-names-if-multi.patch
+Patch0481: 0481-fix-typo-in-ProtectSystem-option.patch
+Patch0482: 0482-remove-references-of-non-existent-man-pages.patch
+Patch0483: 0483-log-Prefer-logging-to-CLI-unless-JOURNAL_STREAM-is-s.patch
+Patch0484: 0484-locale-util-add-new-helper-locale_is_installed.patch
+Patch0485: 0485-test-add-test-case-for-locale_is_installed.patch
+Patch0486: 0486-tree-wide-port-various-bits-over-to-locale_is_instal.patch
+Patch0487: 0487-install-allow-instantiated-units-to-be-enabled-via-p.patch
+Patch0488: 0488-install-small-refactor-to-combine-two-function-calls.patch
+Patch0489: 0489-test-fix-a-memleak.patch
+Patch0490: 0490-docs-Add-syntax-for-templated-units-to-systemd.prese.patch
+Patch0491: 0491-shared-install-fix-preset-operations-for-non-service.patch
+Patch0492: 0492-introduce-setsockopt_int-helper.patch
+Patch0493: 0493-socket-util-add-generic-socket_pass_pktinfo-helper.patch
+Patch0494: 0494-core-add-new-PassPacketInfo-socket-unit-property.patch
+Patch0495: 0495-resolved-tweak-cmsg-calculation.patch
+Patch0496: 0496-ci-PowerTools-repo-was-renamed-to-powertools-in-RHEL.patch
+Patch0497: 0497-ci-use-quay.io-instead-of-Docker-Hub-to-avoid-rate-l.patch
+Patch0498: 0498-ci-move-jobs-from-Travis-CI-to-GH-Actions.patch
+Patch0499: 0499-unit-make-UNIT-cast-function-deal-with-NULL-pointers.patch
+Patch0500: 0500-use-link-to-RHEL-8-docs.patch
+Patch0501: 0501-cgroup-Also-set-blkio.bfq.weight.patch
+Patch0502: 0502-units-make-sure-initrd-cleanup.service-terminates-be.patch
+Patch0503: 0503-core-reload-SELinux-label-cache-on-daemon-reload.patch
+Patch0504: 0504-selinux-introduce-mac_selinux_create_file_prepare_at.patch
+Patch0505: 0505-selinux-add-trigger-for-policy-reload-to-refresh-int.patch
+Patch0506: 0506-udev-net_id-give-RHEL-8.4-naming-scheme-a-name.patch
+Patch0507: 0507-basic-stat-util-make-mtime-check-stricter-and-use-en.patch
+Patch0508: 0508-udev-make-algorithm-that-selects-highest-priority-de.patch
+Patch0509: 0509-test-create-dev-null-in-test-udev.pl.patch
+Patch0510: 0510-test-missing-die.patch
+Patch0511: 0511-udev-test-remove-a-check-for-whether-the-test-is-run.patch
+Patch0512: 0512-udev-test-skip-the-test-only-if-it-can-t-setup-its-e.patch
+Patch0513: 0513-udev-test-fix-test-skip-condition.patch
+Patch0514: 0514-udev-test-fix-missing-directory-test-run.patch
+Patch0515: 0515-udev-test-check-if-permitted-to-create-block-device-.patch
+Patch0516: 0516-test-udev-add-a-testcase-of-too-long-line.patch
+Patch0517: 0517-test-udev-use-proper-semantics-for-too-long-line-wit.patch
+Patch0518: 0518-test-udev-add-more-tests-for-line-continuations-and-.patch
+Patch0519: 0519-test-udev-add-more-tests-for-line-continuation.patch
+Patch0520: 0520-test-udev-fix-alignment-and-drop-unnecessary-white-s.patch
+Patch0521: 0521-test-udev-test.pl-cleanup-if-skipping-test.patch
+Patch0522: 0522-test-add-test-cases-for-empty-string-match.patch
+Patch0523: 0523-test-add-test-case-for-multi-matches-when-use.patch
+Patch0524: 0524-udev-test-do-not-rely-on-mail-group-being-defined.patch
+Patch0525: 0525-test-udev-test.pl-allow-multiple-devices-per-test.patch
+Patch0526: 0526-test-udev-test.pl-create-rules-only-once.patch
+Patch0527: 0527-test-udev-test.pl-allow-concurrent-additions-and-rem.patch
+Patch0528: 0528-test-udev-test.pl-use-computed-devnode-name.patch
+Patch0529: 0529-test-udev-test.pl-test-correctness-of-symlink-target.patch
+Patch0530: 0530-test-udev-test.pl-allow-checking-multiple-symlinks.patch
+Patch0531: 0531-test-udev-test.pl-fix-wrong-test-descriptions.patch
+Patch0532: 0532-test-udev-test.pl-last_rule-is-unsupported.patch
+Patch0533: 0533-test-udev-test.pl-Make-some-tests-a-little-harder.patch
+Patch0534: 0534-test-udev-test.pl-remove-bogus-rules-from-magic-subs.patch
+Patch0535: 0535-test-udev-test.pl-merge-space-and-var-with-space-tes.patch
+Patch0536: 0536-test-udev-test.pl-merge-import-parent-tests-into-one.patch
+Patch0537: 0537-test-udev-test.pl-count-good-results.patch
+Patch0538: 0538-tests-udev-test.pl-add-multiple-device-test.patch
+Patch0539: 0539-test-udev-test.pl-add-repeat-count.patch
+Patch0540: 0540-test-udev-test.pl-generator-for-large-list-of-block-.patch
+Patch0541: 0541-test-udev-test.pl-suppress-umount-error-message-at-s.patch
+Patch0542: 0542-test-udev_test.pl-add-expected-good-count.patch
+Patch0543: 0543-test-udev-test-gracefully-exit-when-imports-fail.patch
+Patch0544: 0544-Revert-test-add-test-cases-for-empty-string-match-an.patch
+Patch0545: 0545-test-sys-script.py-add-missing-DEVNAME-entries-to-ue.patch
+Patch0546: 0546-sd-event-split-out-helper-functions-for-reshuffling-.patch
+Patch0547: 0547-sd-event-split-out-enable-and-disable-codepaths-from.patch
+Patch0548: 0548-sd-event-mention-that-two-debug-logged-events-are-ig.patch
+Patch0549: 0549-sd-event-split-clock-data-allocation-out-of-sd_event.patch
+Patch0550: 0550-sd-event-split-out-code-to-add-remove-timer-event-so.patch
+Patch0551: 0551-sd-event-fix-delays-assert-brain-o-17790.patch
+Patch0552: 0552-sd-event-let-s-suffix-last_run-last_log-with-_usec.patch
+Patch0553: 0553-sd-event-refuse-running-default-event-loops-in-any-o.patch
+Patch0554: 0554-sd-event-ref-event-loop-while-in-sd_event_prepare-ot.patch
+Patch0555: 0555-sd-event-follow-coding-style-with-naming-return-para.patch
+Patch0556: 0556-sd-event-remove-earliest_index-latest_index-into-com.patch
+Patch0557: 0557-sd-event-update-state-at-the-end-in-event_source_ena.patch
+Patch0558: 0558-sd-event-increase-n_enabled_child_sources-just-once.patch
+Patch0559: 0559-sd-event-add-ability-to-ratelimit-event-sources.patch
+Patch0560: 0560-test-add-ratelimiting-test.patch
+Patch0561: 0561-core-prevent-excessive-proc-self-mountinfo-parsing.patch
+Patch0562: 0562-udev-run-link_update-with-increased-retry-count-in-s.patch
+Patch0563: 0563-pam-systemd-use-secure_getenv-rather-than-getenv.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -1115,11 +1241,141 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
-* Tue Mar 09 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-41.2
-- fix typo in ProtectSystem= option (#1934500)
+* Thu Mar 11 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-45
+- Revert "test: add test cases for empty string match" and "test: add test case for multi matches when use ||" (#1931947)
+- test/sys-script.py: add missing DEVNAME entries to uevents (#1931947)
+- sd-event: split out helper functions for reshuffling prioqs (#1819868)
+- sd-event: split out enable and disable codepaths from sd_event_source_set_enabled() (#1819868)
+- sd-event: mention that two debug logged events are ignored (#1819868)
+- sd-event: split clock data allocation out of sd_event_add_time() (#1819868)
+- sd-event: split out code to add/remove timer event sources to earliest/latest prioq (#1819868)
+- sd-event: fix delays assert brain-o (#17790) (#1819868)
+- sd-event: let's suffix last_run/last_log with "_usec" (#1819868)
+- sd-event: refuse running default event loops in any other thread than the one they are default for (#1819868)
+- sd-event: ref event loop while in sd_event_prepare() ot sd_event_run() (#1819868)
+- sd-event: follow coding style with naming return parameter (#1819868)
+- sd-event: remove earliest_index/latest_index into common part of event source objects (#1819868)
+- sd-event: update state at the end in event_source_enable (#1819868)
+- sd-event: increase n_enabled_child_sources just once (#1819868)
+- sd-event: add ability to ratelimit event sources (#1819868)
+- test: add ratelimiting test (#1819868)
+- core: prevent excessive /proc/self/mountinfo parsing (#1819868)
+- udev: run link_update() with increased retry count in second invocation (#1931947)
+- pam-systemd: use secure_getenv() rather than getenv() (#1687514)
 
-* Fri Nov 06 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-41.1
-- logind: don't print warning when user@.service template is masked (#1894152)
+* Thu Jan 28 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-44
+- ci: PowerTools repo was renamed to powertools in RHEL 8.3 (#1871827)
+- ci: use quay.io instead of Docker Hub to avoid rate limits (#1871827)
+- ci: move jobs from Travis CI to GH Actions (#1871827)
+- unit: make UNIT() cast function deal with NULL pointers (#1871827)
+- use link to RHEL-8 docs (#1623116)
+- cgroup: Also set blkio.bfq.weight (#1657810)
+- units: make sure initrd-cleanup.service terminates before switching to rootfs (#1657810)
+- core: reload SELinux label cache on daemon-reload (#1888912)
+- selinux: introduce mac_selinux_create_file_prepare_at() (#1888912)
+- selinux: add trigger for policy reload to refresh internal selabel cache (#1888912)
+- udev/net_id: give RHEL-8.4 naming scheme a name (#1827462)
+- basic/stat-util: make mtime check stricter and use entire timestamp (#1642728)
+- udev: make algorithm that selects highest priority devlink less susceptible to race conditions (#1642728)
+- test: create /dev/null in test-udev.pl (#1642728)
+- test: missing "die" (#1642728)
+- udev-test: remove a check for whether the test is run in a container (#1642728)
+- udev-test: skip the test only if it can't setup its environment (#1642728)
+- udev-test: fix test skip condition (#1642728)
+- udev-test: fix missing directory test/run (#1642728)
+- udev-test: check if permitted to create block device nodes (#1642728)
+- test-udev: add a testcase of too long line (#1642728)
+- test-udev: use proper semantics for too long line with continuation (#1642728)
+- test-udev: add more tests for line continuations and comments (#1642728)
+- test-udev: add more tests for line continuation (#1642728)
+- test-udev: fix alignment and drop unnecessary white spaces (#1642728)
+- test/udev-test.pl: cleanup if skipping test (#1642728)
+- test: add test cases for empty string match (#1642728)
+- test: add test case for multi matches when use "||" (#1642728)
+- udev-test: do not rely on "mail" group being defined (#1642728)
+- test/udev-test.pl: allow multiple devices per test (#1642728)
+- test/udev-test.pl: create rules only once (#1642728)
+- test/udev-test.pl: allow concurrent additions and removals (#1642728)
+- test/udev-test.pl: use computed devnode name (#1642728)
+- test/udev-test.pl: test correctness of symlink targets (#1642728)
+- test/udev-test.pl: allow checking multiple symlinks (#1642728)
+- test/udev-test.pl: fix wrong test descriptions (#1642728)
+- test/udev-test.pl: last_rule is unsupported (#1642728)
+- test/udev-test.pl: Make some tests a little harder (#1642728)
+- test/udev-test.pl: remove bogus rules from magic subsys test (#1642728)
+- test/udev-test.pl: merge "space and var with space" tests (#1642728)
+- test/udev-test.pl: merge import parent tests into one (#1642728)
+- test/udev-test.pl: count "good" results (#1642728)
+- tests/udev-test.pl: add multiple device test (#1642728)
+- test/udev-test.pl: add repeat count (#1642728)
+- test/udev-test.pl: generator for large list of block devices (#1642728)
+- test/udev-test.pl: suppress umount error message at startup (#1642728)
+- test/udev_test.pl: add "expected good" count (#1642728)
+- test/udev-test: gracefully exit when imports fail (#1642728)
+
+* Thu Nov 26 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-43
+- man: mention System Administrator's Guide in systemctl manpage (#1623116)
+- udev: introduce udev net_id "naming schemes" (#1827462)
+- meson: make net.naming-scheme= default configurable (#1827462)
+- man: describe naming schemes in a new man page (#1827462)
+- udev/net_id: parse _SUN ACPI index as a signed integer (#1827462)
+- udev/net_id: don't generate slot based names if multiple devices might claim the same slot (#1827462)
+- fix typo in ProtectSystem= option (#1871139)
+- remove references of non-existent man pages (#1876807)
+- log: Prefer logging to CLI unless JOURNAL_STREAM is set (#1865840)
+- locale-util: add new helper locale_is_installed() (#1755287)
+- test: add test case for locale_is_installed() (#1755287)
+- tree-wide: port various bits over to locale_is_installed() (#1755287)
+- install: allow instantiated units to be enabled via presets (#1812972)
+- install: small refactor to combine two function calls into one function (#1812972)
+- test: fix a memleak (#1812972)
+- docs: Add syntax for templated units to systemd.preset man page (#1812972)
+- shared/install: fix preset operations for non-service instantiated units (#1812972)
+- introduce setsockopt_int() helper (#1887181)
+- socket-util: add generic socket_pass_pktinfo() helper (#1887181)
+- core: add new PassPacketInfo= socket unit property (#1887181)
+- resolved: tweak cmsg calculation (#1887181)
+
+* Tue Nov 03 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-42
+- logind: don't print warning when user@.service template is masked (#1880270)
+- build: use simple project version in pkgconfig files (#1862714)
+- basic/virt: try the /proc/1/sched hack also for PID1 (#1868877)
+- seccomp: rework how the S[UG]ID filter is installed (#1860374)
+- vconsole-setup: downgrade log message when setting font fails on dummy console (#1889996)
+- units: fix systemd.special man page reference in system-update-cleanup.service (#1871827)
+- units: drop reference to sushell man page (#1871827)
+- sd-bus: break the loop in bus_ensure_running() if the bus is not connecting (#1885553)
+- core: add new API for enqueing a job with returning the transaction data (#846319)
+- systemctl: replace switch statement by table of structures (#846319)
+- systemctl: reindent table (#846319)
+- systemctl: Only wait when there's something to wait for. (#846319)
+- systemctl: clean up start_unit_one() error handling (#846319)
+- systemctl: split out extra args generation into helper function of its own (#846319)
+- systemctl: add new --show-transaction switch (#846319)
+- test: add some basic testing that "systemctl start -T" does something (#846319)
+- man: document the new systemctl --show-transaction option (#846319)
+- socket: New option 'FlushPending' (boolean) to flush socket before entering listening state (#1870638)
+- core: remove support for API bus "started outside our own logic" (#1764282)
+- mount-setup: fix segfault in mount_cgroup_controllers when using gcc9 compiler (#1868877)
+- dbus-execute: make transfer of CPUAffinity endian safe (#12711) (#1740657)
+- core: add support for setting CPUAffinity= to special "numa" value (#1740657)
+- basic/user-util: always use base 10 for user/group numbers (#1848373)
+- parse-util: sometimes it is useful to check if a string is a valid integer, but not actually parse it (#1848373)
+- basic/parse-util: add safe_atoux64() (#1848373)
+- parse-util: allow tweaking how to parse integers (#1848373)
+- parse-util: allow '-0' as alternative to '0' and '+0' (#1848373)
+- parse-util: make return parameter optional in safe_atou16_full() (#1848373)
+- parse-util: rewrite parse_mode() on top of safe_atou_full() (#1848373)
+- user-util: be stricter in parse_uid() (#1848373)
+- strv: add new macro STARTSWITH_SET() (#1848373)
+- parse-util: also parse integers prefixed with 0b and 0o (#1848373)
+- tests: beef up integer parsing tests (#1848373)
+- shared/user-util: add compat forms of user name checking functions (#1848373)
+- shared/user-util: emit a warning on names with dots (#1848373)
+- user-util: Allow names starting with a digit (#1848373)
+- shared/user-util: allow usernames with dots in specific fields (#1848373)
+- user-util: switch order of checks in valid_user_group_name_or_id_full() (#1848373)
+- user-util: rework how we validate user names (#1848373)
 
 * Wed Oct 07 2020 systemd maintenance team <systemd-maint@redhat.com> - 239-41
 - cgroup: freezer action must be NOP when cgroup v2 freezer is not available (#1868831)

@@ -1,4 +1,4 @@
-From 37a4f8256410e3ba1bf1eb7523ebc9f1a68b65e1 Mon Sep 17 00:00:00 2001
+From 65e96327360ab41d44d5383dcecc82a19fad198c Mon Sep 17 00:00:00 2001
 From: Michal Sekletar <msekleta@redhat.com>
 Date: Fri, 22 Feb 2019 15:50:55 +0100
 Subject: [PATCH] logind: don't print warning when user@.service template is
@@ -10,9 +10,8 @@ instances of systemd for logged in users. We don't need to be verbose
 about it.
 
 (cherry picked from commit 03b6fa0c5b51b0d39334ff6ba183a3391443bcf6)
-(cherry picked from commit 65e96327360ab41d44d5383dcecc82a19fad198c)
 
-Resolves: #1894152
+Resolves: #1880270
 ---
  src/login/logind-user.c | 3 ++-
  1 file changed, 2 insertions(+), 1 deletion(-)
