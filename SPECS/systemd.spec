@@ -26,7 +26,7 @@
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 Version:        248.2
-Release:        1.2%{?dist}
+Release:        1.3%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -155,6 +155,7 @@ BuildRequires:  tree
 BuildRequires:  hostname
 BuildRequires:  python3-devel
 BuildRequires:  python3-lxml
+BuildRequires:  python3-jinja2
 %if 0%{?have_gnu_efi}
 BuildRequires:  gnu-efi gnu-efi-devel
 %endif
@@ -958,6 +959,9 @@ fi
 %endif
 
 %changelog
+* Wed May 19 2021 Davide Cavalca <dcavalca@centosproject.org> - 248.2-1.3
+- Add BuildRequires for python-jinja2 in preparation for 249 (see PR#19630)
+
 * Mon May 17 2021 Davide Cavalca <dcavalca@centosproject.org> - 248.2-1.2
 - Add systemd-oomd-defaults subpackage from Fedora
 
