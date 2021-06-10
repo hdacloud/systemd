@@ -26,7 +26,7 @@
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 Version:        248.2
-Release:        1.3%{?dist}
+Release:        1.4%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -94,6 +94,7 @@ Patch0102:      17495-rebased.patch
 # PR 18621: Quiet "proc: Bad value for 'hidepid'" messages
 Patch0101:      https://github.com/systemd/systemd/pull/18621.patch
 %endif
+Patch0103:      https://github.com/systemd/systemd/pull/19811.patch
 
 # Downstream-only patches (0500–9999)
 
@@ -959,6 +960,9 @@ fi
 %endif
 
 %changelog
+* Thu Jun 10 2021 Anita Zhang <anitazha@fb.com> - 248.2-1.4
+- Backport PR #19811 to fix issues with mount sd-event rate limiting
+
 * Wed May 19 2021 Davide Cavalca <dcavalca@centosproject.org> - 248.2-1.3
 - Add BuildRequires for python-jinja2 in preparation for 249 (see PR#19630)
 
