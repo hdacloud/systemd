@@ -26,7 +26,7 @@
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 Version:        248.2
-Release:        1.4%{?dist}
+Release:        1.5%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -94,7 +94,6 @@ Patch0102:      17495-rebased.patch
 # PR 18621: Quiet "proc: Bad value for 'hidepid'" messages
 Patch0101:      https://github.com/systemd/systemd/pull/18621.patch
 %endif
-Patch0103:      https://github.com/systemd/systemd/pull/19811.patch
 
 # Downstream-only patches (0500–9999)
 
@@ -102,6 +101,8 @@ Patch0103:      https://github.com/systemd/systemd/pull/19811.patch
 Patch0501:      https://github.com/systemd/systemd/pull/17050/commits/f58b96d3e8d1cb0dd3666bc74fa673918b586612.patch
 # Downgrade sysv-generator messages from warning to debug
 Patch0502:      0001-sysv-generator-downgrade-log-warning-about-autogener.patch
+# Revert ratelimiting added to mount processing events
+Patch0503:      revert-d586f642fd90e3bb378f7b6d3e3a64a753e51756.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -960,6 +961,11 @@ fi
 %endif
 
 %changelog
+* Mon Jun 14 2021 Anita Zhang <anitazha@fb.com> - 248.2-1.5
+- Remove backport PR #19811 since it's still buggy
+- Remove d586f642fd90e3bb378f7b6d3e3a64a753e51756 to fix rate limiting instead
+  (at least until sd-event rate limiting is fixed in 249).
+
 * Thu Jun 10 2021 Anita Zhang <anitazha@fb.com> - 248.2-1.4
 - Backport PR #19811 to fix issues with mount sd-event rate limiting
 
