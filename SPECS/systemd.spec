@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        45%{?dist}
+Release:        45%{?dist}.1
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -613,6 +613,9 @@ Patch0560: 0560-test-add-ratelimiting-test.patch
 Patch0561: 0561-core-prevent-excessive-proc-self-mountinfo-parsing.patch
 Patch0562: 0562-udev-run-link_update-with-increased-retry-count-in-s.patch
 Patch0563: 0563-pam-systemd-use-secure_getenv-rather-than-getenv.patch
+Patch0564: 0564-Revert-udev-run-link_update-with-increased-retry-cou.patch
+Patch0565: 0565-Revert-udev-make-algorithm-that-selects-highest-prio.patch
+Patch0566: 0566-test-udev-test.pl-drop-test-cases-that-add-mutliple-.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -1241,6 +1244,11 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Tue May 25 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-45.1
+- Revert "udev: run link_update() with increased retry count in second invocation" (#1963980)
+- Revert "udev: make algorithm that selects highest priority devlink less susceptible to race conditions" (#1963980)
+- test/udev-test.pl: drop test cases that add mutliple devices (#1963980)
+
 * Thu Mar 11 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-45
 - Revert "test: add test cases for empty string match" and "test: add test case for multi matches when use ||" (#1931947)
 - test/sys-script.py: add missing DEVNAME entries to uevents (#1931947)
