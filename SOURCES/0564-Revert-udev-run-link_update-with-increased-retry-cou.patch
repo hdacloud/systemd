@@ -1,4 +1,4 @@
-From 43c0bcb8b24edb83bc265cdde264e6d2a36d1cea Mon Sep 17 00:00:00 2001
+From 1afb38f39a9b4508533cc1c7262e5fff418cb317 Mon Sep 17 00:00:00 2001
 From: Michal Sekletar <msekleta@redhat.com>
 Date: Mon, 17 May 2021 15:49:08 +0200
 Subject: [PATCH] Revert "udev: run link_update() with increased retry count in
@@ -6,7 +6,7 @@ Subject: [PATCH] Revert "udev: run link_update() with increased retry count in
 
 This reverts commit 1f3165bda13c8572c8c31d23c998835c4e2ad8f3.
 
-Related: #1963980
+Related: #1942299
 ---
  src/udev/udev-event.c | 3 ++-
  1 file changed, 2 insertions(+), 1 deletion(-)
