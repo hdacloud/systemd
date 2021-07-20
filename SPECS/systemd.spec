@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        45%{?dist}.1
+Release:        45%{?dist}.2
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -617,6 +617,9 @@ Patch0564: 0564-Revert-udev-run-link_update-with-increased-retry-cou.patch
 Patch0565: 0565-Revert-udev-make-algorithm-that-selects-highest-prio.patch
 Patch0566: 0566-test-udev-test.pl-drop-test-cases-that-add-mutliple-.patch
 
+
+# Security patches
+Patch9000: 9000-basic-unit-name-do-not-use-strdupa-on-a-path.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1244,6 +1247,9 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Mon Jun 28 2021 Jan Macku <jamacku@redhat.com> - 239-45.2
+- basic/unit-name: do not use strdupa() on a path (CVE-2021-33910, #1974699)
+
 * Tue May 25 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-45.1
 - Revert "udev: run link_update() with increased retry count in second invocation" (#1963980)
 - Revert "udev: make algorithm that selects highest priority devlink less susceptible to race conditions" (#1963980)
