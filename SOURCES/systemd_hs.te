@@ -3,6 +3,7 @@ policy_module(systemd_hs,0.0.1)
 # systemd overrides for 247
 gen_require(`
 	type avahi_t;
+	type cgroup_t;
 	type init_t;
 	type init_var_run_t;
 	type kmsg_device_t;
@@ -18,7 +19,9 @@ gen_require(`
 	type systemd_resolved_t;
 	type systemd_tmpfiles_t;
 	type security_t;
+	type sssd_t;
 	type syslogd_t;
+	type udev_var_run_t;
 	type user_tmp_t;
 	type xdm_t;
 ')
@@ -30,12 +33,19 @@ allow init_t systemd_machined_t:unix_stream_socket connectto;
 allow policykit_auth_t init_var_run_t:dir read;
 allow policykit_auth_t systemd_machined_t:unix_stream_socket connectto;
 allow policykit_t systemd_machined_t:unix_stream_socket connectto;
+allow sssd_t cgroup_t:filesystem getattr;
 allow syslogd_t user_tmp_t:lnk_file read;
 allow system_dbusd_t systemd_machined_t:unix_stream_socket connectto;
-allow systemd_logind_t self:netlink_selinux_socket create;
+allow systemd_hostnamed_t udev_var_run_t:file getattr;
+allow systemd_hostnamed_t udev_var_run_t:file open;
+allow systemd_hostnamed_t udev_var_run_t:file read;
 allow systemd_logind_t self:netlink_selinux_socket bind;
+allow systemd_logind_t self:netlink_selinux_socket create;
 allow systemd_logind_t systemd_machined_t:unix_stream_socket connectto;
+allow systemd_logind_t user_tmp_t:chr_file unlink;
 allow systemd_machined_t init_var_run_t:sock_file create;
+allow sssd_t cgroup_t:dir search;
+allow sssd_t cgroup_t:filesystem getattr;
 allow xdm_t systemd_machined_t:unix_stream_socket connectto;
 
 selinux_use_status_page(init_t)
