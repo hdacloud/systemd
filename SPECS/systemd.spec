@@ -25,8 +25,8 @@
 
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
-Version:        248.2
-Release:        1.5%{?dist}
+Version:        248.5
+Release:        1.1%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -122,8 +122,9 @@ BuildRequires:  audit-libs-devel
 BuildRequires:  cryptsetup-devel
 %endif
 BuildRequires:  dbus-devel
+BuildRequires:  /usr/sbin/sfdisk
 # /usr/bin/getfacl is needed by test-acl-util
-BuildRequires:  acl
+BuildRequires:  /usr/bin/getfacl
 BuildRequires:  libacl-devel
 BuildRequires:  gobject-introspection-devel
 BuildRequires:  libblkid-devel
@@ -961,6 +962,21 @@ fi
 %endif
 
 %changelog
+* Wed Jul 21 2021 Anita Zhang <anitazha@fb.com> - 248.5-1.1
+- Update to systemd-stable 248.5 (includes fix for CVE-2021-33910)
+
+* Tue Jul 20 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248.5-1
+- Various minor documentation and correctness fixes.
+- CVE-2021-33910, #1984020: an unchecked stack allocation could be used to
+  crash systemd and cause the system to reboot by creating a very long
+  fuse mountpoint path.
+
+* Mon Jul 12 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248.4-1
+- Assorted fixes (some systemd-resolved crashes, invalid
+  systemd-tmpfiles assertion, etc.)
+- systemd-networkd workaround for TALOS-2020-1142, CVE-2020-13529.
+- A big update of hardware descriptions.
+
 * Mon Jun 14 2021 Anita Zhang <anitazha@fb.com> - 248.2-1.5
 - Remove backport PR #19811 since it's still buggy
 - Remove d586f642fd90e3bb378f7b6d3e3a64a753e51756 to fix rate limiting instead
@@ -974,6 +990,10 @@ fi
 
 * Mon May 17 2021 Davide Cavalca <dcavalca@centosproject.org> - 248.2-1.2
 - Add systemd-oomd-defaults subpackage from Fedora
+
+* Sat May 15 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248.3-1
+- A fix for resolved crashes (#1946386, #1960227, #1950241)
+- Some minor fixes for documentation, systemd-networkd, systemd-run, bootctl.
 
 * Mon May 10 2021 Anita Zhang <anitazha@fb.com> - 248.2-1.1
 - New release for 248
