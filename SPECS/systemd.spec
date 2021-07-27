@@ -26,7 +26,7 @@
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 Version:        248.5
-Release:        1.2%{?dist}
+Release:        1.3%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -962,6 +962,10 @@ fi
 %endif
 
 %changelog
+* Tue Jul 27 2021 Davide Cavalca <dcavalca@centosproject.org> - 248.5-1.3
+- Add missing SELinux rules for the GNOME and KDE LiveDVD spins
+  (https://pagure.io/centos-sig-hyperscale/package-bugs/issue/7)
+
 * Wed Jul 21 2021 Davide Cavalca <dcavalca@centosproject.org> - 248.5-1.2
 - Add missing SELinux rules for 248
   (https://pagure.io/centos-sig-hyperscale/package-bugs/issue/1)
