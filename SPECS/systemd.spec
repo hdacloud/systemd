@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        48%{?dist}
+Release:        49%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -647,6 +647,19 @@ Patch0594: 0594-core-Detect-initial-timer-state-from-serialized-data.patch
 Patch0595: 0595-rc-local-order-after-network-online.target.patch
 Patch0596: 0596-set-core-ulimit-to-0-like-on-RHEL-7.patch
 Patch0597: 0597-test-mountpointutil-util-do-not-assert-in-test_mnt_i.patch
+Patch0598: 0598-remove-a-left-over-break.patch
+Patch0599: 0599-basic-unit-name-do-not-use-strdupa-on-a-path.patch
+Patch0600: 0600-sd-event-change-ordering-of-pending-ratelimited-even.patch
+Patch0601: 0601-sd-event-drop-unnecessary-else.patch
+Patch0602: 0602-sd-event-use-CMP-macro.patch
+Patch0603: 0603-sd-event-use-usec_add.patch
+Patch0604: 0604-sd-event-make-event_source_time_prioq_reshuffle-acce.patch
+Patch0605: 0605-sd-event-always-reshuffle-time-prioq-on-changing-onl.patch
+Patch0606: 0606-ci-run-unit-tests-on-z-stream-branches-as-well.patch
+Patch0607: 0607-ci-drop-forgotten-Travis-references.patch
+Patch0608: 0608-ci-run-unit-tests-on-CentOS-8-Stream-as-well.patch
+Patch0609: 0609-ci-add-missing-test-dependencies.patch
+Patch0610: 0610-meson-bump-timeout-for-test-udev-to-180s.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -1274,6 +1287,21 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Fri Jul 23 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-49
+- remove a left-over break (#1970860)
+- basic/unit-name: do not use strdupa() on a path (#1974700)
+- sd-event: change ordering of pending/ratelimited events (#1968528)
+- sd-event: drop unnecessary "else" (#1968528)
+- sd-event: use CMP() macro (#1968528)
+- sd-event: use usec_add() (#1968528)
+- sd-event: make event_source_time_prioq_reshuffle() accept all event source type (#1968528)
+- sd-event: always reshuffle time prioq on changing online/offline state (#1968528)
+- ci: run unit tests on z-stream branches as well (#1970860)
+- ci: drop forgotten Travis references (#1934504)
+- ci: run unit tests on CentOS 8 Stream as well (#1934504)
+- ci: add missing test dependencies (#1934504)
+- meson: bump timeout for test-udev to 180s (#1934504)
+
 * Thu Jun 24 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-48
 - cgroup: Also set io.bfq.weight (#1927290)
 - seccomp: allow turning off of seccomp filtering via env var (#1916835)
