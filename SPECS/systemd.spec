@@ -12,35 +12,52 @@
 %global system_unit_dir %{pkgdir}/system
 %global user_unit_dir %{pkgdir}/user
 
+%if 0%{?__isa_bits} == 64
+%global elf_bits (64bit)
+%global elf_suffix ()%{elf_bits}
+%endif
+
 # Bootstrap may be needed to break intercircular dependencies with
 # cryptsetup, e.g. when re-building cryptsetup on a json-c SONAME-bump.
 %bcond_with    bootstrap
 %bcond_without tests
 %bcond_without lto
+
+# Support for quick builds with rpmbuild --build-in-place.
+# See README.build-in-place.
+%bcond_with    inplace
+
 %if 0%{?facebook}
 %bcond_with selinux
 %else
 %bcond_without selinux
 %endif
 
+# Remove this when the macro exists in CentOS
+%global version_no_tilde %(c=%{version}; echo ${c}|tr '~' '-')
+
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
-Version:        248.5
-Release:        1.3%{?dist}
+%if %{without inplace}
+Version:        249.2
+Release:        1.1%{?dist}
+%else
+# determine the build information from local checkout
+Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
+Release:        0
+%endif
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
-
-%global github_version %(c=%{version}; echo ${c}|tr '~' '-')
 
 # download tarballs with "spectool -g systemd.spec"
 %if %{defined commit}
 Source0:        https://github.com/systemd/systemd%{?stable:-stable}/archive/%{commit}/%{name}-%{shortcommit}.tar.gz
 %else
 %if 0%{?stable}
-Source0:        https://github.com/systemd/systemd-stable/archive/v%{github_version}/%{name}-%{github_version}.tar.gz
+Source0:        https://github.com/systemd/systemd-stable/archive/v%{version_no_tilde}/%{name}-%{version_no_tilde}.tar.gz
 %else
-Source0:        https://github.com/systemd/systemd/archive/v%{github_version}/%{name}-%{github_version}.tar.gz
+Source0:        https://github.com/systemd/systemd/archive/v%{version_no_tilde}/%{name}-%{version_no_tilde}.tar.gz
 %endif
 %endif
 # This file must be available before %%prep.
@@ -56,6 +73,7 @@ Source9:        20-yama-ptrace.conf
 Source10:       systemd-udev-trigger-no-reload.conf
 Source11:       20-grubby.install
 Source12:       systemd-user
+Source13:       libsystemd-shared.abignore
 
 Source14:       10-oomd-defaults.conf
 Source15:       10-oomd-root-slice-defaults.conf
@@ -84,15 +102,11 @@ GIT_DIR=../../src/systemd/.git git diffab -M v233..master@{2017-06-15} -- hwdb/[
 # patches in this range before applying upstream pull requests.
 
 %if 0%{?facebook}
-# PR 13496: Extend bpf cgroup program support
-Patch0100:      13496-fb.patch
 # PR 18621: FB variant of quieting "proc: Bad value for 'hidepid'" messages
-Patch0101:      18621-fb.patch
-# PR 17495: Fixes BPF pinning post-coldplug
-Patch0102:      17495-rebased.patch
+Patch0001:      18621-fb.patch
 %else
 # PR 18621: Quiet "proc: Bad value for 'hidepid'" messages
-Patch0101:      https://github.com/systemd/systemd/pull/18621.patch
+Patch0001:      https://github.com/systemd/systemd/pull/18621.patch
 %endif
 
 # Downstream-only patches (0500–9999)
@@ -101,8 +115,6 @@ Patch0101:      https://github.com/systemd/systemd/pull/18621.patch
 Patch0501:      https://github.com/systemd/systemd/pull/17050/commits/f58b96d3e8d1cb0dd3666bc74fa673918b586612.patch
 # Downgrade sysv-generator messages from warning to debug
 Patch0502:      0001-sysv-generator-downgrade-log-warning-about-autogener.patch
-# Revert ratelimiting added to mount processing events
-Patch0503:      revert-d586f642fd90e3bb378f7b6d3e3a64a753e51756.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -149,6 +161,7 @@ BuildRequires:  iptables-devel
 BuildRequires:  pkgconfig(tss2-esys)
 BuildRequires:  pkgconfig(tss2-rc)
 BuildRequires:  pkgconfig(tss2-mu)
+BuildRequires:  systemtap-sdt-devel
 BuildRequires:  libxslt
 BuildRequires:  docbook-style-xsl
 BuildRequires:  pkgconfig
@@ -156,9 +169,8 @@ BuildRequires:  gperf
 BuildRequires:  gawk
 BuildRequires:  tree
 BuildRequires:  hostname
-BuildRequires:  python3-devel
-BuildRequires:  python3-lxml
-BuildRequires:  python3-jinja2
+BuildRequires:  python3dist(lxml)
+BuildRequires:  python3dist(jinja2)
 %if 0%{?have_gnu_efi}
 BuildRequires:  gnu-efi gnu-efi-devel
 %endif
@@ -178,15 +190,14 @@ Requires(post): grep
 # systemd-machine-id-setup requires libssl
 Requires(post): openssl-libs
 Requires(pre):  coreutils
-Requires(pre):  /usr/bin/getent
-Requires(pre):  /usr/sbin/groupadd
 Requires:       dbus >= 1.9.18
 Requires:       %{name}-pam = %{version}-%{release}
-Requires:       %{name}-rpm-macros = %{version}-%{release}
+Requires:       (%{name}-rpm-macros = %{version}-%{release} if rpm-build)
 Requires:       %{name}-libs = %{version}-%{release}
 %{?fedora:Recommends:     %{name}-networkd = %{version}-%{release}}
+%{?fedora:Recommends:     %{name}-resolved = %{version}-%{release}}
 Recommends:     diffutils
-Requires:       util-linux
+Requires:       (util-linux-core or util-linux)
 Recommends:     libxkbcommon%{?_isa}
 Provides:       /bin/systemctl
 Provides:       /sbin/shutdown
@@ -198,7 +209,7 @@ Provides:       system-setup-keyboard = 0.9
 Obsoletes:      systemd-sysv < 206
 %if 0%{?facebook} == 0
 # self-obsoletes so that dnf will install new subpackages on upgrade (#1260394)
-Obsoletes:      %{name} < 246.6-2
+Obsoletes:      %{name} < 249~~
 Conflicts:      initscripts < 9.56.1
 %endif
 Provides:       systemd-sysv = 206
@@ -213,14 +224,12 @@ Conflicts:      %{name}-standalone-sysusers < %{version}-%{release}
 Obsoletes:      %{name}-standalone-sysusers < %{version}-%{release}
 
 # Recommends to replace normal Requires deps for stuff that is dlopen()ed
-Recommends:     libcryptsetup.so.12()(64bit)
-Recommends:     libcryptsetup.so.12(CRYPTSETUP_2.0)(64bit)
-Recommends:     libidn2.so.0()(64bit)
-Recommends:     libidn2.so.0(IDN2_0.0.0)(64bit)
-Recommends:     libpcre2-8.so.0()(64bit)
-Recommends:     libpwquality.so.1()(64bit)
-Recommends:     libpwquality.so.1(LIBPWQUALITY_1.0)(64bit)
-Recommends:     libqrencode.so.4()(64bit)
+Recommends:     libidn2.so.0%{?elf_suffix}
+Recommends:     libidn2.so.0(IDN2_0.0.0)%{?elf_bits}
+Recommends:     libpcre2-8.so.0%{?elf_suffix}
+Recommends:     libpwquality.so.1%{?elf_suffix}
+Recommends:     libpwquality.so.1(LIBPWQUALITY_1.0)%{?elf_bits}
+Recommends:     libqrencode.so.4%{?elf_suffix}
 
 %if %{with selinux}
 # Force the SELinux module to be installed
@@ -322,10 +331,6 @@ Requires:       kbd
 Provides:       u2f-hidraw-policy = 1.0.2-40
 Obsoletes:      u2f-hidraw-policy < 1.0.2-40
 
-# Recommends to replace normal Requires deps for stuff that is dlopen()ed
-Recommends:     libcryptsetup.so.12()(64bit)
-Recommends:     libcryptsetup.so.12(CRYPTSETUP_2.0)(64bit)
-
 %description udev
 This package contains systemd-udev and the rules and hardware database
 needed to manage device nodes. This package is necessary on physical
@@ -368,10 +373,33 @@ and to write journal files from serialized journal contents.
 This package contains systemd-journal-gatewayd,
 systemd-journal-remote, and systemd-journal-upload.
 
-%package oomd-defaults
-Summary:        Configuration files for systemd-oomd
+%package networkd
+Summary:        System daemon that manages network configurations
 Requires:       %{name}%{?_isa} = %{version}-%{release}
 License:        LGPLv2+
+# https://src.fedoraproject.org/rpms/systemd/pull-request/34
+Obsoletes:      systemd < 246.6-2
+
+%description networkd
+systemd-networkd is a system service that manages networks. It detects
+and configures network devices as they appear, as well as creating virtual
+network devices.
+
+%package resolved
+Summary:        Network Name Resolution manager
+Requires:       %{name}%{?_isa} = %{version}-%{release}
+Obsoletes:      %{name} < 249~~
+
+%description resolved
+systemd-resolved is a system service that provides network name resolution
+to local applications. It implements a caching and validating DNS/DNSSEC
+stub resolver, as well as an LLMNR and MulticastDNS resolver and responder.
+
+%package oomd-defaults
+Summary:        Configuration files for systemd-oomd
+Requires:       %{name} = %{version}-%{release}
+License:        LGPLv2+
+BuildArch:      noarch
 
 %description oomd-defaults
 A set of drop-in files for systemd units to enable action from systemd-oomd,
@@ -406,7 +434,7 @@ runs properly under an environment with SELinux enabled.
 %endif
 
 %prep
-%autosetup -n %{?commit:%{name}%{?stable:-stable}-%{commit}}%{!?commit:%{name}%{?stable:-stable}-%{github_version}} -p1
+%autosetup -n %{?commit:%{name}%{?stable:-stable}-%{commit}}%{!?commit:%{name}%{?stable:-stable}-%{version_no_tilde}} -p1
 
 %if %{with selinux}
 mkdir selinux
@@ -487,10 +515,32 @@ CONFIGURE_OPTS=(
         -Dfallback-hostname=localhost
 %endif
         -Ddefault-dnssec=no
+        -Ddefault-dns-over-tls=opportunistic
         # https://bugzilla.redhat.com/show_bug.cgi?id=1867830
         -Ddefault-mdns=no
         -Ddefault-llmnr=resolve
         -Doomd=true
+        -Dadm-gid=4
+        -Daudio-gid=63
+        -Dcdrom-gid=11
+        -Ddialout-gid=18
+        -Ddisk-gid=6
+        -Dinput-gid=104   # https://pagure.io/setup/pull-request/27
+        -Dkmem-gid=9
+        -Dkvm-gid=36
+        -Dlp-gid=7
+        -Drender-gid=105  # https://pagure.io/setup/pull-request/27
+        -Dsgx-gid=106     # https://pagure.io/setup/pull-request/27
+        -Dtape-gid=33
+        -Dtty-gid=5
+        -Dusers-gid=100
+        -Dutmp-gid=22
+        -Dvideo-gid=39
+        -Dwheel-gid=10
+        -Dsystemd-journal-gid=190
+        -Dsystemd-network-uid=192
+        -Dsystemd-resolve-uid=193
+        # -Dsystemd-timesync-uid=, not set yet
         # Need to set this for CentOS build
         -Ddocdir=%{_pkgdocdir}
         # CentOS is missing newer deps required to include these
@@ -525,7 +575,17 @@ CONFIGURE_OPTS+=(
 
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
-%meson "${CONFIGURE_OPTS[@]}"
+# Do configuration. If doing an inplace build, try to do
+# reconfiguration to pick up new options.
+%if %{with inplace}
+  command -v ccache 2>/dev/null && { CC="${CC:-ccache %__cc}"; CXX="${CXX:-ccache %__cxx}"; }
+
+  [ -e %{_vpath_builddir}/build.ninja ] &&
+  %__meson configure %{_vpath_builddir} "${CONFIGURE_OPTS[@]}" ||
+%endif
+{ %meson "${CONFIGURE_OPTS[@]}"; }
+
+%meson_build
 
 new_triggers=%{_vpath_builddir}/src/rpm/triggers.systemd.sh
 if ! diff -u %{SOURCE1} ${new_triggers}; then
@@ -533,8 +593,6 @@ if ! diff -u %{SOURCE1} ${new_triggers}; then
    echo -e "      cp $PWD/${new_triggers} %{SOURCE1}\n\n\n"
    sleep 5
 fi
-
-%meson_build
 
 %if %{with selinux}
 cd selinux
@@ -627,6 +685,8 @@ EOF
 
 install -Dm0755 -t %{buildroot}%{_prefix}/lib/kernel/install.d/ %{SOURCE11}
 
+install -Dm0644 -t %{buildroot}%{_prefix}/lib/systemd/ %{SOURCE13}
+
 install -D -t %{buildroot}/usr/lib/systemd/ %{SOURCE3}
 
 # systemd-oomd default configuration
@@ -699,30 +759,17 @@ meson test -C %{_vpath_builddir} -t 6 --print-errorlogs
 
 %include %{SOURCE1}
 
-%pre
-getent group cdrom &>/dev/null || groupadd -r -g 11 cdrom &>/dev/null || :
-getent group utmp &>/dev/null || groupadd -r -g 22 utmp &>/dev/null || :
-getent group tape &>/dev/null || groupadd -r -g 33 tape &>/dev/null || :
-getent group dialout &>/dev/null || groupadd -r -g 18 dialout &>/dev/null || :
-getent group input &>/dev/null || groupadd -r input &>/dev/null || :
-getent group kvm &>/dev/null || groupadd -r -g 36 kvm &>/dev/null || :
-getent group render &>/dev/null || groupadd -r render &>/dev/null || :
-getent group systemd-journal &>/dev/null || groupadd -r -g 190 systemd-journal 2>&1 || :
-
-getent group systemd-coredump &>/dev/null || groupadd -r systemd-coredump 2>&1 || :
-getent passwd systemd-coredump &>/dev/null || useradd -r -l -g systemd-coredump -d / -s /sbin/nologin -c "systemd Core Dumper" systemd-coredump &>/dev/null || :
-
-getent group systemd-network &>/dev/null || groupadd -r -g 192 systemd-network 2>&1 || :
-getent passwd systemd-network &>/dev/null || useradd -r -u 192 -l -g systemd-network -d / -s /sbin/nologin -c "systemd Network Management" systemd-network &>/dev/null || :
-
-getent group systemd-resolve &>/dev/null || groupadd -r -g 193 systemd-resolve 2>&1 || :
-getent passwd systemd-resolve &>/dev/null || useradd -r -u 193 -l -g systemd-resolve -d / -s /sbin/nologin -c "systemd Resolver" systemd-resolve &>/dev/null || :
-
-getent group systemd-oom &>/dev/null || groupadd -r systemd-oom 2>&1 || :
-getent passwd systemd-oom &>/dev/null || useradd -r -l -g systemd-oom -d / -s /sbin/nologin -c "systemd Userspace OOM Killer" systemd-oom &>/dev/null || :
-
 %post
 systemd-machine-id-setup &>/dev/null || :
+
+# FIXME: move to %postun. We want to restart systemd *after* removing
+# files from the old rpm. Right now we may still have bits the old
+# setup if the files are not present in the new version. But before
+# implement restarting of *other* services after the transaction, moving
+# this would make things worse, increasing the number of warnings we get
+# about needed daemon-reload.
+
+oomd_state=$(systemctl is-active systemd-oomd 2>/dev/null || :)
 
 systemctl daemon-reexec &>/dev/null || {
   # systemd v239 had bug #9553 in D-Bus authentication of the private socket,
@@ -744,24 +791,19 @@ systemctl daemon-reexec &>/dev/null || {
   fi
 }
 
-if [ $1 -eq 1 ]; then
-   # create /var/log/journal only on initial installation,
-   # and only if it's writable (it won't be in rpm-ostree).
-   [ -w %{_localstatedir} ] && mkdir -p %{_localstatedir}/log/journal
-
-   [ -w %{_localstatedir} ] && journalctl --update-catalog || :
-   systemd-tmpfiles --create &>/dev/null || :
+if [ "$oomd_state" == "active" ]; then
+   systemctl start -q systemd-oomd 2>/dev/null || :
 fi
 
-# Make sure new journal files will be owned by the "systemd-journal" group
-machine_id=$(cat /etc/machine-id 2>/dev/null)
-chgrp systemd-journal /{run,var}/log/journal/{,${machine_id}} &>/dev/null || :
-chmod g+s /{run,var}/log/journal/{,${machine_id}} &>/dev/null || :
-
-# Apply ACL to the journal directory
-setfacl -Rnm g:wheel:rx,d:g:wheel:rx,g:adm:rx,d:g:adm:rx /var/log/journal/ &>/dev/null || :
-
 [ $1 -eq 1 ] || exit 0
+
+# create /var/log/journal only on initial installation,
+# and only if it's writable (it won't be in rpm-ostree).
+[ -w %{_localstatedir} ] && mkdir -p %{_localstatedir}/log/journal
+
+[ -w %{_localstatedir} ] && journalctl --update-catalog || :
+systemd-sysusers || :
+systemd-tmpfiles --create &>/dev/null || :
 
 # We reset the enablement of all services upon initial installation
 # https://bugzilla.redhat.com/show_bug.cgi?id=1118740#c23
@@ -773,24 +815,22 @@ setfacl -Rnm g:wheel:rx,d:g:wheel:rx,g:adm:rx,d:g:adm:rx /var/log/journal/ &>/de
 systemctl preset-all &>/dev/null || :
 systemctl --global preset-all &>/dev/null || :
 
-# Create /etc/resolv.conf symlink.
-# We would also create it using tmpfiles, but let's do this here
-# too before NetworkManager gets a chance. (systemd-tmpfiles invocation above
-# does not do this, because it's marked with ! and we don't specify --boot.)
-# https://bugzilla.redhat.com/show_bug.cgi?id=1873856
-#
-# If systemd is not running, don't overwrite the symlink because that
-# will immediately break DNS resolution, since systemd-resolved is
-# also not running (https://bugzilla.redhat.com/show_bug.cgi?id=1891847).
-#
-# Also don't creat the symlink to the stub when the stub is disabled (#1891847 again).
-if test -d /run/systemd/system/ &&
-   systemctl -q is-enabled systemd-resolved.service &>/dev/null &&
-   ! mountpoint /etc/resolv.conf &>/dev/null &&
-   ! systemd-analyze cat-config systemd/resolved.conf 2>/dev/null | \
-        grep -qE '^DNSStubListener\s*=\s*([nN][oO]?|[fF]|[fF][aA][lL][sS][eE]|0|[oO][fF][fF])$'; then
-  ln -fsv ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+%postun
+if [ $1 -eq 1 ]; then
+   [ -w %{_localstatedir} ] && journalctl --update-catalog || :
+   systemd-tmpfiles --create &>/dev/null || :
 fi
+
+%systemd_postun_with_restart systemd-timedated.service systemd-portabled.service systemd-homed.service systemd-hostnamed.service systemd-journald.service systemd-localed.service systemd-userdbd.service systemd-oomd.service
+
+# FIXME: systemd-logind.service is excluded (https://github.com/systemd/systemd/pull/17558)
+# FIXME: user@*.service needs to be restarted, but using systemctl --user daemon-reexec
+
+%triggerpostun -- systemd < 247.3-2
+# This is for upgrades from previous versions before oomd-defaults is available.
+# We use %%triggerpostun here because rpm doesn't allow a second %%triggerun with
+# a different package version.
+systemctl --no-reload preset systemd-oomd.service &>/dev/null || :
 
 %post libs
 %{?ldconfig}
@@ -836,10 +876,6 @@ fi
 
 %global udev_services systemd-udev{d,-settle,-trigger}.service systemd-udevd-{control,kernel}.socket systemd-timesyncd.service
 
-%pre udev
-getent group systemd-timesync &>/dev/null || groupadd -r systemd-timesync 2>&1 || :
-getent passwd systemd-timesync &>/dev/null || useradd -r -l -g systemd-timesync -d / -s /sbin/nologin -c "systemd Time Synchronization" systemd-timesync &>/dev/null || :
-
 %post udev
 # Move old stuff around in /var/lib
 mv %{_localstatedir}/lib/random-seed %{_localstatedir}/lib/systemd/random-seed &>/dev/null
@@ -874,15 +910,13 @@ grep -q -E '^KEYMAP="?fi-latin[19]"?' /etc/vconsole.conf 2>/dev/null &&
 # Others are either oneshot services, or sockets, and restarting them causes issues (#1378974)
 %systemd_postun_with_restart systemd-udevd.service systemd-timesyncd.service
 
-%pre journal-remote
-getent group systemd-journal-remote &>/dev/null || groupadd -r systemd-journal-remote 2>&1 || :
-getent passwd systemd-journal-remote &>/dev/null || useradd -r -l -g systemd-journal-remote -d %{_localstatedir}/log/journal/remote -s /sbin/nologin -c "Journal Remote" systemd-journal-remote &>/dev/null || :
-
+%global journal_remote_units_restart systemd-journal-gatewayd.service systemd-journal-remote.service systemd-journal-upload.service
+%global journal_remote_units_norestart systemd-journal-gatewayd.socket systemd-journal-remote.socket
 %post journal-remote
-%systemd_post systemd-journal-gatewayd.socket systemd-journal-gatewayd.service systemd-journal-remote.socket systemd-journal-remote.service systemd-journal-upload.service
+%systemd_post %journal_remote_units_restart %journal_remote_units_norestart
 
 %preun journal-remote
-%systemd_preun systemd-journal-gatewayd.socket systemd-journal-gatewayd.service systemd-journal-remote.socket systemd-journal-remote.service systemd-journal-upload.service
+%systemd_preun %journal_remote_units_restart %journal_remote_units_norestart
 if [ $1 -eq 1 ] ; then
     if [ -f %{_localstatedir}/lib/systemd/journal-upload/state -a ! -L %{_localstatedir}/lib/systemd/journal-upload ] ; then
         mkdir -p %{_localstatedir}/lib/private/systemd/journal-upload
@@ -892,7 +926,63 @@ if [ $1 -eq 1 ] ; then
 fi
 
 %postun journal-remote
-%systemd_postun_with_restart systemd-journal-gatewayd.service systemd-journal-remote.service systemd-journal-upload.service
+%systemd_postun_with_restart %journal_remote_units_restart
+
+%post networkd
+# systemd-networkd was split out in systemd-246.6-2.
+# Ideally, we would have a trigger scriptlet to record enablement
+# state when upgrading from systemd <= systemd-246.6-1. But, AFAICS,
+# rpm doesn't allow us to trigger on another package, short of
+# querying the rpm database ourselves, which seems risky. For rpm,
+# systemd and systemd-networkd are completely unrelated.  So let's use
+# a hack to detect if an old systemd version is currently present in
+# the file system.
+# https://bugzilla.redhat.com/show_bug.cgi?id=1943263
+if [ $1 -eq 1 ] && ls /usr/lib/systemd/libsystemd-shared-24[0-6].so &>/dev/null; then
+    echo "Skipping presets for systemd-networkd.service, seems we are upgrading from old systemd."
+else
+    %systemd_post systemd-networkd.service systemd-networkd-wait-online.service
+fi
+
+%preun networkd
+%systemd_preun systemd-networkd.service systemd-networkd-wait-online.service
+
+%preun resolved
+if [ $1 -eq 0 ] ; then
+        systemctl disable --quiet \
+                systemd-resolved.service \
+                >/dev/null || :
+fi
+
+%post resolved
+[ $1 -gt 1 ] && exit 0
+
+# Related to https://bugzilla.redhat.com/show_bug.cgi?id=1943263
+if ls /usr/lib/systemd/libsystemd-shared-24[0-8].so &>/dev/null; then
+    echo "Skipping presets for systemd-resolved.service, seems we are upgrading from old systemd."
+    exit 0
+fi
+
+%systemd_post systemd-resolved.service
+
+# Create /etc/resolv.conf symlink.
+# We would also create it using tmpfiles, but let's do this here
+# too before NetworkManager gets a chance. (systemd-tmpfiles invocation above
+# does not do this, because it's marked with ! and we don't specify --boot.)
+# https://bugzilla.redhat.com/show_bug.cgi?id=1873856
+#
+# If systemd is not running, don't overwrite the symlink because that
+# will immediately break DNS resolution, since systemd-resolved is
+# also not running (https://bugzilla.redhat.com/show_bug.cgi?id=1891847).
+#
+# Also don't create the symlink to the stub when the stub is disabled (#1891847 again).
+if test -d /run/systemd/system/ &&
+   systemctl -q is-enabled systemd-resolved.service &>/dev/null &&
+   ! mountpoint /etc/resolv.conf &>/dev/null &&
+   ! systemd-analyze cat-config systemd/resolved.conf 2>/dev/null | \
+        grep -qE '^DNSStubListener\s*=\s*([nN][oO]?|[fF]|[fF][aA][lL][sS][eE]|0|[oO][fF][fF])$'; then
+  ln -fsv ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+fi
 
 %if %{with selinux}
 %pre selinux
@@ -943,6 +1033,8 @@ fi
 
 %files rpm-macros -f .file-list-rpm-macros
 
+%files resolved -f .file-list-resolve
+
 %files devel -f .file-list-devel
 
 %files udev -f .file-list-udev
@@ -950,6 +1042,8 @@ fi
 %files container -f .file-list-container
 
 %files journal-remote -f .file-list-remote
+
+%files networkd -f .file-list-networkd
 
 %files oomd-defaults -f .file-list-oomd-defaults
 
@@ -962,9 +1056,23 @@ fi
 %endif
 
 %changelog
+* Wed Jul 28 2021 Anita Zhang <the.anitazha@gmail.com> - 249.2-1.1
+- New release for 249
+- Drop merged patches
+- Split networkd and resolved into their own subpackages. However we don't
+  create the /etc/resolv.conf stub.
+
 * Tue Jul 27 2021 Davide Cavalca <dcavalca@centosproject.org> - 248.5-1.3
 - Add missing SELinux rules for the GNOME and KDE LiveDVD spins
   (https://pagure.io/centos-sig-hyperscale/package-bugs/issue/7)
+
+* Fri Jul 23 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 249.2-1
+- Latest bugfix release (a minor hwdb regression bugfix, and correction
+  to kernel commandline handling when reexecuting PID 1 in a container)
+
+* Fri Jul 23 2021 Michael Catanzaro <mcatanzaro@redhat.com> - 249.2-1
+- Build with -Ddefault-dns-over-tls=opportunistic
+  (https://fedoraproject.org/wiki/Changes/DNS_Over_TLS, #1889901)
 
 * Wed Jul 21 2021 Davide Cavalca <dcavalca@centosproject.org> - 248.5-1.2
 - Add missing SELinux rules for 248
@@ -984,6 +1092,34 @@ fi
   systemd-tmpfiles assertion, etc.)
 - systemd-networkd workaround for TALOS-2020-1142, CVE-2020-13529.
 - A big update of hardware descriptions.
+
+* Wed Jul  7 2021 Neal Gompa <ngompa13@gmail.com> - 249-2
+- Use correct NEWS URLs for systemd 249 releases in changelog entries
+
+* Wed Jul  7 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 249-1
+- Latest upstream release with minor bugfixes, see
+  https://github.com/systemd/systemd/blob/v249/NEWS.
+- systemd-oomd cpu usage is reduced (#1944646)
+
+* Thu Jul  1 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 249~rc3-1
+- Latest upstream prerelease with various bugfixes, see
+  https://github.com/systemd/systemd/blob/v249-rc3/NEWS.
+
+* Fri Jun 25 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 249~rc2-1
+- Latest upstream prerelease with various bugfixes, see
+  https://github.com/systemd/systemd/blob/v249-rc2/NEWS.
+- Ignore FORCERENEW DHCP packets (TALOS-2020-1142, CVE-2020-13529, #1959398)
+
+* Thu Jun 17 2021 Adam Williamson <awilliam@redhat.com> - 249~rc1-2
+- Stop systemd providing systemd-resolved, now the subpackage exists (#1973462)
+
+* Wed Jun 16 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 249~rc1-1
+- Latest upstream prerelease, see
+  https://github.com/systemd/systemd/blob/v249-rc1/NEWS.
+  Fixes #1963428.
+- Use systemd-sysusers to create users (#1965815)
+- Move systemd-resolved into systemd-resolved subpackage (#1923727)
+  [patch from Petr Menšík]
 
 * Mon Jun 14 2021 Anita Zhang <anitazha@fb.com> - 248.2-1.5
 - Remove backport PR #19811 since it's still buggy
