@@ -169,8 +169,9 @@ BuildRequires:  gperf
 BuildRequires:  gawk
 BuildRequires:  tree
 BuildRequires:  hostname
-BuildRequires:  python3dist(lxml)
-BuildRequires:  python3dist(jinja2)
+BuildRequires:  python3-devel
+BuildRequires:  python3-lxml
+BuildRequires:  python3-jinja2
 %if 0%{?have_gnu_efi}
 BuildRequires:  gnu-efi gnu-efi-devel
 %endif
