@@ -40,7 +40,7 @@ Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 %if %{without inplace}
 Version:        249.2
-Release:        1.1%{?dist}
+Release:        1.2%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -378,8 +378,6 @@ systemd-journal-remote, and systemd-journal-upload.
 Summary:        System daemon that manages network configurations
 Requires:       %{name}%{?_isa} = %{version}-%{release}
 License:        LGPLv2+
-# https://src.fedoraproject.org/rpms/systemd/pull-request/34
-Obsoletes:      systemd < 246.6-2
 
 %description networkd
 systemd-networkd is a system service that manages networks. It detects
@@ -389,7 +387,6 @@ network devices.
 %package resolved
 Summary:        Network Name Resolution manager
 Requires:       %{name}%{?_isa} = %{version}-%{release}
-Obsoletes:      %{name} < 249~~
 
 %description resolved
 systemd-resolved is a system service that provides network name resolution
@@ -1057,6 +1054,10 @@ fi
 %endif
 
 %changelog
+* Thu Jul 29 2021 Anita Zhang <the.anitazha@gmail.com> - 249.2-1.2
+- Remove Obsoletes lines on systemd-resolved and systemd-networkd since we don't
+  want to install these by default.
+
 * Wed Jul 28 2021 Anita Zhang <the.anitazha@gmail.com> - 249.2-1.1
 - New release for 249
 - Drop merged patches
