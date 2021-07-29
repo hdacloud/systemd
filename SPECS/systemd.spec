@@ -1059,8 +1059,7 @@ fi
 * Wed Jul 28 2021 Anita Zhang <the.anitazha@gmail.com> - 249.2-1.1
 - New release for 249
 - Drop merged patches
-- Split networkd and resolved into their own subpackages. However we don't
-  create the /etc/resolv.conf stub.
+- Split networkd and resolved into their own subpackages.
 
 * Tue Jul 27 2021 Davide Cavalca <dcavalca@centosproject.org> - 248.5-1.3
 - Add missing SELinux rules for the GNOME and KDE LiveDVD spins
