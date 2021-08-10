@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        45%{?dist}.2
+Release:        45%{?dist}.3
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -616,10 +616,20 @@ Patch0563: 0563-pam-systemd-use-secure_getenv-rather-than-getenv.patch
 Patch0564: 0564-Revert-udev-run-link_update-with-increased-retry-cou.patch
 Patch0565: 0565-Revert-udev-make-algorithm-that-selects-highest-prio.patch
 Patch0566: 0566-test-udev-test.pl-drop-test-cases-that-add-mutliple-.patch
+Patch0567: 0567-basic-unit-name-do-not-use-strdupa-on-a-path.patch
+Patch0568: 0568-sd-event-change-ordering-of-pending-ratelimited-even.patch
+Patch0569: 0569-sd-event-drop-unnecessary-else.patch
+Patch0570: 0570-sd-event-use-CMP-macro.patch
+Patch0571: 0571-sd-event-use-usec_add.patch
+Patch0572: 0572-sd-event-make-event_source_time_prioq_reshuffle-acce.patch
+Patch0573: 0573-sd-event-always-reshuffle-time-prioq-on-changing-onl.patch
+Patch0574: 0574-meson-remove-strange-dep-that-causes-meson-to-enter-.patch
+Patch0575: 0575-copy-handle-copy_file_range-weirdness-on-procfs-sysf.patch
+Patch0576: 0576-ci-run-unit-tests-on-z-stream-branches-as-well.patch
+Patch0577: 0577-remove-a-left-over-break.patch
 
 
 # Security patches
-Patch9000: 9000-basic-unit-name-do-not-use-strdupa-on-a-path.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1247,6 +1257,18 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Wed Jul 28 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-45.3
+- sd-event: change ordering of pending/ratelimited events (#1984406)
+- sd-event: drop unnecessary "else" (#1984406)
+- sd-event: use CMP() macro (#1984406)
+- sd-event: use usec_add() (#1984406)
+- sd-event: make event_source_time_prioq_reshuffle() accept all event source type (#1984406)
+- sd-event: always reshuffle time prioq on changing online/offline state (#1984406)
+- meson: remove strange dep that causes meson to enter infinite loop (#1984406)
+- copy: handle copy_file_range() weirdness on procfs/sysfs (#1984406)
+- ci: run unit tests on z-stream branches as well (#1984406)
+- remove a left-over break (#1984406)
+
 * Mon Jun 28 2021 Jan Macku <jamacku@redhat.com> - 239-45.2
 - basic/unit-name: do not use strdupa() on a path (CVE-2021-33910, #1974699)
 
