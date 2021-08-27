@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        49%{?dist}
+Release:        50%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -660,6 +660,32 @@ Patch0607: 0607-ci-drop-forgotten-Travis-references.patch
 Patch0608: 0608-ci-run-unit-tests-on-CentOS-8-Stream-as-well.patch
 Patch0609: 0609-ci-add-missing-test-dependencies.patch
 Patch0610: 0610-meson-bump-timeout-for-test-udev-to-180s.patch
+Patch0611: 0611-Added-option-check-inhibitors-for-non-tty-usage.patch
+Patch0612: 0612-logind-Introduce-RebootWithFlags-and-others.patch
+Patch0613: 0613-logind-add-WithFlags-methods-to-policy.patch
+Patch0614: 0614-logind-simplify-flags-handling-a-bit.patch
+Patch0615: 0615-Update-link-to-RHEL-documentation.patch
+Patch0616: 0616-Set-default-core-ulimit-to-0-but-keep-the-hard-limit.patch
+Patch0617: 0617-shared-seccomp-util-address-family-filtering-is-brok.patch
+Patch0618: 0618-logind-rework-Seat-Session-User-object-allocation-an.patch
+Patch0619: 0619-logind-fix-serialization-deserialization-of-user-s-d.patch
+Patch0620: 0620-logind-turn-of-stdio-locking-when-writing-session-fi.patch
+Patch0621: 0621-units-set-StopWhenUnneeded-for-the-user-slice-units-.patch
+Patch0622: 0622-units-improve-Description-string-a-bit.patch
+Patch0623: 0623-logind-improve-logging-in-manager_connect_console.patch
+Patch0624: 0624-logind-save-restore-User-object-s-stopping-field-dur.patch
+Patch0625: 0625-logind-correct-bad-clean-up-path.patch
+Patch0626: 0626-logind-fix-bad-error-propagation.patch
+Patch0627: 0627-logind-never-elect-a-session-that-is-stopping-as-dis.patch
+Patch0628: 0628-logind-introduce-little-helper-that-checks-whether-a.patch
+Patch0629: 0629-logind-propagate-session-stop-errors.patch
+Patch0630: 0630-logind-rework-how-we-manage-the-slice-and-user-runti.patch
+Patch0631: 0631-logind-optionally-keep-the-user-.service-instance-fo.patch
+Patch0632: 0632-logind-add-a-RequiresMountsFor-dependency-from-the-s.patch
+Patch0633: 0633-logind-improve-error-propagation-of-user_check_linge.patch
+Patch0634: 0634-logind-automatically-GC-lingering-users-for-who-now-.patch
+Patch0635: 0635-pam_systemd-simplify-code-which-with-we-set-environm.patch
+Patch0636: 0636-logind-validate-run-user-1000-before-we-set-it.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -1287,6 +1313,34 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Fri Aug 27 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-50
+- Added option --check-inhibitors for non-tty usage (#1269726)
+- logind: Introduce RebootWithFlags and others (#1269726)
+- logind: add …WithFlags methods to policy (#1269726)
+- logind: simplify flags handling a bit (#1269726)
+- Update link to RHEL documentation (#1982584)
+- Set default core ulimit to 0, but keep the hard limit ulimited (#1905582)
+- shared/seccomp-util: address family filtering is broken on ppc (#1982650)
+- logind: rework Seat/Session/User object allocation and freeing a bit (#1642460)
+- logind: fix serialization/deserialization of user's "display session" (#1642460)
+- logind: turn of stdio locking when writing session files too (#1642460)
+- units: set StopWhenUnneeded= for the user slice units too (#1642460)
+- units: improve Description= string a bit (#1642460)
+- logind: improve logging in manager_connect_console() (#1642460)
+- logind: save/restore User object's "stopping" field during restarts (#1642460)
+- logind: correct bad clean-up path (#1642460)
+- logind: fix bad error propagation (#1642460)
+- logind: never elect a session that is stopping as display (#1642460)
+- logind: introduce little helper that checks whether a session is ready (#1642460)
+- logind: propagate session stop errors (#1642460)
+- logind: rework how we manage the slice and user-runtime-dir@.service unit for each user (#1642460)
+- logind: optionally, keep the user@.service instance for eached logged in user around for a while (#1642460)
+- logind: add a RequiresMountsFor= dependency from the session scope unit to the home directory of the user (#1642460)
+- logind: improve error propagation of user_check_linger_file() (#1642460)
+- logind: automatically GC lingering users for who now user@.service (nor slice, not runtime dir service) is running anymore (#1642460)
+- pam_systemd: simplify code which with we set environment variables (#1642460)
+- logind: validate /run/user/1000 before we set it (#1642460)
+
 * Fri Jul 23 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-49
 - remove a left-over break (#1970860)
 - basic/unit-name: do not use strdupa() on a path (#1974700)
