@@ -1,0 +1,96 @@
+From 0e5c20b7a4f47fd3f8edbc2735810ea3513360bb Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Thu, 19 Aug 2021 13:44:35 +0100
+Subject: [PATCH] link: Add support for rx-gro-hw nic feature
+
+---
+ man/systemd.link.xml                       |  7 +++++++
+ src/shared/ethtool-util.c                  | 15 ++++++++-------
+ src/shared/ethtool-util.h                  |  1 +
+ src/udev/net/link-config-gperf.gperf       |  1 +
+ test/fuzz/fuzz-link-parser/directives.link |  1 +
+ 5 files changed, 18 insertions(+), 7 deletions(-)
+
+diff --git a/man/systemd.link.xml b/man/systemd.link.xml
+index 6d8dcb9af7..638a1522cd 100644
+--- a/man/systemd.link.xml
++++ b/man/systemd.link.xml
+@@ -701,6 +701,13 @@
+           When unset, the kernel's default will be used.</para>
+         </listitem>
+       </varlistentry>
++      <varlistentry>
++        <term><varname>GenericReceiveOffloadHardware=</varname></term>
++        <listitem>
++          <para>Takes a boolean. If set to true, hardware accelerated Generic Receive Offload (GRO) is
++          enabled. When unset, the kernel's default will be used.</para>
++        </listitem>
++      </varlistentry>
+       <varlistentry>
+         <term><varname>LargeReceiveOffload=</varname></term>
+         <listitem>
+diff --git a/src/shared/ethtool-util.c b/src/shared/ethtool-util.c
+index f7f553dd29..a08bb2b7f5 100644
+--- a/src/shared/ethtool-util.c
++++ b/src/shared/ethtool-util.c
+@@ -70,13 +70,14 @@ DEFINE_STRING_TABLE_LOOKUP(port, NetDevPort);
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_port, port, NetDevPort, "Failed to parse Port setting");
+ 
+ static const char* const netdev_feature_table[_NET_DEV_FEAT_MAX] = {
+-        [NET_DEV_FEAT_RX]   = "rx-checksum",
+-        [NET_DEV_FEAT_TX]   = "tx-checksum-", /* The suffix "-" means any feature beginning with "tx-checksum-" */
+-        [NET_DEV_FEAT_GSO]  = "tx-generic-segmentation",
+-        [NET_DEV_FEAT_GRO]  = "rx-gro",
+-        [NET_DEV_FEAT_LRO]  = "rx-lro",
+-        [NET_DEV_FEAT_TSO]  = "tx-tcp-segmentation",
+-        [NET_DEV_FEAT_TSO6] = "tx-tcp6-segmentation",
++        [NET_DEV_FEAT_RX]     = "rx-checksum",
++        [NET_DEV_FEAT_TX]     = "tx-checksum-", /* The suffix "-" means any feature beginning with "tx-checksum-" */
++        [NET_DEV_FEAT_GSO]    = "tx-generic-segmentation",
++        [NET_DEV_FEAT_GRO]    = "rx-gro",
++        [NET_DEV_FEAT_GRO_HW] = "rx-gro-hw",
++        [NET_DEV_FEAT_LRO]    = "rx-lro",
++        [NET_DEV_FEAT_TSO]    = "tx-tcp-segmentation",
++        [NET_DEV_FEAT_TSO6]   = "tx-tcp6-segmentation",
+ };
+ 
+ static const char* const ethtool_link_mode_bit_table[] = {
+diff --git a/src/shared/ethtool-util.h b/src/shared/ethtool-util.h
+index bb0333775c..2181ab6fd6 100644
+--- a/src/shared/ethtool-util.h
++++ b/src/shared/ethtool-util.h
+@@ -23,6 +23,7 @@ typedef enum NetDevFeature {
+         NET_DEV_FEAT_TX,
+         NET_DEV_FEAT_GSO,
+         NET_DEV_FEAT_GRO,
++        NET_DEV_FEAT_GRO_HW,
+         NET_DEV_FEAT_LRO,
+         NET_DEV_FEAT_TSO,
+         NET_DEV_FEAT_TSO6,
+diff --git a/src/udev/net/link-config-gperf.gperf b/src/udev/net/link-config-gperf.gperf
+index f800de8386..44b46cb17c 100644
+--- a/src/udev/net/link-config-gperf.gperf
++++ b/src/udev/net/link-config-gperf.gperf
+@@ -57,6 +57,7 @@ Link.TCPSegmentationOffload,              config_parse_tristate,
+ Link.TCP6SegmentationOffload,             config_parse_tristate,                 0,                             offsetof(LinkConfig, features[NET_DEV_FEAT_TSO6])
+ Link.UDPSegmentationOffload,              config_parse_warn_compat,              DISABLED_LEGACY,               0
+ Link.GenericReceiveOffload,               config_parse_tristate,                 0,                             offsetof(LinkConfig, features[NET_DEV_FEAT_GRO])
++Link.GenericReceiveOffloadHardware,       config_parse_tristate,                 0,                             offsetof(LinkConfig, features[NET_DEV_FEAT_GRO_HW])
+ Link.LargeReceiveOffload,                 config_parse_tristate,                 0,                             offsetof(LinkConfig, features[NET_DEV_FEAT_LRO])
+ Link.RxChannels,                          config_parse_ring_buffer_or_channel,   0,                             offsetof(LinkConfig, channels.rx)
+ Link.TxChannels,                          config_parse_ring_buffer_or_channel,   0,                             offsetof(LinkConfig, channels.tx)
+diff --git a/test/fuzz/fuzz-link-parser/directives.link b/test/fuzz/fuzz-link-parser/directives.link
+index 5f232ce698..b5cffb1a27 100644
+--- a/test/fuzz/fuzz-link-parser/directives.link
++++ b/test/fuzz/fuzz-link-parser/directives.link
+@@ -36,6 +36,7 @@ TCPSegmentationOffload=
+ TCP6SegmentationOffload=
+ UDPSegmentationOffload=
+ GenericReceiveOffload=
++GenericReceiveOffloadHardware=
+ LargeReceiveOffload=
+ RxChannels=
+ TxChannels=
+-- 
+2.31.1
+

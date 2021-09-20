@@ -39,8 +39,8 @@
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 %if %{without inplace}
-Version:        249.2
-Release:        1.2%{?dist}
+Version:        249.4
+Release:        1.1%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -108,6 +108,11 @@ Patch0001:      18621-fb.patch
 # PR 18621: Quiet "proc: Bad value for 'hidepid'" messages
 Patch0001:      https://github.com/systemd/systemd/pull/18621.patch
 %endif
+Patch0002:      https://github.com/systemd/systemd/pull/20743.patch
+Patch0003:      https://github.com/systemd/systemd/pull/20458.patch
+Patch0004:      https://github.com/systemd/systemd/pull/20472.patch
+Patch0005:      https://github.com/systemd/systemd/pull/20477.patch
+Patch0006:      https://github.com/systemd/systemd/pull/20484.patch
 
 # Downstream-only patches (0500–9999)
 
@@ -1054,6 +1059,11 @@ fi
 %endif
 
 %changelog
+* Mon Sep 20 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-1.1
+- New stable point release
+- Backport optimization for read_virtual_file() (#20743)
+- Backport new features for systemd-networkd (#20743, #20472, #20477, #20484)
+
 * Thu Jul 29 2021 Anita Zhang <the.anitazha@gmail.com> - 249.2-1.2
 - Remove Obsoletes lines on systemd-resolved and systemd-networkd since we don't
   want to install these by default.
