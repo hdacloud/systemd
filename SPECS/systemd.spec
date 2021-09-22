@@ -40,11 +40,11 @@ Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 %if %{without inplace}
 Version:        249.4
-Release:        1.1%{?dist}
+Release:        2.1%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
-Release:        0
+Release:        1
 %endif
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
@@ -102,17 +102,25 @@ GIT_DIR=../../src/systemd/.git git diffab -M v233..master@{2017-06-15} -- hwdb/[
 # patches in this range before applying upstream pull requests.
 
 %if 0%{?facebook}
+Patch0001:      0001-rpm-don-t-specify-the-full-path-for-systemctl-and-ot.patch
+Patch0002:      0002-rpm-use-a-helper-script-to-actually-invoke-systemctl.patch
+Patch0003:      0003-rpm-call-needs-restart-in-parallel.patch
+Patch0004:      0004-rpm-restart-user-services-at-the-end-of-the-transact.patch
+Patch0005:      0005-update-helper-also-add-user-reexec-verb.patch
+
 # PR 18621: FB variant of quieting "proc: Bad value for 'hidepid'" messages
-Patch0001:      18621-fb.patch
+Patch0006:      18621-fb.patch
 %else
 # PR 18621: Quiet "proc: Bad value for 'hidepid'" messages
-Patch0001:      https://github.com/systemd/systemd/pull/18621.patch
+Patch0006:      https://github.com/systemd/systemd/pull/18621.patch
 %endif
-Patch0002:      https://github.com/systemd/systemd/pull/20743.patch
-Patch0003:      https://github.com/systemd/systemd/pull/20458.patch
-Patch0004:      https://github.com/systemd/systemd/pull/20472.patch
-Patch0005:      https://github.com/systemd/systemd/pull/20477.patch
-Patch0006:      https://github.com/systemd/systemd/pull/20484.patch
+
+Patch0007:      https://github.com/systemd/systemd/pull/20743.patch
+Patch0008:      https://github.com/systemd/systemd/pull/20458.patch
+Patch0009:      https://github.com/systemd/systemd/pull/20472.patch
+Patch0010:      https://github.com/systemd/systemd/pull/20477.patch
+Patch0011:      https://github.com/systemd/systemd/pull/20484.patch
+Patch0012:      https://github.com/systemd/systemd/pull/20489.patch
 
 # Downstream-only patches (0500–9999)
 
@@ -1059,10 +1067,28 @@ fi
 %endif
 
 %changelog
+* Wed Sep 22 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.1
+- Sync changes from Fedora
+- Backport one more feature for systemd-networkd (#20489)
+
 * Mon Sep 20 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-1.1
 - New stable point release
 - Backport optimization for read_virtual_file() (#20743)
 - Backport new features for systemd-networkd (#20743, #20472, #20477, #20484)
+
+* Tue Sep 14 2021 Sahana Prasad <sahana@redhat.com>
+- Rebuilt with OpenSSL 3.0.0
+
+* Tue Aug 24 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 249.4-1
+- Latest bugfix release: various fixes for systemd-networkd,
+  systemd-resolved, systemd, systemd-boot.
+- Backport of macros to restart systemd user units (#1993244)
+
+* Fri Aug  6 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 249.3-1
+- Latest bugfix release: improved compatibility with latest glibc,
+  various small documentation fixes, and fixes for systemd-networkd bridging,
+  other minor fixes.
+- systemctl set-property accepts glob patterns now (#1986258)
 
 * Thu Jul 29 2021 Anita Zhang <the.anitazha@gmail.com> - 249.2-1.2
 - Remove Obsoletes lines on systemd-resolved and systemd-networkd since we don't
