@@ -1,0 +1,86 @@
+From 0db68800c756f298ef45584ac01915c2cb2ce359 Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Mon, 16 Aug 2021 23:47:40 +0900
+Subject: [PATCH 1/2] ethtool: make the size of 'features' array static
+
+---
+ src/shared/ethtool-util.c | 2 +-
+ src/shared/ethtool-util.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/shared/ethtool-util.c b/src/shared/ethtool-util.c
+index f77f6943ca4f..699c7a97ab97 100644
+--- a/src/shared/ethtool-util.c
++++ b/src/shared/ethtool-util.c
+@@ -501,7 +501,7 @@ static int set_features_bit(
+         return found ? 0 : -ENODATA;
+ }
+ 
+-int ethtool_set_features(int *ethtool_fd, const char *ifname, const int *features) {
++int ethtool_set_features(int *ethtool_fd, const char *ifname, const int features[static _NET_DEV_FEAT_MAX]) {
+         _cleanup_free_ struct ethtool_gstrings *strings = NULL;
+         struct ethtool_sfeatures *sfeatures;
+         struct ifreq ifr = {};
+diff --git a/src/shared/ethtool-util.h b/src/shared/ethtool-util.h
+index 7d287666249a..f0fc40b0595f 100644
+--- a/src/shared/ethtool-util.h
++++ b/src/shared/ethtool-util.h
+@@ -88,7 +88,7 @@ int ethtool_get_link_info(int *ethtool_fd, const char *ifname,
+ int ethtool_get_permanent_macaddr(int *ethtool_fd, const char *ifname, struct ether_addr *ret);
+ int ethtool_set_wol(int *ethtool_fd, const char *ifname, uint32_t wolopts);
+ int ethtool_set_nic_buffer_size(int *ethtool_fd, const char *ifname, const netdev_ring_param *ring);
+-int ethtool_set_features(int *ethtool_fd, const char *ifname, const int *features);
++int ethtool_set_features(int *ethtool_fd, const char *ifname, const int features[static _NET_DEV_FEAT_MAX]);
+ int ethtool_set_glinksettings(int *ethtool_fd, const char *ifname,
+                               int autonegotiation, const uint32_t advertise[static N_ADVERTISE],
+                               uint64_t speed, Duplex duplex, NetDevPort port);
+
+From c2f2250e5c52ec3745a462e3f55a94c133786df8 Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Tue, 17 Aug 2021 00:44:00 +0900
+Subject: [PATCH 2/2] ethtool: make ethtool_set_features() return earlier when
+ nothing is requested
+
+---
+ src/shared/ethtool-util.c | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/src/shared/ethtool-util.c b/src/shared/ethtool-util.c
+index 699c7a97ab97..4ca90615f3c1 100644
+--- a/src/shared/ethtool-util.c
++++ b/src/shared/ethtool-util.c
+@@ -505,12 +505,22 @@ int ethtool_set_features(int *ethtool_fd, const char *ifname, const int features
+         _cleanup_free_ struct ethtool_gstrings *strings = NULL;
+         struct ethtool_sfeatures *sfeatures;
+         struct ifreq ifr = {};
+-        int i, r;
++        bool have = false;
++        int r;
+ 
+         assert(ethtool_fd);
+         assert(ifname);
+         assert(features);
+ 
++        for (size_t i = 0; i < _NET_DEV_FEAT_MAX; i++)
++                if (features[i] >= 0) {
++                        have = true;
++                        break;
++                }
++
++        if (!have)
++                return 0;
++
+         r = ethtool_connect(ethtool_fd);
+         if (r < 0)
+                 return r;
+@@ -525,8 +535,8 @@ int ethtool_set_features(int *ethtool_fd, const char *ifname, const int features
+         sfeatures->cmd = ETHTOOL_SFEATURES;
+         sfeatures->size = DIV_ROUND_UP(strings->len, 32U);
+ 
+-        for (i = 0; i < _NET_DEV_FEAT_MAX; i++)
+-                if (features[i] != -1) {
++        for (size_t i = 0; i < _NET_DEV_FEAT_MAX; i++)
++                if (features[i] >= 0) {
+                         r = set_features_bit(strings, netdev_feature_table[i], features[i], sfeatures);
+                         if (r < 0) {
+                                 log_debug_errno(r, "ethtool: could not find feature, ignoring: %s", netdev_feature_table[i]);

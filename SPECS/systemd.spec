@@ -40,7 +40,7 @@ Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 %if %{without inplace}
 Version:        249.4
-Release:        2.1%{?dist}
+Release:        2.2%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -121,6 +121,10 @@ Patch0009:      https://github.com/systemd/systemd/pull/20472.patch
 Patch0010:      https://github.com/systemd/systemd/pull/20477.patch
 Patch0011:      https://github.com/systemd/systemd/pull/20484.patch
 Patch0012:      https://github.com/systemd/systemd/pull/20489.patch
+Patch0013:      https://github.com/systemd/systemd/pull/20450.patch
+Patch0014:      https://github.com/systemd/systemd/pull/20541.patch
+Patch0015:      https://github.com/systemd/systemd/pull/20729.patch
+Patch0016:      https://github.com/systemd/systemd/pull/20828.patch
 
 # Downstream-only patches (0500–9999)
 
@@ -1067,6 +1071,10 @@ fi
 %endif
 
 %changelog
+* Fri Sep 24 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.2
+- Backport more feature support for systemd-networkd
+  (#20450, #20541, #20729, #20828)
+
 * Wed Sep 22 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.1
 - Sync changes from Fedora
 - Backport one more feature for systemd-networkd (#20489)
