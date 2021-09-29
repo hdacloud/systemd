@@ -40,7 +40,7 @@ Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 %if %{without inplace}
 Version:        249.4
-Release:        2.2%{?dist}
+Release:        2.3%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -115,6 +115,7 @@ Patch0006:      18621-fb.patch
 Patch0006:      https://github.com/systemd/systemd/pull/18621.patch
 %endif
 
+# PRs to support additional systemd.network and systemd.link features
 Patch0007:      https://github.com/systemd/systemd/pull/20743.patch
 Patch0008:      https://github.com/systemd/systemd/pull/20458.patch
 Patch0009:      https://github.com/systemd/systemd/pull/20472.patch
@@ -125,6 +126,9 @@ Patch0013:      https://github.com/systemd/systemd/pull/20450.patch
 Patch0014:      https://github.com/systemd/systemd/pull/20541.patch
 Patch0015:      https://github.com/systemd/systemd/pull/20729.patch
 Patch0016:      https://github.com/systemd/systemd/pull/20828.patch
+
+# PR 20875: allow verifying hidden (dot) files again
+Patch0017:      https://github.com/systemd/systemd/pull/20875.patch
 
 # Downstream-only patches (0500–9999)
 
@@ -1071,6 +1075,9 @@ fi
 %endif
 
 %changelog
+* Wed Sep 29 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.3
+- Fix to allow verifying hidden (dot) files again (PR #20875)
+
 * Fri Sep 24 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.2
 - Backport more feature support for systemd-networkd
   (#20450, #20541, #20729, #20828)
