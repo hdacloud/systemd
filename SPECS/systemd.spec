@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        50%{?dist}
+Release:        51%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -686,6 +686,28 @@ Patch0633: 0633-logind-improve-error-propagation-of-user_check_linge.patch
 Patch0634: 0634-logind-automatically-GC-lingering-users-for-who-now-.patch
 Patch0635: 0635-pam_systemd-simplify-code-which-with-we-set-environm.patch
 Patch0636: 0636-logind-validate-run-user-1000-before-we-set-it.patch
+Patch0637: 0637-define-newly-needed-constants.patch
+Patch0638: 0638-sd-netlink-support-IFLA_PROP_LIST-and-IFLA_ALT_IFNAM.patch
+Patch0639: 0639-sd-netlink-introduce-sd_netlink_message_read_strv.patch
+Patch0640: 0640-sd-netlink-introduce-sd_netlink_message_append_strv.patch
+Patch0641: 0641-test-add-a-test-for-sd_netlink_message_-append-read-.patch
+Patch0642: 0642-util-introduce-ifname_valid_full.patch
+Patch0643: 0643-rename-function.patch
+Patch0644: 0644-udev-support-AlternativeName-setting-in-.link-file.patch
+Patch0645: 0645-network-make-Name-in-Match-support-alternative-names.patch
+Patch0646: 0646-udev-extend-the-length-of-ID_NET_NAME_XXX-to-ALTIFNA.patch
+Patch0647: 0647-udev-do-not-fail-if-kernel-does-not-support-alternat.patch
+Patch0648: 0648-udev-introduce-AlternativeNamesPolicy-setting.patch
+Patch0649: 0649-network-set-AlternativeNamesPolicy-in-99-default.lin.patch
+Patch0650: 0650-random-util-call-initialize_srand-after-fork.patch
+Patch0651: 0651-sd-netlink-introduce-rtnl_resolve_link_alternative_n.patch
+Patch0652: 0652-udev-sort-alternative-names.patch
+Patch0653: 0653-netlink-introduce-rtnl_get-delete_link_alternative_n.patch
+Patch0654: 0654-netlink-do-not-fail-when-new-interface-name-is-alrea.patch
+Patch0655: 0655-udev-do-not-try-to-reassign-alternative-names.patch
+Patch0656: 0656-Fix-LGTM-build.patch
+Patch0657: 0657-sd-hwdb-allow-empty-properties.patch
+Patch0658: 0658-Update-hwdb.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -1313,6 +1335,30 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Thu Sep 23 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-51
+- define newly needed constants (#1850986)
+- sd-netlink: support IFLA_PROP_LIST and IFLA_ALT_IFNAME attributes (#1850986)
+- sd-netlink: introduce sd_netlink_message_read_strv() (#1850986)
+- sd-netlink: introduce sd_netlink_message_append_strv() (#1850986)
+- test: add a test for sd_netlink_message_{append,read}_strv() (#1850986)
+- util: introduce ifname_valid_full() (#1850986)
+- rename function (#1850986)
+- udev: support AlternativeName= setting in .link file (#1850986)
+- network: make Name= in [Match] support alternative names of interfaces (#1850986)
+- udev: extend the length of ID_NET_NAME_XXX= to ALTIFNAMSIZ (#1850986)
+- udev: do not fail if kernel does not support alternative names (#1850986)
+- udev: introduce AlternativeNamesPolicy= setting (#1850986)
+- network: set AlternativeNamesPolicy= in 99-default.link (#1850986)
+- random-util: call initialize_srand() after fork() (#1850986)
+- sd-netlink: introduce rtnl_resolve_link_alternative_names() (#1850986)
+- udev: sort alternative names (#1850986)
+- netlink: introduce rtnl_get/delete_link_alternative_names() (#1850986)
+- netlink: do not fail when new interface name is already used as an alternative name (#1850986)
+- udev: do not try to reassign alternative names (#1850986)
+- Fix LGTM build (#1850986)
+- sd-hwdb: allow empty properties (#1930568)
+- Update hwdb (#1930568)
+
 * Fri Aug 27 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-50
 - Added option --check-inhibitors for non-tty usage (#1269726)
 - logind: Introduce RebootWithFlags and others (#1269726)
