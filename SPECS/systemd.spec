@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        44%{?dist}
+Release:        50%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -593,6 +593,99 @@ Patch0540: 0540-test-udev-test.pl-generator-for-large-list-of-block-.patch
 Patch0541: 0541-test-udev-test.pl-suppress-umount-error-message-at-s.patch
 Patch0542: 0542-test-udev_test.pl-add-expected-good-count.patch
 Patch0543: 0543-test-udev-test-gracefully-exit-when-imports-fail.patch
+Patch0544: 0544-Revert-test-add-test-cases-for-empty-string-match-an.patch
+Patch0545: 0545-test-sys-script.py-add-missing-DEVNAME-entries-to-ue.patch
+Patch0546: 0546-sd-event-split-out-helper-functions-for-reshuffling-.patch
+Patch0547: 0547-sd-event-split-out-enable-and-disable-codepaths-from.patch
+Patch0548: 0548-sd-event-mention-that-two-debug-logged-events-are-ig.patch
+Patch0549: 0549-sd-event-split-clock-data-allocation-out-of-sd_event.patch
+Patch0550: 0550-sd-event-split-out-code-to-add-remove-timer-event-so.patch
+Patch0551: 0551-sd-event-fix-delays-assert-brain-o-17790.patch
+Patch0552: 0552-sd-event-let-s-suffix-last_run-last_log-with-_usec.patch
+Patch0553: 0553-sd-event-refuse-running-default-event-loops-in-any-o.patch
+Patch0554: 0554-sd-event-ref-event-loop-while-in-sd_event_prepare-ot.patch
+Patch0555: 0555-sd-event-follow-coding-style-with-naming-return-para.patch
+Patch0556: 0556-sd-event-remove-earliest_index-latest_index-into-com.patch
+Patch0557: 0557-sd-event-update-state-at-the-end-in-event_source_ena.patch
+Patch0558: 0558-sd-event-increase-n_enabled_child_sources-just-once.patch
+Patch0559: 0559-sd-event-add-ability-to-ratelimit-event-sources.patch
+Patch0560: 0560-test-add-ratelimiting-test.patch
+Patch0561: 0561-core-prevent-excessive-proc-self-mountinfo-parsing.patch
+Patch0562: 0562-udev-run-link_update-with-increased-retry-count-in-s.patch
+Patch0563: 0563-pam-systemd-use-secure_getenv-rather-than-getenv.patch
+Patch0564: 0564-Revert-udev-run-link_update-with-increased-retry-cou.patch
+Patch0565: 0565-Revert-udev-make-algorithm-that-selects-highest-prio.patch
+Patch0566: 0566-test-udev-test.pl-drop-test-cases-that-add-mutliple-.patch
+Patch0567: 0567-cgroup-Also-set-io.bfq.weight.patch
+Patch0568: 0568-seccomp-allow-turning-off-of-seccomp-filtering-via-e.patch
+Patch0569: 0569-meson-remove-strange-dep-that-causes-meson-to-enter-.patch
+Patch0570: 0570-copy-handle-copy_file_range-weirdness-on-procfs-sysf.patch
+Patch0571: 0571-core-Hide-Deactivated-successfully-message.patch
+Patch0572: 0572-util-rework-in_initrd-to-make-use-of-path_is_tempora.patch
+Patch0573: 0573-initrd-extend-SYSTEMD_IN_INITRD-to-accept-non-ramfs-.patch
+Patch0574: 0574-initrd-do-a-debug-log-if-failed-to-detect-rootfs-typ.patch
+Patch0575: 0575-initrd-do-a-debug-log-if-etc-initrd-release-doesn-t-.patch
+Patch0576: 0576-units-assign-user-runtime-dir-.service-to-user-i.sli.patch
+Patch0577: 0577-units-order-user-runtime-dir-.service-after-systemd-.patch
+Patch0578: 0578-units-make-sure-user-runtime-dir-.service-is-Type-on.patch
+Patch0579: 0579-user-runtime-dir-downgrade-a-few-log-messages-to-LOG.patch
+Patch0580: 0580-shared-install-Preserve-escape-characters-for-escape.patch
+Patch0581: 0581-basic-virt-Detect-PowerVM-hypervisor.patch
+Patch0582: 0582-man-document-differences-in-clean-exit-status-for-Ty.patch
+Patch0583: 0583-busctl-add-a-timestamp-to-the-output-of-the-busctl-m.patch
+Patch0584: 0584-basic-cap-list-parse-print-numerical-capabilities.patch
+Patch0585: 0585-shared-mount-util-convert-to-libmount.patch
+Patch0586: 0586-mount-util-bind_remount-avoid-calling-statvfs.patch
+Patch0587: 0587-mount-util-use-UMOUNT_NOFOLLOW-in-recursive-umounter.patch
+Patch0588: 0588-test-install-root-create-referenced-targets.patch
+Patch0589: 0589-install-warn-if-WantedBy-targets-don-t-exist.patch
+Patch0590: 0590-test-install-root-add-test-for-unknown-WantedBy-targ.patch
+Patch0591: 0591-ceph-is-a-network-filesystem.patch
+Patch0592: 0592-sysctl-set-kernel.core_pipe_limit-16.patch
+Patch0593: 0593-core-don-t-drop-timer-expired-but-not-yet-processed-.patch
+Patch0594: 0594-core-Detect-initial-timer-state-from-serialized-data.patch
+Patch0595: 0595-rc-local-order-after-network-online.target.patch
+Patch0596: 0596-set-core-ulimit-to-0-like-on-RHEL-7.patch
+Patch0597: 0597-test-mountpointutil-util-do-not-assert-in-test_mnt_i.patch
+Patch0598: 0598-remove-a-left-over-break.patch
+Patch0599: 0599-basic-unit-name-do-not-use-strdupa-on-a-path.patch
+Patch0600: 0600-sd-event-change-ordering-of-pending-ratelimited-even.patch
+Patch0601: 0601-sd-event-drop-unnecessary-else.patch
+Patch0602: 0602-sd-event-use-CMP-macro.patch
+Patch0603: 0603-sd-event-use-usec_add.patch
+Patch0604: 0604-sd-event-make-event_source_time_prioq_reshuffle-acce.patch
+Patch0605: 0605-sd-event-always-reshuffle-time-prioq-on-changing-onl.patch
+Patch0606: 0606-ci-run-unit-tests-on-z-stream-branches-as-well.patch
+Patch0607: 0607-ci-drop-forgotten-Travis-references.patch
+Patch0608: 0608-ci-run-unit-tests-on-CentOS-8-Stream-as-well.patch
+Patch0609: 0609-ci-add-missing-test-dependencies.patch
+Patch0610: 0610-meson-bump-timeout-for-test-udev-to-180s.patch
+Patch0611: 0611-Added-option-check-inhibitors-for-non-tty-usage.patch
+Patch0612: 0612-logind-Introduce-RebootWithFlags-and-others.patch
+Patch0613: 0613-logind-add-WithFlags-methods-to-policy.patch
+Patch0614: 0614-logind-simplify-flags-handling-a-bit.patch
+Patch0615: 0615-Update-link-to-RHEL-documentation.patch
+Patch0616: 0616-Set-default-core-ulimit-to-0-but-keep-the-hard-limit.patch
+Patch0617: 0617-shared-seccomp-util-address-family-filtering-is-brok.patch
+Patch0618: 0618-logind-rework-Seat-Session-User-object-allocation-an.patch
+Patch0619: 0619-logind-fix-serialization-deserialization-of-user-s-d.patch
+Patch0620: 0620-logind-turn-of-stdio-locking-when-writing-session-fi.patch
+Patch0621: 0621-units-set-StopWhenUnneeded-for-the-user-slice-units-.patch
+Patch0622: 0622-units-improve-Description-string-a-bit.patch
+Patch0623: 0623-logind-improve-logging-in-manager_connect_console.patch
+Patch0624: 0624-logind-save-restore-User-object-s-stopping-field-dur.patch
+Patch0625: 0625-logind-correct-bad-clean-up-path.patch
+Patch0626: 0626-logind-fix-bad-error-propagation.patch
+Patch0627: 0627-logind-never-elect-a-session-that-is-stopping-as-dis.patch
+Patch0628: 0628-logind-introduce-little-helper-that-checks-whether-a.patch
+Patch0629: 0629-logind-propagate-session-stop-errors.patch
+Patch0630: 0630-logind-rework-how-we-manage-the-slice-and-user-runti.patch
+Patch0631: 0631-logind-optionally-keep-the-user-.service-instance-fo.patch
+Patch0632: 0632-logind-add-a-RequiresMountsFor-dependency-from-the-s.patch
+Patch0633: 0633-logind-improve-error-propagation-of-user_check_linge.patch
+Patch0634: 0634-logind-automatically-GC-lingering-users-for-who-now-.patch
+Patch0635: 0635-pam_systemd-simplify-code-which-with-we-set-environm.patch
+Patch0636: 0636-logind-validate-run-user-1000-before-we-set-it.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -625,7 +718,6 @@ BuildRequires:  libgpg-error-devel
 BuildRequires:  gnutls-devel
 BuildRequires:  libmicrohttpd-devel
 BuildRequires:  libxkbcommon-devel
-BuildRequires:  iptables-devel
 BuildRequires:  libxslt
 BuildRequires:  docbook-style-xsl
 BuildRequires:  pkgconfig
@@ -647,6 +739,8 @@ Requires(post): coreutils
 Requires(post): sed
 Requires(post): acl
 Requires(post): grep
+# systemd-machine-id-setup requires libssl
+Requires(post): openssl-libs
 Requires(pre):  coreutils
 Requires(pre):  /usr/bin/getent
 Requires(pre):  /usr/sbin/groupadd
@@ -833,7 +927,7 @@ CONFIGURE_OPTS=(
         -Dgnutls=true
         -Dmicrohttpd=true
         -Dlibidn2=true
-        -Dlibiptc=true
+        -Dlibiptc=false
         -Dlibcurl=true
         -Defi=true
         -Dgnu-efi=%{?have_gnu_efi:true}%{?!have_gnu_efi:false}
@@ -1053,16 +1147,14 @@ if [ -e /etc/fstab ]; then
          sed -i.rpm.bak -r '/^devpts\s+\/dev\/pts\s+devpts\s+defaults\s+/d; /^tmpfs\s+\/dev\/shm\s+tmpfs\s+defaults\s+/d; /^sysfs\s+\/sys\s+sysfs\s+defaults\s+/d; /^proc\s+\/proc\s+proc\s+defaults\s+/d' /etc/fstab || :
 fi
 
-# Services we install by default, and which are controlled by presets.
+# We reset the enablement of all services upon initial installation
+# https://bugzilla.redhat.com/show_bug.cgi?id=1118740#c23
+# This will fix up enablement of any preset services that got installed
+# before systemd due to rpm ordering problems:
+# Fedora: https://bugzilla.redhat.com/show_bug.cgi?id=1647172
+# RHEL: https://bugzilla.redhat.com/show_bug.cgi?id=1783263
 if [ $1 -eq 1 ] ; then
-        systemctl preset --quiet \
-                remote-fs.target \
-                getty@.service \
-                serial-getty@.service \
-                console-getty.service \
-                debug-shell.service \
-                systemd-resolved.service \
-                >/dev/null || :
+        systemctl preset-all &>/dev/null || :
 fi
 
 # remove obsolete systemd-readahead file
@@ -1221,6 +1313,115 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Fri Aug 27 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-50
+- Added option --check-inhibitors for non-tty usage (#1269726)
+- logind: Introduce RebootWithFlags and others (#1269726)
+- logind: add …WithFlags methods to policy (#1269726)
+- logind: simplify flags handling a bit (#1269726)
+- Update link to RHEL documentation (#1982584)
+- Set default core ulimit to 0, but keep the hard limit ulimited (#1905582)
+- shared/seccomp-util: address family filtering is broken on ppc (#1982650)
+- logind: rework Seat/Session/User object allocation and freeing a bit (#1642460)
+- logind: fix serialization/deserialization of user's "display session" (#1642460)
+- logind: turn of stdio locking when writing session files too (#1642460)
+- units: set StopWhenUnneeded= for the user slice units too (#1642460)
+- units: improve Description= string a bit (#1642460)
+- logind: improve logging in manager_connect_console() (#1642460)
+- logind: save/restore User object's "stopping" field during restarts (#1642460)
+- logind: correct bad clean-up path (#1642460)
+- logind: fix bad error propagation (#1642460)
+- logind: never elect a session that is stopping as display (#1642460)
+- logind: introduce little helper that checks whether a session is ready (#1642460)
+- logind: propagate session stop errors (#1642460)
+- logind: rework how we manage the slice and user-runtime-dir@.service unit for each user (#1642460)
+- logind: optionally, keep the user@.service instance for eached logged in user around for a while (#1642460)
+- logind: add a RequiresMountsFor= dependency from the session scope unit to the home directory of the user (#1642460)
+- logind: improve error propagation of user_check_linger_file() (#1642460)
+- logind: automatically GC lingering users for who now user@.service (nor slice, not runtime dir service) is running anymore (#1642460)
+- pam_systemd: simplify code which with we set environment variables (#1642460)
+- logind: validate /run/user/1000 before we set it (#1642460)
+
+* Fri Jul 23 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-49
+- remove a left-over break (#1970860)
+- basic/unit-name: do not use strdupa() on a path (#1974700)
+- sd-event: change ordering of pending/ratelimited events (#1968528)
+- sd-event: drop unnecessary "else" (#1968528)
+- sd-event: use CMP() macro (#1968528)
+- sd-event: use usec_add() (#1968528)
+- sd-event: make event_source_time_prioq_reshuffle() accept all event source type (#1968528)
+- sd-event: always reshuffle time prioq on changing online/offline state (#1968528)
+- ci: run unit tests on z-stream branches as well (#1970860)
+- ci: drop forgotten Travis references (#1934504)
+- ci: run unit tests on CentOS 8 Stream as well (#1934504)
+- ci: add missing test dependencies (#1934504)
+- meson: bump timeout for test-udev to 180s (#1934504)
+
+* Thu Jun 24 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-48
+- cgroup: Also set io.bfq.weight (#1927290)
+- seccomp: allow turning off of seccomp filtering via env var (#1916835)
+- meson: remove strange dep that causes meson to enter infinite loop (#1970860)
+- copy: handle copy_file_range() weirdness on procfs/sysfs (#1970860)
+- core: Hide "Deactivated successfully" message (#1954802)
+- util: rework in_initrd() to make use of path_is_temporary_fs() (#1959339)
+- initrd: extend SYSTEMD_IN_INITRD to accept non-ramfs rootfs (#1959339)
+- initrd: do a debug log if failed to detect rootfs type (#1959339)
+- initrd: do a debug log if /etc/initrd-release doesn't take effect (#1959339)
+- units: assign user-runtime-dir@.service to user-%i.slice (#1946453)
+- units: order user-runtime-dir@.service after systemd-user-sessions.service (#1946453)
+- units: make sure user-runtime-dir@.service is Type=oneshot (#1946453)
+- user-runtime-dir: downgrade a few log messages to LOG_DEBUG that we ignore (#1946453)
+- shared/install: Preserve escape characters for escaped unit names (#1952686)
+- basic/virt: Detect PowerVM hypervisor (#1937989)
+- man: document differences in clean exit status for Type=oneshot (#1940078)
+- busctl: add a timestamp to the output of the busctl monitor command (#1909214)
+- basic/cap-list: parse/print numerical capabilities (#1946943)
+- shared/mount-util: convert to libmount (#1885143)
+- mount-util: bind_remount: avoid calling statvfs (#1885143)
+- mount-util: use UMOUNT_NOFOLLOW in recursive umounter (#1885143)
+- test-install-root: create referenced targets (#1835351)
+- install: warn if WantedBy targets don't exist (#1835351)
+- test-install-root: add test for unknown WantedBy= target (#1835351)
+- ceph is a network filesystem (#1952013)
+- sysctl: set kernel.core_pipe_limit=16 (#1949729)
+- core: don't drop timer expired but not yet processed when system date is changed (#1899402)
+- core: Detect initial timer state from serialized data (#1899402)
+- rc-local: order after network-online.target (#1934028)
+- set core ulimit to 0 like on RHEL-7 (#1905582)
+- test-mountpointutil-util: do not assert in test_mnt_id() (#1910425)
+
+* Fri Jun 04 2021 Jan Macku <jamacku@redhat.com> - 239-47
+- systemd-binfmt: Add safeguard in triggers (#1787144)
+- spec: Requires(post) openssl-libs to fix missing /etc/machine-id (#1947438)
+- spec: Go back to using systemctl preset-all in post (#1783263, #1647172, #1118740)
+- spec: Disable libiptc support (#1817265)
+
+* Wed May 19 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-46
+- Revert "udev: run link_update() with increased retry count in second invocation" (#1942299)
+- Revert "udev: make algorithm that selects highest priority devlink less susceptible to race conditions" (#1942299)
+- test/udev-test.pl: drop test cases that add mutliple devices (#1942299)
+
+* Thu Mar 11 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-45
+- Revert "test: add test cases for empty string match" and "test: add test case for multi matches when use ||" (#1935124)
+- test/sys-script.py: add missing DEVNAME entries to uevents (#1935124)
+- sd-event: split out helper functions for reshuffling prioqs (#1937315)
+- sd-event: split out enable and disable codepaths from sd_event_source_set_enabled() (#1937315)
+- sd-event: mention that two debug logged events are ignored (#1937315)
+- sd-event: split clock data allocation out of sd_event_add_time() (#1937315)
+- sd-event: split out code to add/remove timer event sources to earliest/latest prioq (#1937315)
+- sd-event: fix delays assert brain-o (#17790) (#1937315)
+- sd-event: let's suffix last_run/last_log with "_usec" (#1937315)
+- sd-event: refuse running default event loops in any other thread than the one they are default for (#1937315)
+- sd-event: ref event loop while in sd_event_prepare() ot sd_event_run() (#1937315)
+- sd-event: follow coding style with naming return parameter (#1937315)
+- sd-event: remove earliest_index/latest_index into common part of event source objects (#1937315)
+- sd-event: update state at the end in event_source_enable (#1937315)
+- sd-event: increase n_enabled_child_sources just once (#1937315)
+- sd-event: add ability to ratelimit event sources (#1937315)
+- test: add ratelimiting test (#1937315)
+- core: prevent excessive /proc/self/mountinfo parsing (#1937315)
+- udev: run link_update() with increased retry count in second invocation (#1935124)
+- pam-systemd: use secure_getenv() rather than getenv() (#1936866)
+
 * Thu Jan 28 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-44
 - ci: PowerTools repo was renamed to powertools in RHEL 8.3 (#1871827)
 - ci: use quay.io instead of Docker Hub to avoid rate limits (#1871827)
