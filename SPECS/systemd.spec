@@ -40,7 +40,7 @@ Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 %if %{without inplace}
 Version:        249.4
-Release:        2.3%{?dist}
+Release:        2.4%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -175,7 +175,6 @@ BuildRequires:  openssl-devel
 BuildRequires:  libgcrypt-devel
 BuildRequires:  libgpg-error-devel
 BuildRequires:  gnutls-devel
-BuildRequires:  qrencode-devel
 BuildRequires:  libmicrohttpd-devel
 BuildRequires:  libxkbcommon-devel
 BuildRequires:  iptables-devel
@@ -251,7 +250,6 @@ Recommends:     libidn2.so.0(IDN2_0.0.0)%{?elf_bits}
 Recommends:     libpcre2-8.so.0%{?elf_suffix}
 Recommends:     libpwquality.so.1%{?elf_suffix}
 Recommends:     libpwquality.so.1(LIBPWQUALITY_1.0)%{?elf_bits}
-Recommends:     libqrencode.so.4%{?elf_suffix}
 
 %if %{with selinux}
 # Force the SELinux module to be installed
@@ -1075,6 +1073,9 @@ fi
 %endif
 
 %changelog
+* Wed Oct 06 2021 Davide Cavalca <dcavalca@centosproject.org> - 249.4-2.4
+- Drop qrencode-devel from BuildRequires as it's not actually used
+
 * Wed Sep 29 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.3
 - Fix to allow verifying hidden (dot) files again (PR #20875)
 
