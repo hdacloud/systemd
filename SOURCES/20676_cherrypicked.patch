@@ -1,0 +1,336 @@
+From 0b9f08931944c2e33c6ed012919157e429eb7be2 Mon Sep 17 00:00:00 2001
+From: Antony Deepak Thomas <antonydeepak@gmail.com>
+Date: Wed, 29 Sep 2021 12:47:49 +0900
+Subject: [PATCH 1/4] fileio: introduce read_virtual_file_fd()
+
+---
+ src/basic/fileio.c | 24 ++++++++++++++++--------
+ src/basic/fileio.h |  1 +
+ 2 files changed, 17 insertions(+), 8 deletions(-)
+
+diff --git a/src/basic/fileio.c b/src/basic/fileio.c
+index 466c6321c7..4a0d060105 100644
+--- a/src/basic/fileio.c
++++ b/src/basic/fileio.c
+@@ -373,9 +373,8 @@ int verify_file(const char *fn, const char *blob, bool accept_extra_nl) {
+         return 1;
+ }
+ 
+-int read_virtual_file(const char *filename, size_t max_size, char **ret_contents, size_t *ret_size) {
++int read_virtual_file_fd(int fd, size_t max_size, char **ret_contents, size_t *ret_size) {
+         _cleanup_free_ char *buf = NULL;
+-        _cleanup_close_ int fd = -1;
+         size_t n, size;
+         int n_retries;
+         bool truncated = false;
+@@ -393,10 +392,7 @@ int read_virtual_file(const char *filename, size_t max_size, char **ret_contents
+          * contents* may be returned. (Though the read is still done using one syscall.) Returns 0 on
+          * partial success, 1 if untruncated contents were read. */
+ 
+-        fd = open(filename, O_RDONLY|O_CLOEXEC);
+-        if (fd < 0)
+-                return -errno;
+-
++        assert(fd >= 0);
+         assert(max_size <= READ_VIRTUAL_BYTES_MAX || max_size == SIZE_MAX);
+ 
+         /* Limit the number of attempts to read the number of bytes returned by fstat(). */
+@@ -432,8 +428,8 @@ int read_virtual_file(const char *filename, size_t max_size, char **ret_contents
+ 
+                         n_retries--;
+                 } else if (n_retries > 1) {
+-                        /* Files in /proc are generally smaller than the page size so let's start with a page size
+-                         * buffer from malloc and only use the max buffer on the final try. */
++                        /* Files in /proc are generally smaller than the page size so let's start with
++                         * a page size buffer from malloc and only use the max buffer on the final try. */
+                         size = MIN3(page_size() - 1, READ_VIRTUAL_BYTES_MAX, max_size);
+                         n_retries = 1;
+                 } else {
+@@ -517,6 +513,18 @@ int read_virtual_file(const char *filename, size_t max_size, char **ret_contents
+         return !truncated;
+ }
+ 
++int read_virtual_file(const char *filename, size_t max_size, char **ret_contents, size_t *ret_size) {
++        _cleanup_close_ int fd = -1;
++
++        assert(filename);
++
++        fd = open(filename, O_RDONLY | O_NOCTTY | O_CLOEXEC);
++        if (fd < 0)
++                return -errno;
++
++        return read_virtual_file_fd(fd, max_size, ret_contents, ret_size);
++}
++
+ int read_full_stream_full(
+                 FILE *f,
+                 const char *filename,
+diff --git a/src/basic/fileio.h b/src/basic/fileio.h
+index 9bd2037f5b..82330840bf 100644
+--- a/src/basic/fileio.h
++++ b/src/basic/fileio.h
+@@ -66,6 +66,7 @@ static inline int read_full_file(const char *filename, char **ret_contents, size
+         return read_full_file_full(AT_FDCWD, filename, UINT64_MAX, SIZE_MAX, 0, NULL, ret_contents, ret_size);
+ }
+ 
++int read_virtual_file_fd(int fd, size_t max_size, char **ret_contents, size_t *ret_size);
+ int read_virtual_file(const char *filename, size_t max_size, char **ret_contents, size_t *ret_size);
+ static inline int read_full_virtual_file(const char *filename, char **ret_contents, size_t *ret_size) {
+         return read_virtual_file(filename, SIZE_MAX, ret_contents, ret_size);
+-- 
+2.31.1
+
+
+From bede594fa1ea4c32a886191b774134effcf71bef Mon Sep 17 00:00:00 2001
+From: Antony Deepak Thomas <antonydeepak@gmail.com>
+Date: Wed, 29 Sep 2021 12:57:30 +0900
+Subject: [PATCH 2/4] string-util: introduce streq_skip_trailing_chars()
+
+---
+ src/basic/string-util.c     | 16 ++++++++++++++++
+ src/basic/string-util.h     |  2 ++
+ src/test/test-string-util.c | 28 ++++++++++++++++++++++++++++
+ 3 files changed, 46 insertions(+)
+
+diff --git a/src/basic/string-util.c b/src/basic/string-util.c
+index a645958d38..6ceaeaf9df 100644
+--- a/src/basic/string-util.c
++++ b/src/basic/string-util.c
+@@ -1146,3 +1146,19 @@ int string_contains_word_strv(const char *string, const char *separators, char *
+                 *ret_word = found;
+         return !!found;
+ }
++
++bool streq_skip_trailing_chars(const char *s1, const char *s2, const char *ok) {
++        if (!s1 && !s2)
++                return true;
++        if (!s1 || !s2)
++                return false;
++
++        if (!ok)
++                ok = WHITESPACE;
++
++        for (; *s1 && *s2; s1++, s2++)
++                if (*s1 != *s2)
++                        break;
++
++        return in_charset(s1, ok) && in_charset(s2, ok);
++}
+diff --git a/src/basic/string-util.h b/src/basic/string-util.h
+index 9155e50ba8..0bf215827e 100644
+--- a/src/basic/string-util.h
++++ b/src/basic/string-util.h
+@@ -242,3 +242,5 @@ int string_contains_word_strv(const char *string, const char *separators, char *
+ static inline int string_contains_word(const char *string, const char *separators, const char *word) {
+         return string_contains_word_strv(string, separators, STRV_MAKE(word), NULL);
+ }
++
++bool streq_skip_trailing_chars(const char *s1, const char *s2, const char *ok);
+diff --git a/src/test/test-string-util.c b/src/test/test-string-util.c
+index 4d9d0260c9..9a9c974332 100644
+--- a/src/test/test-string-util.c
++++ b/src/test/test-string-util.c
+@@ -1000,6 +1000,33 @@ static void test_strextendf(void) {
+         assert_se(streq(p, "<77>,<99>,<                                                                              88>,<00001234>"));
+ }
+ 
++static void test_streq_skip_trailing_chars(void) {
++        log_info("/* %s */", __func__);
++
++        /* NULL is WHITESPACE by default*/
++        assert_se(streq_skip_trailing_chars("foo bar", "foo bar", NULL));
++        assert_se(streq_skip_trailing_chars("foo", "foo", NULL));
++        assert_se(streq_skip_trailing_chars("foo bar      ", "foo bar", NULL));
++        assert_se(streq_skip_trailing_chars("foo bar", "foo bar\t\t", NULL));
++        assert_se(streq_skip_trailing_chars("foo bar  ", "foo bar\t\t", NULL));
++        assert_se(streq_skip_trailing_chars("foo\nbar", "foo\nbar", NULL));
++        assert_se(streq_skip_trailing_chars("\t\tfoo bar", "\t\tfoo bar", NULL));
++        assert_se(streq_skip_trailing_chars(" foo bar\t", " foo bar\n", NULL));
++
++        assert_se(!streq_skip_trailing_chars("foobar", "foo bar", NULL));
++        assert_se(!streq_skip_trailing_chars("foo\nbar", "foo\tbar", NULL));
++        assert_se(!streq_skip_trailing_chars("\t\nfoo bar", "\t foo bar", NULL));
++
++        assert_se(streq_skip_trailing_chars("foo bar      ", "foo bar", WHITESPACE));
++        assert_se(!streq_skip_trailing_chars("foo bar      ", "foo bar", NEWLINE));
++
++        assert_se(streq_skip_trailing_chars(NULL, NULL, NULL));
++        assert_se(streq_skip_trailing_chars("", "", NULL));
++        assert_se(!streq_skip_trailing_chars(NULL, "foo bar", NULL));
++        assert_se(!streq_skip_trailing_chars("foo", NULL, NULL));
++        assert_se(!streq_skip_trailing_chars("", "f", NULL));
++}
++
+ int main(int argc, char *argv[]) {
+         test_setup_logging(LOG_DEBUG);
+ 
+@@ -1039,6 +1066,7 @@ int main(int argc, char *argv[]) {
+         test_string_contains_word();
+         test_strverscmp_improved();
+         test_strextendf();
++        test_streq_skip_trailing_chars();
+ 
+         return 0;
+ }
+-- 
+2.31.1
+
+
+From a2552e17829d0090db3ff5f2e6f2d772d0fca3e9 Mon Sep 17 00:00:00 2001
+From: Antony Deepak Thomas <antonydeepak@gmail.com>
+Date: Wed, 29 Sep 2021 13:06:25 +0900
+Subject: [PATCH 3/4] fileio: introduce new mode to suppress writing the same
+ value
+
+---
+ src/basic/fileio.c | 29 +++++++++++++++++++++++++++--
+ src/basic/fileio.h | 23 ++++++++++++-----------
+ 2 files changed, 39 insertions(+), 13 deletions(-)
+
+diff --git a/src/basic/fileio.c b/src/basic/fileio.c
+index 4a0d060105..729789ce47 100644
+--- a/src/basic/fileio.c
++++ b/src/basic/fileio.c
+@@ -146,6 +146,30 @@ int write_string_stream_ts(
+                         return -EBADF;
+         }
+ 
++        if (flags & WRITE_STRING_FILE_SUPPRESS_REDUNDANT_VIRTUAL) {
++                _cleanup_free_ char *t = NULL;
++
++                /* If value to be written is same as that of the existing value, then suppress the write. */
++
++                if (fd < 0) {
++                        fd = fileno(f);
++                        if (fd < 0)
++                                return -EBADF;
++                }
++
++                /* Read an additional byte to detect cases where the prefix matches but the rest
++                 * doesn't. Also, 0 returned by read_virtual_file_fd() means the read was truncated and
++                 * it won't be equal to the new value. */
++                if (read_virtual_file_fd(fd, strlen(line)+1, &t, NULL) > 0 &&
++                    streq_skip_trailing_chars(line, t, NEWLINE)) {
++                        log_debug("No change in value '%s', supressing write", line);
++                        return 0;
++                }
++
++                if (lseek(fd, 0, SEEK_SET) < 0)
++                        return -errno;
++        }
++
+         needs_nl = !(flags & WRITE_STRING_FILE_AVOID_NEWLINE) && !endswith(line, "\n");
+ 
+         if (needs_nl && (flags & WRITE_STRING_FILE_DISABLE_BUFFER)) {
+@@ -261,10 +285,11 @@ int write_string_file_ts(
+                 assert(!ts);
+ 
+         /* We manually build our own version of fopen(..., "we") that works without O_CREAT and with O_NOFOLLOW if needed. */
+-        fd = open(fn, O_WRONLY|O_CLOEXEC|O_NOCTTY |
++        fd = open(fn, O_CLOEXEC|O_NOCTTY |
+                   (FLAGS_SET(flags, WRITE_STRING_FILE_NOFOLLOW) ? O_NOFOLLOW : 0) |
+                   (FLAGS_SET(flags, WRITE_STRING_FILE_CREATE) ? O_CREAT : 0) |
+-                  (FLAGS_SET(flags, WRITE_STRING_FILE_TRUNCATE) ? O_TRUNC : 0),
++                  (FLAGS_SET(flags, WRITE_STRING_FILE_TRUNCATE) ? O_TRUNC : 0) |
++                  (FLAGS_SET(flags, WRITE_STRING_FILE_SUPPRESS_REDUNDANT_VIRTUAL) ? O_RDWR : O_WRONLY),
+                   (FLAGS_SET(flags, WRITE_STRING_FILE_MODE_0600) ? 0600 : 0666));
+         if (fd < 0) {
+                 r = -errno;
+diff --git a/src/basic/fileio.h b/src/basic/fileio.h
+index 82330840bf..a72b2f3881 100644
+--- a/src/basic/fileio.h
++++ b/src/basic/fileio.h
+@@ -15,17 +15,18 @@
+ #define LONG_LINE_MAX (1U*1024U*1024U)
+ 
+ typedef enum {
+-        WRITE_STRING_FILE_CREATE                = 1 << 0,
+-        WRITE_STRING_FILE_TRUNCATE              = 1 << 1,
+-        WRITE_STRING_FILE_ATOMIC                = 1 << 2,
+-        WRITE_STRING_FILE_AVOID_NEWLINE         = 1 << 3,
+-        WRITE_STRING_FILE_VERIFY_ON_FAILURE     = 1 << 4,
+-        WRITE_STRING_FILE_VERIFY_IGNORE_NEWLINE = 1 << 5,
+-        WRITE_STRING_FILE_SYNC                  = 1 << 6,
+-        WRITE_STRING_FILE_DISABLE_BUFFER        = 1 << 7,
+-        WRITE_STRING_FILE_NOFOLLOW              = 1 << 8,
+-        WRITE_STRING_FILE_MKDIR_0755            = 1 << 9,
+-        WRITE_STRING_FILE_MODE_0600             = 1 << 10,
++        WRITE_STRING_FILE_CREATE                     = 1 << 0,
++        WRITE_STRING_FILE_TRUNCATE                   = 1 << 1,
++        WRITE_STRING_FILE_ATOMIC                     = 1 << 2,
++        WRITE_STRING_FILE_AVOID_NEWLINE              = 1 << 3,
++        WRITE_STRING_FILE_VERIFY_ON_FAILURE          = 1 << 4,
++        WRITE_STRING_FILE_VERIFY_IGNORE_NEWLINE      = 1 << 5,
++        WRITE_STRING_FILE_SYNC                       = 1 << 6,
++        WRITE_STRING_FILE_DISABLE_BUFFER             = 1 << 7,
++        WRITE_STRING_FILE_NOFOLLOW                   = 1 << 8,
++        WRITE_STRING_FILE_MKDIR_0755                 = 1 << 9,
++        WRITE_STRING_FILE_MODE_0600                  = 1 << 10,
++        WRITE_STRING_FILE_SUPPRESS_REDUNDANT_VIRTUAL = 1 << 11,
+ 
+         /* And before you wonder, why write_string_file_atomic_label_ts() is a separate function instead of just one
+            more flag here: it's about linking: we don't want to pull -lselinux into all users of write_string_file()
+-- 
+2.31.1
+
+
+From 41d86b627331f432454280714dd5b17d255367ba Mon Sep 17 00:00:00 2001
+From: Antony Deepak Thomas <antonydeepak@gmail.com>
+Date: Wed, 29 Sep 2021 13:07:42 +0900
+Subject: [PATCH 4/4] sysctl-util: minimize side-effects when running
+ `systemd-sysctl`
+
+Currently `systemd-sysctl` binary is used in `systemd-sysctl.service`
+which is mostly configured as `oneshot`. There are situations where one
+would like to use systemd to maintain Sysctl configurations on a host,
+using a configuration managers such as Chef or Puppet, by apply
+configurations every X duration.
+The problem with using `systemd-sysctl` is that it writes all the Sysctl
+settings, even if the values for those settings have not changed. From
+experience, we have observed that some Sysctl settings cause actions in
+the kernel upon writing(like dropping caches) which in turn cause
+undesired side effects.
+This patch tries to minimize such side effects by comparing values
+before writing.
+---
+ src/basic/sysctl-util.c | 19 +++++--------------
+ 1 file changed, 5 insertions(+), 14 deletions(-)
+
+diff --git a/src/basic/sysctl-util.c b/src/basic/sysctl-util.c
+index 8913e6ff85..4da3eaf5f7 100644
+--- a/src/basic/sysctl-util.c
++++ b/src/basic/sysctl-util.c
+@@ -44,25 +44,16 @@ char *sysctl_normalize(char *s) {
+ 
+ int sysctl_write(const char *property, const char *value) {
+         char *p;
+-        _cleanup_close_ int fd = -1;
+-
+         assert(property);
+         assert(value);
+-
+-        log_debug("Setting '%s' to '%.*s'.", property, (int) strcspn(value, NEWLINE), value);
+-
+         p = strjoina("/proc/sys/", property);
+-        fd = open(p, O_WRONLY|O_CLOEXEC);
+-        if (fd < 0)
+-                return -errno;
++        path_simplify(p);
++        if (!path_is_normalized(p))
++                return -EINVAL;
+ 
+-        if (!endswith(value, "\n"))
+-                value = strjoina(value, "\n");
+-
+-        if (write(fd, value, strlen(value)) < 0)
+-                return -errno;
++        log_debug("Setting '%s' to '%s'", p, value);
+ 
+-        return 0;
++        return write_string_file(p, value, WRITE_STRING_FILE_VERIFY_ON_FAILURE | WRITE_STRING_FILE_DISABLE_BUFFER | WRITE_STRING_FILE_SUPPRESS_REDUNDANT_VIRTUAL);
+ }
+ 
+ int sysctl_writef(const char *property, const char *format, ...) {
+-- 
+2.31.1
+

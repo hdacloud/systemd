@@ -1,0 +1,116 @@
+From 1035e36675e10522824476c9084ff1001039c054 Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Fri, 1 Oct 2021 09:22:18 +0900
+Subject: [PATCH] network: drop and warn duplicated Address= settings
+
+Fixes #20891.
+---
+ src/network/networkd-address.c | 43 +++++++++++++++++++++++++++++++---
+ src/network/networkd-address.h |  2 +-
+ src/network/networkd-network.c |  6 ++++-
+ 3 files changed, 46 insertions(+), 5 deletions(-)
+
+diff --git a/src/network/networkd-address.c b/src/network/networkd-address.c
+index 7b221516d7..e1bc6aa474 100644
+--- a/src/network/networkd-address.c
++++ b/src/network/networkd-address.c
+@@ -304,6 +304,12 @@ bool address_equal(const Address *a1, const Address *a2) {
+         return address_compare_func(a1, a2) == 0;
+ }
+ 
++DEFINE_PRIVATE_HASH_OPS(
++        address_hash_ops_new,
++        Address,
++        address_hash_func,
++        address_compare_func);
++
+ int address_dup(const Address *src, Address **ret) {
+         _cleanup_(address_freep) Address *dest = NULL;
+         int r;
+@@ -1988,12 +1994,43 @@ static int address_section_verify(Address *address) {
+         return 0;
+ }
+ 
+-void network_drop_invalid_addresses(Network *network) {
++int network_drop_invalid_addresses(Network *network) {
++        _cleanup_set_free_ Set *addresses = NULL;
+         Address *address;
++        int r;
+ 
+         assert(network);
+ 
+-        ORDERED_HASHMAP_FOREACH(address, network->addresses_by_section)
+-                if (address_section_verify(address) < 0)
++        ORDERED_HASHMAP_FOREACH(address, network->addresses_by_section) {
++                Address *dup;
++
++                if (address_section_verify(address) < 0) {
++                        /* Drop invalid [Address] sections or Address= settings in [Network].
++                         * Note that address_free() will drop the address from addresses_by_section. */
+                         address_free(address);
++                        continue;
++                }
++
++                /* Always use the setting specified later. So, remove the previously assigned setting. */
++                dup = set_remove(addresses, address);
++                if (dup) {
++                        _cleanup_free_ char *buf = NULL;
++
++                        (void) in_addr_prefix_to_string(address->family, &address->in_addr, address->prefixlen, &buf);
++                        log_warning("%s: Duplicated address %s is specified at line %u and %u, "
++                                    "dropping the address setting specified at line %u.",
++                                    dup->section->filename, strna(buf), address->section->line,
++                                    dup->section->line, dup->section->line);
++                        /* address_free() will drop the address from addresses_by_section. */
++                        address_free(dup);
++                }
++
++                /* Do not use address_hash_ops_free here. Otherwise, all address settings will be freed. */
++                r = set_ensure_put(&addresses, &address_hash_ops_new, address);
++                if (r < 0)
++                        return log_oom();
++                assert(r > 0);
++        }
++
++        return 0;
+ }
+diff --git a/src/network/networkd-address.h b/src/network/networkd-address.h
+index ff3d46abdd..55d22ad221 100644
+--- a/src/network/networkd-address.h
++++ b/src/network/networkd-address.h
+@@ -85,7 +85,7 @@ int request_process_address(Request *req);
+ 
+ int manager_rtnl_process_address(sd_netlink *nl, sd_netlink_message *message, Manager *m);
+ 
+-void network_drop_invalid_addresses(Network *network);
++int network_drop_invalid_addresses(Network *network);
+ 
+ void address_hash_func(const Address *a, struct siphash *state);
+ int address_compare_func(const Address *a1, const Address *a2);
+diff --git a/src/network/networkd-network.c b/src/network/networkd-network.c
+index 2a864a38b1..920f7851ba 100644
+--- a/src/network/networkd-network.c
++++ b/src/network/networkd-network.c
+@@ -119,6 +119,8 @@ static int network_resolve_stacked_netdevs(Network *network) {
+ }
+ 
+ int network_verify(Network *network) {
++        int r;
++
+         assert(network);
+         assert(network->filename);
+ 
+@@ -252,7 +254,9 @@ int network_verify(Network *network) {
+                 network->ipv6_proxy_ndp_addresses = set_free_free(network->ipv6_proxy_ndp_addresses);
+         }
+ 
+-        network_drop_invalid_addresses(network);
++        r = network_drop_invalid_addresses(network);
++        if (r < 0)
++                return r;
+         network_drop_invalid_routes(network);
+         network_drop_invalid_nexthops(network);
+         network_drop_invalid_bridge_fdb_entries(network);
+-- 
+2.31.1
+

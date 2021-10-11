@@ -40,7 +40,7 @@ Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 %if %{without inplace}
 Version:        249.4
-Release:        2.4%{?dist}
+Release:        2.5%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -126,9 +126,17 @@ Patch0013:      https://github.com/systemd/systemd/pull/20450.patch
 Patch0014:      https://github.com/systemd/systemd/pull/20541.patch
 Patch0015:      https://github.com/systemd/systemd/pull/20729.patch
 Patch0016:      https://github.com/systemd/systemd/pull/20828.patch
+# Part of PR #20892; it was difficult to backport the whole PR
+Patch0017:      50783f91d44b1978c0e4ba62283131fac75d3745_cherrypicked.patch
 
 # PR 20875: allow verifying hidden (dot) files again
-Patch0017:      https://github.com/systemd/systemd/pull/20875.patch
+Patch0018:      https://github.com/systemd/systemd/pull/20875.patch
+
+# PR 20978: serialize bpf device programs across reloads/reexecs
+Patch0019:      https://github.com/systemd/systemd/pull/20978.patch
+
+# PR 20676: don't rewrite sysctls that are already set
+Patch0020:      20676_cherrypicked.patch
 
 # Downstream-only patches (0500–9999)
 
@@ -1073,6 +1081,11 @@ fi
 %endif
 
 %changelog
+* Mon Oct 11 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.5
+- Remove duplicate Address= properties in network configs (part of PR #20892)
+- Serialize bpf device programs across reloads/reexecs (PR #20978)
+- Don't rewrite sysctls that are already set (PR #20676)
+
 * Wed Oct 06 2021 Davide Cavalca <dcavalca@centosproject.org> - 249.4-2.4
 - Drop qrencode-devel from BuildRequires as it's not actually used
 
