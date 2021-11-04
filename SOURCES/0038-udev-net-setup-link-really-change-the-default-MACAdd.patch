@@ -1,0 +1,24 @@
+From 19ab86202b9c4366ea5bd5ac820301f0ab6d1f95 Mon Sep 17 00:00:00 2001
+From: Michal Sekletar <msekleta@redhat.com>
+Date: Fri, 1 Oct 2021 11:46:23 +0200
+Subject: [PATCH] udev/net-setup-link: *really* change the default
+ MACAddressPolicy to "none"
+
+Fix the oversight and change the policy in the link file, i.e. the
+place where it actually matters.
+
+Related: #1921094
+---
+ network/99-default.link | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/network/99-default.link b/network/99-default.link
+index bca660ac28..31aee37e75 100644
+--- a/network/99-default.link
++++ b/network/99-default.link
+@@ -13,4 +13,4 @@ OriginalName=*
+ [Link]
+ NamePolicy=keep kernel database onboard slot path
+ AlternativeNamesPolicy=database onboard slot path
+-MACAddressPolicy=persistent
++MACAddressPolicy=none
