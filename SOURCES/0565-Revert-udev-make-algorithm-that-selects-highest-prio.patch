@@ -1,4 +1,4 @@
-From 612773fa8b6333dcdac382849e81fa5a473dd1f9 Mon Sep 17 00:00:00 2001
+From 897b4d1e19c706d9198b9308125df57a5d469a6b Mon Sep 17 00:00:00 2001
 From: Michal Sekletar <msekleta@redhat.com>
 Date: Mon, 17 May 2021 15:50:31 +0200
 Subject: [PATCH] Revert "udev: make algorithm that selects highest priority
@@ -6,7 +6,7 @@ Subject: [PATCH] Revert "udev: make algorithm that selects highest priority
 
 This reverts commit 1d5f966c1758eb620755fcae54abd07a1ac36d3d.
 
-Related: #1963980
+Related: #1942299
 ---
  src/udev/udev-event.c |  71 +++++-------
  src/udev/udev-node.c  | 244 ++++++++++++------------------------------

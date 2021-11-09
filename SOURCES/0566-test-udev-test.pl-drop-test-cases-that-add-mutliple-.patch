@@ -1,4 +1,4 @@
-From bc21daeb780911d586de7ff0004ed2bc515b8826 Mon Sep 17 00:00:00 2001
+From 94ad224240140a7287f9e2be5905b9c506350193 Mon Sep 17 00:00:00 2001
 From: Michal Sekletar <msekleta@redhat.com>
 Date: Mon, 17 May 2021 15:54:10 +0200
 Subject: [PATCH] test/udev-test.pl: drop test cases that add mutliple devices
@@ -7,7 +7,7 @@ Subject: [PATCH] test/udev-test.pl: drop test cases that add mutliple devices
 udev test fail. Once we reintroduce the fix for link_update()
 we will revert this commit.]
 
-Related: #1963980
+Related: #1942299
 ---
  test/udev-test.pl | 179 ----------------------------------------------
  1 file changed, 179 deletions(-)
