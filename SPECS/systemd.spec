@@ -40,7 +40,7 @@ Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 %if %{without inplace}
 Version:        249.4
-Release:        2.7%{?dist}
+Release:        2.8%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -138,14 +138,15 @@ Patch0019:      https://github.com/systemd/systemd/pull/20978.patch
 # PR 20676: don't rewrite sysctls that are already set
 Patch0020:      20676_cherrypicked.patch
 
+# PR 21221: Fixes non-deterministic Slice= assignments
+Patch0021:      21221.patch
+
 # Downstream-only patches (0500–9999)
 
 # https://github.com/systemd/systemd/pull/17050
 Patch0501:      https://github.com/systemd/systemd/pull/17050/commits/f58b96d3e8d1cb0dd3666bc74fa673918b586612.patch
 # Downgrade sysv-generator messages from warning to debug
 Patch0502:      0001-sysv-generator-downgrade-log-warning-about-autogener.patch
-# Fixes non-deterministic Slice= assignments
-Patch0503:      revert_d219a2b07cc5dc8ffd5010f08561fab2780d8616.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1087,6 +1088,10 @@ fi
 %endif
 
 %changelog
+* Thu Nov 11 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.8
+- Remove revert_d219a2b07cc5dc8ffd5010f08561fab2780d8616.patch and replace with
+  proper fix (PR #21221)
+
 * Wed Nov 10 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.7
 - Add meson >= 0.57 for el8 builds. This version uses python 3.8.
 

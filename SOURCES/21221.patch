@@ -1,0 +1,172 @@
+From fbdc87679cc4f3c9fc3653636e94be20f06d18e4 Mon Sep 17 00:00:00 2001
+From: Anita Zhang <the.anitazha@gmail.com>
+Date: Tue, 9 Nov 2021 15:26:28 -0800
+Subject: [PATCH] core: replace slice dependencies as they get added
+
+Defines a "UNIT_DEPENDENCY_SLICE_PROPERTY" UnitDependencyMask type that
+is used when adding slices to the dependencies hashmap. This type is
+used to remove slice dependencies when they get overridden by new ones.
+
+Fixes #20182
+---
+ src/core/dbus-unit.c      |  2 +-
+ src/core/load-fragment.c  |  2 +-
+ src/core/unit-serialize.c |  1 +
+ src/core/unit.c           | 10 +++++++---
+ src/core/unit.h           |  7 +++++--
+ src/test/test-engine.c    | 31 ++++++++++++++++++++++++++++++-
+ 6 files changed, 45 insertions(+), 8 deletions(-)
+
+diff --git a/src/core/dbus-unit.c b/src/core/dbus-unit.c
+index fe320f1b05a8..d4ec789a7c11 100644
+--- a/src/core/dbus-unit.c
++++ b/src/core/dbus-unit.c
+@@ -2273,7 +2273,7 @@ static int bus_unit_set_transient_property(
+                         return sd_bus_error_setf(error, SD_BUS_ERROR_INVALID_ARGS, "Unit name '%s' is not a slice", s);
+ 
+                 if (!UNIT_WRITE_FLAGS_NOOP(flags)) {
+-                        r = unit_set_slice(u, slice, UNIT_DEPENDENCY_FILE);
++                        r = unit_set_slice(u, slice);
+                         if (r < 0)
+                                 return r;
+ 
+diff --git a/src/core/load-fragment.c b/src/core/load-fragment.c
+index 62cadaf2286f..830048ae1915 100644
+--- a/src/core/load-fragment.c
++++ b/src/core/load-fragment.c
+@@ -3792,7 +3792,7 @@ int config_parse_unit_slice(
+                 return 0;
+         }
+ 
+-        r = unit_set_slice(u, slice, UNIT_DEPENDENCY_FILE);
++        r = unit_set_slice(u, slice);
+         if (r < 0) {
+                 log_syntax(unit, LOG_WARNING, filename, line, r, "Failed to assign slice %s to unit %s, ignoring: %m", slice->id, u->id);
+                 return 0;
+diff --git a/src/core/unit-serialize.c b/src/core/unit-serialize.c
+index 3458d7017bd5..7d2e6bc130de 100644
+--- a/src/core/unit-serialize.c
++++ b/src/core/unit-serialize.c
+@@ -593,6 +593,7 @@ static void print_unit_dependency_mask(FILE *f, const char *kind, UnitDependency
+                 { UNIT_DEPENDENCY_MOUNTINFO_IMPLICIT, "mountinfo-implicit" },
+                 { UNIT_DEPENDENCY_MOUNTINFO_DEFAULT,  "mountinfo-default"  },
+                 { UNIT_DEPENDENCY_PROC_SWAP,          "proc-swap"          },
++                { UNIT_DEPENDENCY_SLICE_PROPERTY,     "slice-property"     },
+         };
+ 
+         assert(f);
+diff --git a/src/core/unit.c b/src/core/unit.c
+index 4c55827a6511..a3bca43566e0 100644
+--- a/src/core/unit.c
++++ b/src/core/unit.c
+@@ -3284,7 +3284,7 @@ int unit_set_invocation_id(Unit *u, sd_id128_t id) {
+         return r;
+ }
+ 
+-int unit_set_slice(Unit *u, Unit *slice, UnitDependencyMask mask) {
++int unit_set_slice(Unit *u, Unit *slice) {
+         int r;
+ 
+         assert(u);
+@@ -3317,7 +3317,11 @@ int unit_set_slice(Unit *u, Unit *slice, UnitDependencyMask mask) {
+         if (UNIT_GET_SLICE(u) && u->cgroup_realized)
+                 return -EBUSY;
+ 
+-        r = unit_add_dependency(u, UNIT_IN_SLICE, slice, true, mask);
++        /* Remove any slices assigned prior; we should only have one UNIT_IN_SLICE dependency */
++        if (UNIT_GET_SLICE(u))
++                unit_remove_dependencies(u, UNIT_DEPENDENCY_SLICE_PROPERTY);
++
++        r = unit_add_dependency(u, UNIT_IN_SLICE, slice, true, UNIT_DEPENDENCY_SLICE_PROPERTY);
+         if (r < 0)
+                 return r;
+ 
+@@ -3373,7 +3377,7 @@ int unit_set_default_slice(Unit *u) {
+         if (r < 0)
+                 return r;
+ 
+-        return unit_set_slice(u, slice, UNIT_DEPENDENCY_FILE);
++        return unit_set_slice(u, slice);
+ }
+ 
+ const char *unit_slice_name(Unit *u) {
+diff --git a/src/core/unit.h b/src/core/unit.h
+index 0dd6a9591d96..ba12fe4ac1ef 100644
+--- a/src/core/unit.h
++++ b/src/core/unit.h
+@@ -89,7 +89,10 @@ typedef enum UnitDependencyMask {
+         /* A dependency created because of data read from /proc/swaps and no other configuration source */
+         UNIT_DEPENDENCY_PROC_SWAP          = 1 << 7,
+ 
+-        _UNIT_DEPENDENCY_MASK_FULL         = (1 << 8) - 1,
++        /* A dependency for units in slices assigned by directly setting Slice= */
++        UNIT_DEPENDENCY_SLICE_PROPERTY     = 1 << 8,
++
++        _UNIT_DEPENDENCY_MASK_FULL         = (1 << 9) - 1,
+ } UnitDependencyMask;
+ 
+ /* The Unit's dependencies[] hashmaps use this structure as value. It has the same size as a void pointer, and thus can
+@@ -782,7 +785,7 @@ Unit *unit_follow_merge(Unit *u) _pure_;
+ int unit_load_fragment_and_dropin(Unit *u, bool fragment_required);
+ int unit_load(Unit *unit);
+ 
+-int unit_set_slice(Unit *u, Unit *slice, UnitDependencyMask mask);
++int unit_set_slice(Unit *u, Unit *slice);
+ int unit_set_default_slice(Unit *u);
+ 
+ const char *unit_description(Unit *u) _pure_;
+diff --git a/src/test/test-engine.c b/src/test/test-engine.c
+index 880af36fb523..673c66561240 100644
+--- a/src/test/test-engine.c
++++ b/src/test/test-engine.c
+@@ -8,6 +8,7 @@
+ #include "manager-dump.h"
+ #include "rm-rf.h"
+ #include "service.h"
++#include "slice.h"
+ #include "special.h"
+ #include "strv.h"
+ #include "tests.h"
+@@ -75,7 +76,8 @@ int main(int argc, char *argv[]) {
+         _cleanup_(sd_bus_error_free) sd_bus_error err = SD_BUS_ERROR_NULL;
+         _cleanup_(manager_freep) Manager *m = NULL;
+         Unit *a = NULL, *b = NULL, *c = NULL, *d = NULL, *e = NULL, *g = NULL,
+-                *h = NULL, *i = NULL, *a_conj = NULL, *unit_with_multiple_dashes = NULL, *stub = NULL;
++                *h = NULL, *i = NULL, *a_conj = NULL, *unit_with_multiple_dashes = NULL, *stub = NULL,
++                *tomato = NULL, *sauce = NULL, *fruit = NULL, *zupa = NULL;
+         Job *j;
+         int r;
+ 
+@@ -260,5 +262,32 @@ int main(int argc, char *argv[]) {
+ 
+         verify_dependency_atoms();
+ 
++        /* Test adding multiple Slice= dependencies; only the last should remain */
++        assert_se(unit_new_for_name(m, sizeof(Service), "tomato.service", &tomato) >= 0);
++        assert_se(unit_new_for_name(m, sizeof(Slice), "sauce.slice", &sauce) >= 0);
++        assert_se(unit_new_for_name(m, sizeof(Slice), "fruit.slice", &fruit) >= 0);
++        assert_se(unit_new_for_name(m, sizeof(Slice), "zupa.slice", &zupa) >= 0);
++
++        unit_set_slice(tomato, sauce);
++        unit_set_slice(tomato, fruit);
++        unit_set_slice(tomato, zupa);
++
++        assert_se(UNIT_GET_SLICE(tomato) == zupa);
++        assert_se(!unit_has_dependency(tomato, UNIT_ATOM_IN_SLICE, sauce));
++        assert_se(!unit_has_dependency(tomato, UNIT_ATOM_IN_SLICE, fruit));
++        assert_se(unit_has_dependency(tomato, UNIT_ATOM_IN_SLICE, zupa));
++
++        assert_se(!unit_has_dependency(tomato, UNIT_ATOM_REFERENCES, sauce));
++        assert_se(!unit_has_dependency(tomato, UNIT_ATOM_REFERENCES, fruit));
++        assert_se(unit_has_dependency(tomato, UNIT_ATOM_REFERENCES, zupa));
++
++        assert_se(!unit_has_dependency(sauce, UNIT_ATOM_SLICE_OF, tomato));
++        assert_se(!unit_has_dependency(fruit, UNIT_ATOM_SLICE_OF, tomato));
++        assert_se(unit_has_dependency(zupa, UNIT_ATOM_SLICE_OF, tomato));
++
++        assert_se(!unit_has_dependency(sauce, UNIT_ATOM_REFERENCED_BY, tomato));
++        assert_se(!unit_has_dependency(fruit, UNIT_ATOM_REFERENCED_BY, tomato));
++        assert_se(unit_has_dependency(zupa, UNIT_ATOM_REFERENCED_BY, tomato));
++
+         return 0;
+ }
