@@ -40,7 +40,7 @@ Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 %if %{without inplace}
 Version:        249.4
-Release:        2.6%{?dist}
+Release:        2.7%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -206,7 +206,11 @@ BuildRequires:  python3-jinja2
 BuildRequires:  gnu-efi gnu-efi-devel
 %endif
 BuildRequires:  libseccomp-devel
+%if 0%{?el8}
+BuildRequires:  meson >= 0.57
+%else
 BuildRequires:  meson >= 0.43
+%endif
 BuildRequires:  gettext
 # We use RUNNING_ON_VALGRIND in tests, so the headers need to be available
 BuildRequires:  valgrind-devel
@@ -1083,6 +1087,9 @@ fi
 %endif
 
 %changelog
+* Wed Nov 10 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.7
+- Add meson >= 0.57 for el8 builds. This version uses python 3.8.
+
 * Wed Oct 20 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.6
 - Revert d219a2b because it creates non-determinisitic Slice= assignments
 
