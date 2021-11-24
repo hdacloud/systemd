@@ -40,7 +40,7 @@ Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 %if %{without inplace}
 Version:        249.4
-Release:        2.8%{?dist}
+Release:        2.9%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -515,7 +515,7 @@ CONFIGURE_OPTS=(
         -Dgnutls=true
         -Dmicrohttpd=true
         -Dlibidn2=true
-        -Dlibiptc=true
+        -Dlibiptc=false
         -Dlibcurl=true
         -Defi=true
         -Dgnu-efi=%{?have_gnu_efi:true}%{?!have_gnu_efi:false}
@@ -1088,6 +1088,9 @@ fi
 %endif
 
 %changelog
+* Wed Nov 24 2021 Davide Cavalca <dcavalca@centosproject.org> - 249.4-2.9
+- Disable legacy iptables support
+
 * Thu Nov 11 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.8
 - Remove revert_d219a2b07cc5dc8ffd5010f08561fab2780d8616.patch and replace with
   proper fix (PR #21221)
