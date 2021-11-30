@@ -40,7 +40,7 @@ Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 %if %{without inplace}
 Version:        249.4
-Release:        2.9%{?dist}
+Release:        2.10%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -147,6 +147,8 @@ Patch0021:      21221.patch
 Patch0501:      https://github.com/systemd/systemd/pull/17050/commits/f58b96d3e8d1cb0dd3666bc74fa673918b586612.patch
 # Downgrade sysv-generator messages from warning to debug
 Patch0502:      0001-sysv-generator-downgrade-log-warning-about-autogener.patch
+# Update libfdisk dep version to 2.32.1-26 (has the fix for repart tests to pass)
+Patch0503:      libfdisk_version_for_centos.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -157,7 +159,7 @@ BuildRequires:  gcc-c++
 BuildRequires:  coreutils
 BuildRequires:  libcap-devel
 BuildRequires:  libmount-devel
-BuildRequires:  libfdisk-devel
+BuildRequires:  libfdisk-devel >= 2.32.1-26
 BuildRequires:  libpwquality-devel
 BuildRequires:  pam-devel
 BuildRequires:  libselinux-devel
@@ -489,6 +491,7 @@ CONFIGURE_OPTS=(
         -Dkmod=true
         -Dxkbcommon=true
         -Dblkid=true
+        -Dfdisk=true
         -Dseccomp=true
         -Dima=true
         -Dselinux=true
@@ -580,8 +583,6 @@ CONFIGURE_OPTS=(
         -Dp11kit=false
         -Duserdb=false
         -Dhomed=false
-        -Drepart=false
-        -Dfdisk=false
         -Dpwquality=false
         -Dqrencode=false
         -Dlibfido2=false
@@ -1088,6 +1089,10 @@ fi
 %endif
 
 %changelog
+* Tue Nov 30 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.10
+- Re-enable fdisk and repart since util-linux-2.32.1-26 in C8s has the fix
+  it needs for tests to pass.
+
 * Wed Nov 24 2021 Davide Cavalca <dcavalca@centosproject.org> - 249.4-2.9
 - Disable legacy iptables support
 
