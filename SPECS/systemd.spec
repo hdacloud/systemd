@@ -40,7 +40,7 @@ Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 %if %{without inplace}
 Version:        249.4
-Release:        2.10%{?dist}
+Release:        2.11%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -140,6 +140,9 @@ Patch0020:      20676_cherrypicked.patch
 
 # PR 21221: Fixes non-deterministic Slice= assignments
 Patch0021:      21221.patch
+
+# PR 21241: fix bpf-foreign cgroup controller realization
+Patch0022:      21241.patch
 
 # Downstream-only patches (0500–9999)
 
@@ -1089,6 +1092,9 @@ fi
 %endif
 
 %changelog
+* Tue Nov 30 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.11
+- Backport PR #21241: fix bpf-foreign cgroup controller realization
+
 * Tue Nov 30 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.10
 - Re-enable fdisk and repart since util-linux-2.32.1-26 in C8s has the fix
   it needs for tests to pass.
