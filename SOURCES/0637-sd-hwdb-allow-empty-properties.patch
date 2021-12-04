@@ -1,4 +1,4 @@
-From cd407514366a2ec2c32ebc7a5b405d37005456fd Mon Sep 17 00:00:00 2001
+From 2ab6e6ae9853e410310268efc0cea7f2276979ee Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Zbigniew=20J=C4=99drzejewski-Szmek?= <zbyszek@in.waw.pl>
 Date: Tue, 20 Oct 2020 17:12:42 +0200
 Subject: [PATCH] sd-hwdb: allow empty properties
@@ -9,7 +9,7 @@ override properties (back to the empty) value for specific cases.
 
 (cherry picked from commit afe87974dd57741f74dd87165b251886f24c859f)
 
-Related: #1930568
+Related: #2005009
 ---
  src/hwdb/hwdb.c | 5 ++---
  1 file changed, 2 insertions(+), 3 deletions(-)

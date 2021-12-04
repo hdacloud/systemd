@@ -1,9 +1,9 @@
-From a02798d09681906096cfb8f0f3997b535bb6a06d Mon Sep 17 00:00:00 2001
+From 793dc4d9e32baba27eac1f37283a7485b0889803 Mon Sep 17 00:00:00 2001
 From: David Tardon <dtardon@redhat.com>
 Date: Thu, 19 Aug 2021 12:31:36 +0200
 Subject: [PATCH] Update hwdb
 
-Resolves: #1930568
+Resolves: #2005009
 ---
  hwdb/20-OUI.hwdb                            | 26574 +++++++++++++++++-
  hwdb/20-acpi-vendor.hwdb                    |   257 +-
