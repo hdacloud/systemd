@@ -1,4 +1,4 @@
-From 16a6007cc8881ef19cc97de676d3b2b36b2def82 Mon Sep 17 00:00:00 2001
+From a13bd62f6cb8332864ed3566fdf51eedfe240043 Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Wed, 1 Sep 2021 12:57:40 +0900
 Subject: [PATCH] udev-node: always update timestamp of stack directory
@@ -7,7 +7,7 @@ Please see the comments in the code.
 
 (cherry picked from commit 6df797f75fa08bb1a9e657001229bd47903e6174)
 
-Related: #1977994
+Related: #2005024
 ---
  src/udev/udev-node.c | 90 ++++++++++++++++++++++++++++++++++++++++++--
  1 file changed, 87 insertions(+), 3 deletions(-)

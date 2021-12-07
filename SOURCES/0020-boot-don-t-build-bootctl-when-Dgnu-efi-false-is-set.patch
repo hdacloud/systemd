@@ -1,11 +1,11 @@
-From 7cea77bd5712260277e451d34908f01f14c467c4 Mon Sep 17 00:00:00 2001
+From 9c67a1570d89ff462cb51f4b2a6d2ed0af8e2e9c Mon Sep 17 00:00:00 2001
 From: Michal Sekletar <msekleta@redhat.com>
 Date: Mon, 30 Aug 2021 18:38:09 +0200
 Subject: [PATCH] boot: don't build bootctl when -Dgnu-efi=false is set
 
 (cherry picked from commit fbe3a414e1d8f7b05dccf3d24d4fa475eb9c6bc9)
 
-Resolves: #1972223
+Resolves: #2003130
 ---
  meson.build                       | 8 +++++---
  shell-completion/bash/meson.build | 2 +-

@@ -1,4 +1,4 @@
-From 458a6cd748ee5555b6957888b69d475ac3f619c6 Mon Sep 17 00:00:00 2001
+From c715be5f677ab61704ffe358716cf700d662b82d Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Wed, 1 Sep 2021 09:29:42 +0900
 Subject: [PATCH] udev-node: drop redundant trial of devlink creation
@@ -12,7 +12,7 @@ directory. So, the double evaluation is not necessary anymore.
 
 (cherry picked from commit 7920d0a135fb6a08aa0bfc31e9d0a3f589fe7a1f)
 
-Related: #1977994
+Related: #2005024
 ---
  src/udev/udev-event.c |  5 +----
  src/udev/udev-node.c  | 12 ++++--------

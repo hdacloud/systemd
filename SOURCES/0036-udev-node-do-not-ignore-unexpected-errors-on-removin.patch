@@ -1,4 +1,4 @@
-From 735971d9bffeccc0c17311a29909bdf5d693f806 Mon Sep 17 00:00:00 2001
+From 969b05b3f1dc644e821756205450b06a30c79d7f Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Sun, 12 Sep 2021 16:14:27 +0900
 Subject: [PATCH] udev-node: do not ignore unexpected errors on removing
@@ -8,7 +8,7 @@ Only acceptable error here is -ENOENT.
 
 (cherry picked from commit 0706cdf4ec92d6bd40391da0e81a30d9bf851663)
 
-Related: #1977994
+Related: #2005024
 ---
  src/udev/udev-node.c | 23 ++++++++++++++---------
  1 file changed, 14 insertions(+), 9 deletions(-)

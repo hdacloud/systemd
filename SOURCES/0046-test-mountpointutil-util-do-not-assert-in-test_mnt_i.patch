@@ -1,4 +1,4 @@
-From f58b96d3e8d1cb0dd3666bc74fa673918b586612 Mon Sep 17 00:00:00 2001
+From 5a86b79c5f79215a17f6617ae925dc76b25396a6 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Zbigniew=20J=C4=99drzejewski-Szmek?= <zbyszek@in.waw.pl>
 Date: Mon, 14 Sep 2020 17:58:03 +0200
 Subject: [PATCH] test-mountpointutil-util: do not assert in test_mnt_id()
@@ -102,17 +102,24 @@ getpid()                                = 20
 gettid()                                = 20
 tgkill(20, 20, SIGABRT)                 = 0
 rt_sigprocmask(SIG_SETMASK, [], NULL, 8) = 0
---- SIGABRT {si_signo=SIGABRT, si_code=SI_TKILL, si_pid=20, si_uid=0} ---
-+++ killed by SIGABRT (core dumped) +++
+
+RHEL notes: af918c4 should mitigate this issue, but in some build
+systems (Copr, brew, etc.) we don't have enough privileges to create a
+new mount namespace
+
+Cherry-picked manually from https://github.com/systemd/systemd/pull/17050.
+
+rhel-only
+Related: #2017035
 ---
  src/test/test-mountpoint-util.c | 8 ++++++--
  1 file changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/src/test/test-mountpoint-util.c b/src/test/test-mountpoint-util.c
-index 30b00ae4d8b..ffe5144b04a 100644
+index 983e1842d6..66d476d06d 100644
 --- a/src/test/test-mountpoint-util.c
 +++ b/src/test/test-mountpoint-util.c
-@@ -89,8 +89,12 @@ static void test_mnt_id(void) {
+@@ -91,8 +91,12 @@ static void test_mnt_id(void) {
                  /* The ids don't match? If so, then there are two mounts on the same path, let's check if
                   * that's really the case */
                  char *t = hashmap_get(h, INT_TO_PTR(mnt_id2));

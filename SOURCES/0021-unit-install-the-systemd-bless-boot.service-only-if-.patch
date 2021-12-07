@@ -1,4 +1,4 @@
-From aef14d77e157fd0748ef664c83e55fd3880ea787 Mon Sep 17 00:00:00 2001
+From 8f08b876d44d96b3f255ac5275a1daa3ccf9a801 Mon Sep 17 00:00:00 2001
 From: Frantisek Sumsal <frantisek@sumsal.cz>
 Date: Tue, 21 Sep 2021 22:47:42 +0200
 Subject: [PATCH] unit: install the systemd-bless-boot.service only if we have
@@ -8,7 +8,7 @@ Follow-up to #20591.
 
 (cherry picked from commit 220261ef940a126588b20a1765a2501811473839)
 
-Related: #1972223
+Related: #2003130
 ---
  units/meson.build | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)

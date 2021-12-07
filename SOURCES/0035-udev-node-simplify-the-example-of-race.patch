@@ -1,11 +1,11 @@
-From a5a14281160881fbb39d80a2572a18ecadbeedd5 Mon Sep 17 00:00:00 2001
+From 13293ddc7822025cb9f785262655f928634395f6 Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Sun, 12 Sep 2021 16:05:51 +0900
 Subject: [PATCH] udev-node: simplify the example of race
 
 (cherry picked from commit 3df566a66723490914ef3bae0ca8046044b70dce)
 
-Related: #1977994
+Related: #2005024
 ---
  src/udev/udev-node.c | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)

@@ -1,4 +1,4 @@
-From acf81f97412be44d60be03a0a2e3ca62f4a5146b Mon Sep 17 00:00:00 2001
+From a4fba2d79634d660ed2014e18cb85eea090b6413 Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Wed, 1 Sep 2021 09:24:15 +0900
 Subject: [PATCH] udev-node: split out permission handling from udev_node_add()
@@ -7,7 +7,7 @@ And then merge udev_node_add() and udev_node_update_old_links().
 
 (cherry picked from commit 2f48561e0db3cd63f65e9311b4d69282b4ac605d)
 
-Related: #1977994
+Related: #2005024
 ---
  src/udev/udev-event.c |   9 +-
  src/udev/udev-node.c  | 204 +++++++++++++++++++-----------------------

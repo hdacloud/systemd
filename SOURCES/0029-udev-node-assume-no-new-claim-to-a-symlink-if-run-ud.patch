@@ -1,4 +1,4 @@
-From 18936c8ee21fabb2036b1849a4bb7f5b64bee897 Mon Sep 17 00:00:00 2001
+From cf49a46c165619a0480d361a0afebb89e998f61c Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Thu, 2 Sep 2021 06:58:59 +0900
 Subject: [PATCH] udev-node: assume no new claim to a symlink if
@@ -11,7 +11,7 @@ unconditionally.
 
 (cherry picked from commit 8f27311eb2aec2411d1fb7d62e6c9d75d21ae8df)
 
-Related: #1977994
+Related: #2005024
 ---
  src/udev/udev-node.c | 5 -----
  1 file changed, 5 deletions(-)

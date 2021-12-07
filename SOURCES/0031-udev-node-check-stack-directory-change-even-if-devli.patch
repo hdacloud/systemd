@@ -1,4 +1,4 @@
-From 6ecd6fdcc27f374debcce47366c2862967f99463 Mon Sep 17 00:00:00 2001
+From a3389b23db9b9ab1ad11f181f036be35aade8c31 Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Wed, 1 Sep 2021 09:44:26 +0900
 Subject: [PATCH] udev-node: check stack directory change even if devlink is
@@ -11,7 +11,7 @@ Hopefully fixes #19946.
 
 (cherry picked from commit 1cd4e325693007b3628f1a27297f0ab7114b24b8)
 
-Related: #1977994
+Related: #2005024
 ---
  src/udev/udev-node.c | 15 ++++++---------
  1 file changed, 6 insertions(+), 9 deletions(-)

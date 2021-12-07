@@ -1,4 +1,4 @@
-From 7938e1e61c57441798d81124fd67b2e9bdd5e525 Mon Sep 17 00:00:00 2001
+From f583f3db3533bb2b3db1646d6afa74613fca46a6 Mon Sep 17 00:00:00 2001
 From: Lukas Nykryn <lnykryn@redhat.com>
 Date: Tue, 12 Feb 2019 16:58:16 +0100
 Subject: [PATCH] rules: add elevator= kernel command line parameter
@@ -8,7 +8,7 @@ it for rhel8 via udev rule.
 
 RHEL-only
 
-Resolves: #1998190
+Resolves: #2003002
 ---
  rules.d/40-elevator.rules | 20 ++++++++++++++++++++
  rules.d/meson.build       |  1 +

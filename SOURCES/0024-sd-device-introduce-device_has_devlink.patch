@@ -1,11 +1,11 @@
-From 76aebe6fec5894b05114fdf1e8aee54139bef69e Mon Sep 17 00:00:00 2001
+From 9c46b3e584fbb7be0a9e93471d30f2885bd194c9 Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Wed, 1 Sep 2021 09:22:15 +0900
 Subject: [PATCH] sd-device: introduce device_has_devlink()
 
 (cherry picked from commit b881ce16b9ccae4c3089c82e2ea1781cd9773a4f)
 
-Related: #1977994
+Related: #2005024
 ---
  src/libsystemd/sd-device/device-private.h | 1 +
  src/libsystemd/sd-device/sd-device.c      | 7 +++++++

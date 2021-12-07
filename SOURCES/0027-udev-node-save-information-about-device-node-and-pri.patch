@@ -1,4 +1,4 @@
-From 9c68b5675ffd11f2a3f9123446b54c2d0eea4682 Mon Sep 17 00:00:00 2001
+From 065209fc7a53d6f296f7fffd261f0a92fddc4485 Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Wed, 1 Sep 2021 04:16:21 +0900
 Subject: [PATCH] udev-node: save information about device node and priority in
@@ -14,7 +14,7 @@ without parsing the files.
 
 (cherry picked from commit 377a83f0d80376456d9be203796f66f543a8b943)
 
-Related: #1977994
+Related: #2005024
 ---
  src/udev/udev-node.c | 172 ++++++++++++++++++++++++++++++-------------
  1 file changed, 121 insertions(+), 51 deletions(-)

@@ -21,7 +21,7 @@
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 Version:        249
-Release:        7%{?dist}
+Release:        9%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -63,6 +63,7 @@ Source21:       macros.sysusers
 Source22:       sysusers.attr
 Source23:       sysusers.prov
 Source24:       sysusers.generate-pre.sh
+Source25:       rc.local
 
 %if 0
 GIT_DIR=../../src/systemd/.git git format-patch-ab --no-signature -M -N v235..v235-stable
@@ -94,31 +95,38 @@ Patch0014: 0014-random-util-increase-random-seed-size-to-1024.patch
 Patch0015: 0015-journal-don-t-enable-systemd-journald-audit.socket-b.patch
 Patch0016: 0016-journald.conf-don-t-touch-current-audit-settings.patch
 Patch0017: 0017-Revert-udev-remove-WAIT_FOR-key.patch
-Patch0018: 0018-boot-don-t-build-bootctl-when-Dgnu-efi-false-is-set.patch
+Patch0018: 0018-Really-don-t-enable-systemd-journald-audit.socket.patch
 Patch0019: 0019-rules-add-elevator-kernel-command-line-parameter.patch
-Patch0020: 0020-sd-device-introduce-device_has_devlink.patch
-Patch0021: 0021-udev-node-split-out-permission-handling-from-udev_no.patch
-Patch0022: 0022-udev-node-stack-directory-must-exist-when-adding-dev.patch
-Patch0023: 0023-udev-node-save-information-about-device-node-and-pri.patch
-Patch0024: 0024-udev-node-always-update-timestamp-of-stack-directory.patch
-Patch0025: 0025-udev-node-assume-no-new-claim-to-a-symlink-if-run-ud.patch
-Patch0026: 0026-udev-node-always-atomically-create-symlink-to-device.patch
-Patch0027: 0027-udev-node-check-stack-directory-change-even-if-devli.patch
-Patch0028: 0028-udev-node-shorten-code-a-bit-and-update-log-message.patch
-Patch0029: 0029-udev-node-add-random-delay-on-conflict-in-updating-d.patch
-Patch0030: 0030-udev-node-drop-redundant-trial-of-devlink-creation.patch
-Patch0031: 0031-udev-node-simplify-the-example-of-race.patch
-Patch0032: 0032-udev-node-do-not-ignore-unexpected-errors-on-removin.patch
-Patch0033: 0033-basic-time-util-introduce-FORMAT_TIMESPAN.patch
-Patch0034: 0034-unit-install-the-systemd-bless-boot.service-only-if-.patch
-Patch0035: 0035-units-don-t-enable-tmp.mount-statically-in-local-fs..patch
-Patch0036: 0036-pid1-bump-DefaultTasksMax-to-80-of-the-kernel-pid.ma.patch
-Patch0037: 0037-udev-net-setup-link-change-the-default-MACAddressPol.patch
-Patch0038: 0038-udev-net-setup-link-really-change-the-default-MACAdd.patch
+Patch0020: 0020-boot-don-t-build-bootctl-when-Dgnu-efi-false-is-set.patch
+Patch0021: 0021-unit-install-the-systemd-bless-boot.service-only-if-.patch
+Patch0022: 0022-units-don-t-enable-tmp.mount-statically-in-local-fs..patch
+Patch0023: 0023-pid1-bump-DefaultTasksMax-to-80-of-the-kernel-pid.ma.patch
+Patch0024: 0024-sd-device-introduce-device_has_devlink.patch
+Patch0025: 0025-udev-node-split-out-permission-handling-from-udev_no.patch
+Patch0026: 0026-udev-node-stack-directory-must-exist-when-adding-dev.patch
+Patch0027: 0027-udev-node-save-information-about-device-node-and-pri.patch
+Patch0028: 0028-udev-node-always-update-timestamp-of-stack-directory.patch
+Patch0029: 0029-udev-node-assume-no-new-claim-to-a-symlink-if-run-ud.patch
+Patch0030: 0030-udev-node-always-atomically-create-symlink-to-device.patch
+Patch0031: 0031-udev-node-check-stack-directory-change-even-if-devli.patch
+Patch0032: 0032-udev-node-shorten-code-a-bit-and-update-log-message.patch
+Patch0033: 0033-udev-node-add-random-delay-on-conflict-in-updating-d.patch
+Patch0034: 0034-udev-node-drop-redundant-trial-of-devlink-creation.patch
+Patch0035: 0035-udev-node-simplify-the-example-of-race.patch
+Patch0036: 0036-udev-node-do-not-ignore-unexpected-errors-on-removin.patch
+Patch0037: 0037-basic-time-util-introduce-FORMAT_TIMESPAN.patch
+Patch0038: 0038-udev-net-setup-link-change-the-default-MACAddressPol.patch
+Patch0039: 0039-set-core-ulimit-to-0-like-on-RHEL-7.patch
+Patch0040: 0040-test-don-t-install-test-network-generator-conversion.patch
+Patch0041: 0041-meson.build-change-operator-combining-bools-from-to-.patch
+Patch0042: 0042-openssl-util-use-EVP-API-to-get-RSA-bits.patch
+Patch0043: 0043-procfs-util-fix-confusion-wrt.-quantity-limit-and-ma.patch
+Patch0044: 0044-test-process-util-also-add-EROFS-to-the-list-of-good.patch
+Patch0045: 0045-ci-use-C9S-chroots-in-Packit.patch
+Patch0046: 0046-test-mountpointutil-util-do-not-assert-in-test_mnt_i.patch
+Patch0047: 0047-core-mount-add-implicit-unit-dependencies-even-if-wh.patch
 
 # Downstream-only patches (9000–9999)
-# https://github.com/systemd/systemd/pull/17050
-Patch9001:      https://github.com/systemd/systemd/pull/17050/commits/f58b96d3e8d1cb0dd3666bc74fa673918b586612.patch
 
 BuildRequires:  gcc
 BuildRequires:  gcc-c++
@@ -363,6 +371,7 @@ MulticastDNS resolver and responder.
 Summary:        A userspace out-of-memory (OOM) killer
 Requires:       %{name}%{?_isa} = %{version}-%{release}
 License:        LGPLv2+
+Provides:       %{name}-oomd-defaults = %{version}-%{release}
 
 %description oomd
 systemd-oomd is a system service that uses cgroups-v2 and pressure stall
@@ -461,7 +470,7 @@ CONFIGURE_OPTS=(
 %endif
         -Db_ndebug=false
         -Dman=true
-        -Dversion-tag=%{version}-%{release}
+        -Dversion-tag=v%{version}-%{release}
 %if 0%{?fedora}
         -Dfallback-hostname=fedora
 %else
@@ -558,6 +567,11 @@ touch %{buildroot}%{_sysconfdir}/udev/hwdb.bin
 touch %{buildroot}%{_localstatedir}/lib/systemd/random-seed
 touch %{buildroot}%{_localstatedir}/lib/private/systemd/journal-upload/state
 
+# Install rc.local
+mkdir -p %{buildroot}%{_sysconfdir}/rc.d/
+install -m 0644 %{SOURCE25} %{buildroot}%{_sysconfdir}/rc.d/rc.local
+ln -s rc.d/rc.local %{buildroot}%{_sysconfdir}/rc.local
+
 # Install yum protection fragment
 install -Dm0644 %{SOURCE4} %{buildroot}/etc/dnf/protected.d/systemd.conf
 
@@ -616,6 +630,8 @@ python3 %{SOURCE2} %buildroot <<EOF
 %ghost %config(noreplace) /etc/locale.conf
 %ghost %config(noreplace) /etc/machine-id
 %ghost %config(noreplace) /etc/machine-info
+%config(noreplace) %{_sysconfdir}/rc.d/rc.local
+%{_sysconfdir}/rc.local
 %ghost %attr(0700,root,root) %dir /var/cache/private
 %ghost %attr(0700,root,root) %dir /var/lib/private
 %ghost %dir /var/lib/private/systemd
@@ -633,6 +649,10 @@ python3 %{SOURCE2} %buildroot <<EOF
 %ghost %attr(0700,root,root) %dir /var/log/private
 EOF
 
+%check
+%if %{with tests}
+meson test -C %{_vpath_builddir} -t 6 --print-errorlogs
+%endif
 
 #############################################################################################
 
@@ -873,34 +893,40 @@ getent passwd systemd-oom &>/dev/null || useradd -r -l -g systemd-oom -d / -s /s
 %files standalone-sysusers -f .file-list-standalone-sysusers
 
 %changelog
-* Fri Oct 01 2021 systemd maintenance team <systemd-maint@redhat.com> - 249-7
-- spec: make sure version string starts with version number (#1921094)
+* Thu Nov 18 2021 systemd maintenance team <systemd-maint@redhat.com> - 249-9
+- test: don't install test-network-generator-conversion.sh w/o networkd (#2017035)
+- meson.build: change operator combining bools from + to and (#2017035)
+- openssl-util: use EVP API to get RSA bits (#2016042)
+- procfs-util: fix confusion wrt. quantity limit and maximum value (#2017035)
+- test-process-util: also add EROFS to the list of "good" errors (#2017035)
+- ci: use C9S chroots in Packit (#2017035)
+- test-mountpointutil-util: do not assert in test_mnt_id() (#2017035)
+- core/mount: add implicit unit dependencies even if when mount unit is generated from /proc/self/mountinfo (#2019468)
+- Drop Patch9001 - https://github.com/systemd/systemd/pull/17050 - Replaced by Patch0046
 
-* Fri Oct 01 2021 systemd maintenance team <systemd-maint@redhat.com> - 249-6
-- udev/net-setup-link: *really* change the default MACAddressPolicy to "none" (#1921094)
-- spec: Use -Dgnu-efi=false instead of -Defi=false (#1972223)
-
-* Thu Sep 30 2021 systemd maintenance team <systemd-maint@redhat.com> - 249-5
-- boot: don't build bootctl when -Dgnu-efi=false is set (#1972223)
-- rules: add elevator= kernel command line parameter (#1998190)
-- sd-device: introduce device_has_devlink() (#1977994)
-- udev-node: split out permission handling from udev_node_add() (#1977994)
-- udev-node: stack directory must exist when adding device node symlink (#1977994)
-- udev-node: save information about device node and priority in symlink (#1977994)
-- udev-node: always update timestamp of stack directory (#1977994)
-- udev-node: assume no new claim to a symlink if /run/udev/links is not updated (#1977994)
-- udev-node: always atomically create symlink to device node (#1977994)
-- udev-node: check stack directory change even if devlink is removed (#1977994)
-- udev-node: shorten code a bit and update log message (#1977994)
-- udev-node: add random delay on conflict in updating device node symlink (#1977994)
-- udev-node: drop redundant trial of devlink creation (#1977994)
-- udev-node: simplify the example of race (#1977994)
-- udev-node: do not ignore unexpected errors on removing symlink in stack directory (#1977994)
-- basic/time-util: introduce FORMAT_TIMESPAN (#1977994)
-- unit: install the systemd-bless-boot.service only if we have gnu-efi (#1972223)
-- units: don't enable tmp.mount statically in local-fs.target (#1959826)
-- pid1: bump DefaultTasksMax to 80% of the kernel pid.max value (#1997200)
-- udev/net-setup-link: change the default MACAddressPolicy to "none" (#1921094)
+* Tue Oct 12 2021 systemd maintenance team <systemd-maint@redhat.com> - 249-8
+- Really don't enable systemd-journald-audit.socket (#1973856)
+- rules: add elevator= kernel command line parameter (#2003002)
+- boot: don't build bootctl when -Dgnu-efi=false is set (#2003130)
+- unit: install the systemd-bless-boot.service only if we have gnu-efi (#2003130)
+- units: don't enable tmp.mount statically in local-fs.target (#2000927)
+- pid1: bump DefaultTasksMax to 80% of the kernel pid.max value (#2003031)
+- sd-device: introduce device_has_devlink() (#2005024)
+- udev-node: split out permission handling from udev_node_add() (#2005024)
+- udev-node: stack directory must exist when adding device node symlink (#2005024)
+- udev-node: save information about device node and priority in symlink (#2005024)
+- udev-node: always update timestamp of stack directory (#2005024)
+- udev-node: assume no new claim to a symlink if /run/udev/links is not updated (#2005024)
+- udev-node: always atomically create symlink to device node (#2005024)
+- udev-node: check stack directory change even if devlink is removed (#2005024)
+- udev-node: shorten code a bit and update log message (#2005024)
+- udev-node: add random delay on conflict in updating device node symlink (#2005024)
+- udev-node: drop redundant trial of devlink creation (#2005024)
+- udev-node: simplify the example of race (#2005024)
+- udev-node: do not ignore unexpected errors on removing symlink in stack directory (#2005024)
+- basic/time-util: introduce FORMAT_TIMESPAN (#2005024)
+- udev/net-setup-link: change the default MACAddressPolicy to "none" (#2009237)
+- set core ulimit to 0 like on RHEL-7 (#1998509)
 
 * Fri Aug 20 2021 systemd maintenance team <systemd-maint@redhat.com> - 249-4
 - Revert "udev: remove WAIT_FOR key" (#1982666)

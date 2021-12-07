@@ -1,4 +1,4 @@
-From e1f53e60bdc368c81beba8b6173047ec8149f8e9 Mon Sep 17 00:00:00 2001
+From 1cbcfc6f69e50d309698b6aa16a48b7f282913f5 Mon Sep 17 00:00:00 2001
 From: Michal Sekletar <msekleta@redhat.com>
 Date: Tue, 21 Sep 2021 09:28:29 +0200
 Subject: [PATCH] basic/time-util: introduce FORMAT_TIMESPAN
@@ -6,7 +6,7 @@ Subject: [PATCH] basic/time-util: introduce FORMAT_TIMESPAN
 This is cherry-pick of the relevant part from the tree-wide change in
 5291f26d4a6.
 
-Related: #1977994
+Related: #2005024
 ---
  src/basic/time-util.h | 1 +
  1 file changed, 1 insertion(+)

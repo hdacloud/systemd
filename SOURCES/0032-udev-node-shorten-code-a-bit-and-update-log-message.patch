@@ -1,11 +1,11 @@
-From a075830244f699703a88a492413d931eaeb23a65 Mon Sep 17 00:00:00 2001
+From 52938c3ed27ebaadce97060ad8ebdcb351403d90 Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Thu, 2 Sep 2021 08:23:35 +0900
 Subject: [PATCH] udev-node: shorten code a bit and update log message
 
 (cherry picked from commit 8424da2de88ceeed7be8544fb69221f0b0ea84ea)
 
-Related: #1977994
+Related: #2005024
 ---
  src/udev/udev-node.c | 5 ++---
  1 file changed, 2 insertions(+), 3 deletions(-)

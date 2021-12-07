@@ -1,4 +1,4 @@
-From c484f91a87679fb26342408f20e7bdddf316f5a0 Mon Sep 17 00:00:00 2001
+From 75275ae07233e213fe03a1a33870efe10dbb2b39 Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Wed, 1 Sep 2021 04:34:48 +0900
 Subject: [PATCH] udev-node: add random delay on conflict in updating device
@@ -9,7 +9,7 @@ simultaneously.
 
 (cherry picked from commit 0063fa23a1384dd4385d03b568dc629916b7e72a)
 
-Related: #1977994
+Related: #2005024
 ---
  src/udev/udev-node.c | 12 ++++++++++++
  1 file changed, 12 insertions(+)

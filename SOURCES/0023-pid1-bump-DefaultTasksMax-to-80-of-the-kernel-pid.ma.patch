@@ -1,4 +1,4 @@
-From 9ac22ee1e9d1ae32ff2d824e5a0e763a18b36d7e Mon Sep 17 00:00:00 2001
+From 50a744391dbb1130d38b44700ae7e6649fcc9ffb Mon Sep 17 00:00:00 2001
 From: rpm-build <rpm-build>
 Date: Wed, 1 Aug 2018 13:19:39 +0200
 Subject: [PATCH] pid1: bump DefaultTasksMax to 80% of the kernel pid.max value
@@ -7,7 +7,7 @@ This should be hopefully high enough even for the very big deployments.
 
 RHEL-only
 
-Resolves: #1997200
+Resolves: #2003031
 ---
  man/systemd-system.conf.xml | 4 ++--
  src/core/main.c             | 2 +-

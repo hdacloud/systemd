@@ -1,4 +1,4 @@
-From 323f687e53737ccf7687482c31690374da90d8e7 Mon Sep 17 00:00:00 2001
+From 1561b9e2c9ea779ab611f52fd8b4eef616896e09 Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Wed, 1 Sep 2021 02:20:33 +0900
 Subject: [PATCH] udev-node: always atomically create symlink to device node
@@ -14,7 +14,7 @@ conflicts between the workers.
 
 (cherry picked from commit 242d39ebc1391f4734f6e63ff13764de92bc5f70)
 
-Related: #1977994
+Related: #2005024
 ---
  src/udev/udev-node.c | 42 +++++++++---------------------------------
  1 file changed, 9 insertions(+), 33 deletions(-)

@@ -1,4 +1,4 @@
-From 18d2fb228bc155fc357262ec2dc5713318bab453 Mon Sep 17 00:00:00 2001
+From 506dc32b2428936d67e9cf1a034d6b63dbc1cbb0 Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Wed, 1 Sep 2021 04:14:42 +0900
 Subject: [PATCH] udev-node: stack directory must exist when adding device node
@@ -6,7 +6,7 @@ Subject: [PATCH] udev-node: stack directory must exist when adding device node
 
 (cherry picked from commit 46070dbf26435ba0def099121f46a6253f3f19b6)
 
-Related: #1977994
+Related: #2005024
 ---
  src/udev/udev-node.c | 11 ++++++-----
  1 file changed, 6 insertions(+), 5 deletions(-)
