@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        51%{?dist}
+Release:        51%{?dist}.3
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -708,6 +708,16 @@ Patch0655: 0655-udev-do-not-try-to-reassign-alternative-names.patch
 Patch0656: 0656-Fix-LGTM-build.patch
 Patch0657: 0657-sd-hwdb-allow-empty-properties.patch
 Patch0658: 0658-Update-hwdb.patch
+Patch0659: 0659-sd-event-take-ref-on-event-loop-object-before-dispat.patch
+Patch0660: 0660-pid1-fix-free-of-uninitialized-pointer-in-unit_fail_.patch
+Patch0661: 0661-Disable-iptables-for-CI.patch
+Patch0662: 0662-test-seccomp-accept-ENOSYS-from-sysctl-2-too.patch
+Patch0663: 0663-Disable-libpitc-to-fix-CentOS-Stream-CI.patch
+Patch0664: 0664-test-accept-that-char-device-0-0-can-now-be-created-.patch
+Patch0665: 0665-core-return-true-from-cg_is_empty-on-ENOENT.patch
+Patch0666: 0666-Do-not-fail-if-the-same-alt.-name-is-set-again.patch
+Patch0667: 0667-meson-avoid-bogus-meson-warning.patch
+Patch0668: 0668-meson-do-not-fail-if-rsync-is-not-installed-with-mes.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -1335,6 +1345,22 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Fri Dec 10 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-51.3
+- Do not fail if the same alt. name is set again (#2030027)
+- meson: avoid bogus meson warning (#2030027)
+- meson: do not fail if rsync is not installed with meson 0.57.2 (#2030027)
+
+* Fri Dec 03 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-51.2
+- core: return true from cg_is_empty* on ENOENT (#2024903)
+
+* Wed Dec 01 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-51.1
+- sd-event: take ref on event loop object before dispatching event sources (#2024903)
+- pid1: fix free of uninitialized pointer in unit_fail_if_noncanonical() (#2024903)
+- Disable iptables for CI (#2024903)
+- test-seccomp: accept ENOSYS from sysctl(2) too (#2024903)
+- Disable libpitc to fix CentOS Stream CI (#2024903)
+- test: accept that char device 0/0 can now be created witout privileges (#2024903)
+
 * Thu Sep 23 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-51
 - define newly needed constants (#1850986)
 - sd-netlink: support IFLA_PROP_LIST and IFLA_ALT_IFNAME attributes (#1850986)
