@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        51%{?dist}.3
+Release:        51%{?dist}.2
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -715,9 +715,6 @@ Patch0662: 0662-test-seccomp-accept-ENOSYS-from-sysctl-2-too.patch
 Patch0663: 0663-Disable-libpitc-to-fix-CentOS-Stream-CI.patch
 Patch0664: 0664-test-accept-that-char-device-0-0-can-now-be-created-.patch
 Patch0665: 0665-core-return-true-from-cg_is_empty-on-ENOENT.patch
-Patch0666: 0666-Do-not-fail-if-the-same-alt.-name-is-set-again.patch
-Patch0667: 0667-meson-avoid-bogus-meson-warning.patch
-Patch0668: 0668-meson-do-not-fail-if-rsync-is-not-installed-with-mes.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -1345,11 +1342,6 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
-* Fri Dec 10 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-51.3
-- Do not fail if the same alt. name is set again (#2030027)
-- meson: avoid bogus meson warning (#2030027)
-- meson: do not fail if rsync is not installed with meson 0.57.2 (#2030027)
-
 * Fri Dec 03 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-51.2
 - core: return true from cg_is_empty* on ENOENT (#2024903)
 
