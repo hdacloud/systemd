@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        54%{?dist}
+Release:        55%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -729,6 +729,28 @@ Patch0676: 0676-tests-add-helper-function-to-autodetect-CI-environme.patch
 Patch0677: 0677-strv-rework-FOREACH_STRING-macro.patch
 Patch0678: 0678-test-systemctl-use-const-char-instead-of-char.patch
 Patch0679: 0679-ci-pass-the-GITHUB_ACTIONS-variable-to-the-CentOS-co.patch
+Patch0680: 0680-lgtm-detect-uninitialized-variables-using-the-__clea.patch
+Patch0681: 0681-lgtm-replace-the-query-used-for-looking-for-fgets-wi.patch
+Patch0682: 0682-lgtm-beef-up-list-of-dangerous-questionnable-API-cal.patch
+Patch0683: 0683-lgtm-warn-about-strerror-use.patch
+Patch0684: 0684-lgtm-complain-about-accept-people-should-use-accept4.patch
+Patch0685: 0685-lgtm-don-t-treat-the-custom-note-as-a-list-of-tags.patch
+Patch0686: 0686-lgtm-ignore-certain-cleanup-functions.patch
+Patch0687: 0687-lgtm-detect-more-possible-problematic-scenarios.patch
+Patch0688: 0688-lgtm-enable-more-and-potentially-useful-queries.patch
+Patch0689: 0689-meson-avoid-bogus-meson-warning.patch
+Patch0690: 0690-test-make-TEST-47-less-racy.patch
+Patch0691: 0691-core-rename-unit_-start_limit-condition-assert-_test.patch
+Patch0692: 0692-core-Check-unit-start-rate-limiting-earlier.patch
+Patch0693: 0693-sd-event-introduce-callback-invoked-when-event-sourc.patch
+Patch0694: 0694-core-rename-generalize-UNIT-u-test_start_limit-hook.patch
+Patch0695: 0695-mount-make-mount-units-start-jobs-not-runnable-if-p-.patch
+Patch0696: 0696-mount-retrigger-run-queue-after-ratelimit-expired-to.patch
+Patch0697: 0697-pid1-add-a-manager_trigger_run_queue-helper.patch
+Patch0698: 0698-unit-add-jobs-that-were-skipped-because-of-ratelimit.patch
+Patch0699: 0699-Revert-Revert-sysctl-Enable-ping-8-inside-rootless-P.patch
+Patch0700: 0700-sysctl-prefix-ping-port-range-setting-with-a-dash.patch
+Patch0701: 0701-mount-don-t-propagate-errors-from-mount_setup_unit-f.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -1356,6 +1378,29 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Mon Jan 10 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-55
+- lgtm: detect uninitialized variables using the __cleanup__ attribute (#2017033)
+- lgtm: replace the query used for looking for fgets with a more general query (#2017033)
+- lgtm: beef up list of dangerous/questionnable API calls not to make (#2017033)
+- lgtm: warn about strerror() use (#2017033)
+- lgtm: complain about accept() [people should use accept4() instead, due to O_CLOEXEC] (#2017033)
+- lgtm: don't treat the custom note as a list of tags (#2017033)
+- lgtm: ignore certain cleanup functions (#2017033)
+- lgtm: detect more possible problematic scenarios (#2017033)
+- lgtm: enable more (and potentially useful) queries (#2017033)
+- test: make TEST-47 less racy (#2017033)
+- core: rename unit_{start_limit|condition|assert}_test() to unit_test_xyz() (#2036608)
+- core: Check unit start rate limiting earlier (#2036608)
+- sd-event: introduce callback invoked when event source ratelimit expires (#2036608)
+- core: rename/generalize UNIT(u)->test_start_limit() hook (#2036608)
+- mount: make mount units start jobs not runnable if /p/s/mountinfo ratelimit is in effect (#2036608)
+- mount: retrigger run queue after ratelimit expired to run delayed mount start jobs (#2036608)
+- pid1: add a manager_trigger_run_queue() helper (#2036608)
+- unit: add jobs that were skipped because of ratelimit back to run_queue (#2036608)
+- Revert "Revert "sysctl: Enable ping(8) inside rootless Podman containers"" (#2037807)
+- sysctl: prefix ping port range setting with a dash (#2037807)
+- mount: don't propagate errors from mount_setup_unit() further up (#2036853)
+
 * Wed Dec 01 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-54
 - core: consider service with no start command immediately started (#1860899)
 - man: move description of *Action= modes to FailureAction=/SuccessAction= (#1860899)
