@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        55%{?dist}
+Release:        56%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -1057,6 +1057,8 @@ mkdir -p %{buildroot}%{system_unit_dir}/dbus.target.wants
 mkdir -p %{buildroot}%{system_unit_dir}/syslog.target.wants
 mkdir -p %{buildroot}%{_localstatedir}/run
 mkdir -p %{buildroot}%{_localstatedir}/log
+touch %{buildroot}%{_localstatedir}/log/lastlog
+chmod 0664 %{buildroot}%{_localstatedir}/log/lastlog
 touch %{buildroot}%{_localstatedir}/run/utmp
 touch %{buildroot}%{_localstatedir}/log/{w,b}tmp
 
@@ -1141,6 +1143,7 @@ python3 %{SOURCE2} %buildroot <<EOF
 %ghost %attr(0664,root,utmp) /var/run/utmp
 %ghost %attr(0664,root,utmp) /var/log/wtmp
 %ghost %attr(0660,root,utmp) /var/log/btmp
+%ghost %attr(0664,root,utmp) %verify(not md5 size mtime) /var/log/lastlog
 %ghost %config(noreplace) /etc/hostname
 %ghost %config(noreplace) /etc/localtime
 %ghost %config(noreplace) /etc/locale.conf
@@ -1378,6 +1381,9 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Tue Jan 25 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-56
+- Take ghost ownership of /var/log/lastlog (#1798685)
+
 * Mon Jan 10 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-55
 - lgtm: detect uninitialized variables using the __cleanup__ attribute (#2017033)
 - lgtm: replace the query used for looking for fgets with a more general query (#2017033)
