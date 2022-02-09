@@ -40,7 +40,7 @@ Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 %if %{without inplace}
 Version:        249.4
-Release:        2.11%{?dist}
+Release:        2.12%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -143,6 +143,14 @@ Patch0021:      21221.patch
 
 # PR 21241: fix bpf-foreign cgroup controller realization
 Patch0022:      21241.patch
+
+# PR 20695: Sync if_arp.h with Linux 5.14
+Patch0023:      20695.patch
+
+%if 0%{?facebook}
+# PR 22426: MemoryZSwapMax= to configure memory.zswap.max
+Patch0024:      22426-fb.patch
+%endif
 
 # Downstream-only patches (0500–9999)
 
@@ -1092,6 +1100,10 @@ fi
 %endif
 
 %changelog
+* Wed Feb 09 2022 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.12
+- Backport PR #20695: Sync if_arp.h with Linux 5.14
+- FB-only backport PR #22426: MemoryZSwapMax= to configure memory.zswap.max
+
 * Tue Nov 30 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.11
 - Backport PR #21241: fix bpf-foreign cgroup controller realization
 

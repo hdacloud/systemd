@@ -1,0 +1,580 @@
+From 3dbc067d326c600a92822037118961641fc76575 Mon Sep 17 00:00:00 2001
+From: Pasha Vorobyev <plv@fb.com>
+Date: Fri, 4 Feb 2022 11:49:46 -0800
+Subject: [PATCH] MemoryZSwapMax directive to configure new memory.zswap.max
+ cgroup file
+
+---
+ man/org.freedesktop.systemd1.xml              | 36 +++++++++++++++++++
+ src/basic/cgroup-util.c                       | 36 +++++++++++++++++++
+ src/basic/cgroup-util.h                       |  2 ++
+ src/core/cgroup.c                             | 17 +++++++--
+ src/core/cgroup.h                             |  1 +
+ src/core/dbus-cgroup.c                        |  8 +++++
+ src/core/load-fragment-gperf.gperf.in         |  1 +
+ src/core/load-fragment.c                      |  4 ++-
+ src/shared/bus-print-properties.c             |  2 +-
+ src/shared/bus-unit-util.c                    |  1 +
+ src/systemctl/systemctl-show.c                |  8 +++++
+ .../fuzz-unit-file/directives-all.service     |  1 +
+ test/fuzz/fuzz-unit-file/directives.mount     |  1 +
+ test/fuzz/fuzz-unit-file/directives.scope     |  1 +
+ test/fuzz/fuzz-unit-file/directives.service   |  1 +
+ test/fuzz/fuzz-unit-file/directives.slice     |  1 +
+ test/fuzz/fuzz-unit-file/directives.socket    |  1 +
+ test/fuzz/fuzz-unit-file/directives.swap      |  1 +
+ 18 files changed, 118 insertions(+), 5 deletions(-)
+
+diff --git a/man/org.freedesktop.systemd1.xml b/man/org.freedesktop.systemd1.xml
+index c14c5b6601..cc37de4fb4 100644
+--- a/man/org.freedesktop.systemd1.xml
++++ b/man/org.freedesktop.systemd1.xml
+@@ -2493,6 +2493,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t MemorySwapMax = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly t MemoryZSwapMax = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t MemoryLimit = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly s DevicePolicy = '...';
+@@ -3030,6 +3032,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+ 
+     <!--property MemorySwapMax is not documented!-->
+ 
++    <!--property MemoryZSwapMax is not documented!-->
++
+     <!--property MemoryLimit is not documented!-->
+ 
+     <!--property DevicePolicy is not documented!-->
+@@ -3594,6 +3598,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="MemorySwapMax"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="MemoryZSwapMax"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryLimit"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="DevicePolicy"/>
+@@ -4293,6 +4299,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t MemorySwapMax = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly t MemoryZSwapMax = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t MemoryLimit = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly s DevicePolicy = '...';
+@@ -4858,6 +4866,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
+ 
+     <!--property MemorySwapMax is not documented!-->
+ 
++    <!--property MemoryZSwapMax is not documented!-->
++
+     <!--property MemoryLimit is not documented!-->
+ 
+     <!--property DevicePolicy is not documented!-->
+@@ -5420,6 +5430,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="MemorySwapMax"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="MemoryZSwapMax"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryLimit"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="DevicePolicy"/>
+@@ -6016,6 +6028,8 @@ node /org/freedesktop/systemd1/unit/home_2emount {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t MemorySwapMax = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly t MemoryZSwapMax = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t MemoryLimit = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly s DevicePolicy = '...';
+@@ -6509,6 +6523,8 @@ node /org/freedesktop/systemd1/unit/home_2emount {
+ 
+     <!--property MemorySwapMax is not documented!-->
+ 
++    <!--property MemoryZSwapMax is not documented!-->
++
+     <!--property MemoryLimit is not documented!-->
+ 
+     <!--property DevicePolicy is not documented!-->
+@@ -6989,6 +7005,8 @@ node /org/freedesktop/systemd1/unit/home_2emount {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="MemorySwapMax"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="MemoryZSwapMax"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryLimit"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="DevicePolicy"/>
+@@ -7706,6 +7724,8 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t MemorySwapMax = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly t MemoryZSwapMax = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t MemoryLimit = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly s DevicePolicy = '...';
+@@ -8185,6 +8205,8 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
+ 
+     <!--property MemorySwapMax is not documented!-->
+ 
++    <!--property MemoryZSwapMax is not documented!-->
++
+     <!--property MemoryLimit is not documented!-->
+ 
+     <!--property DevicePolicy is not documented!-->
+@@ -8651,6 +8673,8 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="MemorySwapMax"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="MemoryZSwapMax"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryLimit"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="DevicePolicy"/>
+@@ -9221,6 +9245,8 @@ node /org/freedesktop/systemd1/unit/system_2eslice {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t MemorySwapMax = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly t MemoryZSwapMax = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t MemoryLimit = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly s DevicePolicy = '...';
+@@ -9364,6 +9390,8 @@ node /org/freedesktop/systemd1/unit/system_2eslice {
+ 
+     <!--property MemorySwapMax is not documented!-->
+ 
++    <!--property MemoryZSwapMax is not documented!-->
++
+     <!--property MemoryLimit is not documented!-->
+ 
+     <!--property DevicePolicy is not documented!-->
+@@ -9514,6 +9542,8 @@ node /org/freedesktop/systemd1/unit/system_2eslice {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="MemorySwapMax"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="MemoryZSwapMax"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryLimit"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="DevicePolicy"/>
+@@ -9684,6 +9714,8 @@ node /org/freedesktop/systemd1/unit/session_2d1_2escope {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t MemorySwapMax = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly t MemoryZSwapMax = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t MemoryLimit = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly s DevicePolicy = '...';
+@@ -9843,6 +9875,8 @@ node /org/freedesktop/systemd1/unit/session_2d1_2escope {
+ 
+     <!--property MemorySwapMax is not documented!-->
+ 
++    <!--property MemoryZSwapMax is not documented!-->
++
+     <!--property MemoryLimit is not documented!-->
+ 
+     <!--property DevicePolicy is not documented!-->
+@@ -10019,6 +10053,8 @@ node /org/freedesktop/systemd1/unit/session_2d1_2escope {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="MemorySwapMax"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="MemoryZSwapMax"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryLimit"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="DevicePolicy"/>
+diff --git a/src/basic/cgroup-util.c b/src/basic/cgroup-util.c
+index 1ff6160dc8..00b1e71520 100644
+--- a/src/basic/cgroup-util.c
++++ b/src/basic/cgroup-util.c
+@@ -160,6 +160,42 @@ bool cg_freezer_supported(void) {
+         return supported;
+ }
+ 
++bool cg_kill_supported(void) {
++        static thread_local int supported = -1;
++
++        if (supported >= 0)
++                return supported;
++
++        if (cg_all_unified() <= 0)
++                supported = false;
++        else if (access("/sys/fs/cgroup/init.scope/cgroup.kill", F_OK) < 0) {
++                if (errno != ENOENT)
++                        log_debug_errno(errno, "Failed to check if cgroup.kill is available, assuming not: %m");
++                supported = false;
++        } else
++                supported = true;
++
++        return supported;
++}
++
++bool cg_zswap_supported(void) {
++        static thread_local int supported = -1;
++
++        if (supported >= 0)
++                return supported;
++
++        if (cg_all_unified() <= 0)
++                supported = false;
++        else if (access("/sys/fs/cgroup/init.scope/memory.zswap.max", F_OK) < 0) {
++                if (errno != ENOENT)
++                        log_debug_errno(errno, "Failed to check if cgroup memory.zswap.max is available, assuming not: %m");
++                supported = false;
++        } else
++                supported = true;
++
++        return supported;
++}
++
+ int cg_enumerate_subgroups(const char *controller, const char *path, DIR **_d) {
+         _cleanup_free_ char *fs = NULL;
+         int r;
+diff --git a/src/basic/cgroup-util.h b/src/basic/cgroup-util.h
+index ce2f4c6589..8ea94b8870 100644
+--- a/src/basic/cgroup-util.h
++++ b/src/basic/cgroup-util.h
+@@ -272,6 +272,8 @@ int cg_kernel_controllers(Set **controllers);
+ 
+ bool cg_ns_supported(void);
+ bool cg_freezer_supported(void);
++bool cg_kill_supported(void);
++bool cg_zswap_supported(void);
+ 
+ int cg_all_unified(void);
+ int cg_hybrid_unified(void);
+diff --git a/src/core/cgroup.c b/src/core/cgroup.c
+index 5c07aa71d1..4a0aa65037 100644
+--- a/src/core/cgroup.c
++++ b/src/core/cgroup.c
+@@ -123,6 +123,7 @@ void cgroup_context_init(CGroupContext *c) {
+                 .memory_high = CGROUP_LIMIT_MAX,
+                 .memory_max = CGROUP_LIMIT_MAX,
+                 .memory_swap_max = CGROUP_LIMIT_MAX,
++                .memory_zswap_max = CGROUP_LIMIT_MAX,
+ 
+                 .memory_limit = CGROUP_LIMIT_MAX,
+ 
+@@ -322,6 +323,9 @@ static int unit_compare_memory_limit(Unit *u, const char *property_name, uint64_
+         } else if (streq(property_name, "MemorySwapMax")) {
+                 unit_value = c->memory_swap_max;
+                 file = "memory.swap.max";
++        } else if (streq(property_name, "MemoryZSwapMax")) {
++                unit_value = c->memory_zswap_max;
++                file = "memory.zswap.max";
+         } else
+                 return -EINVAL;
+ 
+@@ -364,9 +368,10 @@ static char *format_cgroup_memory_limit_comparison(char *buf, size_t l, Unit *u,
+ 
+         /* memory.swap.max is special in that it relies on CONFIG_MEMCG_SWAP (and the default swapaccount=1).
+          * In the absence of reliably being able to detect whether memcg swap support is available or not,
+-         * only complain if the error is not ENOENT. */
++         * only complain if the error is not ENOENT. This is similarly the case for memory.zswap.max relying on CONFIG_ZSWAP. */
+         if (r > 0 || IN_SET(r, -ENODATA, -EOWNERDEAD) ||
+-            (r == -ENOENT && streq(property_name, "MemorySwapMax"))) {
++            (r == -ENOENT && (streq(property_name, "MemorySwapMax") ||
++                              streq(property_name, "MemoryZSwapMax")))) {
+                 buf[0] = 0;
+                 return buf;
+         }
+@@ -441,6 +446,7 @@ void cgroup_context_dump(Unit *u, FILE* f, const char *prefix) {
+                 "%sMemoryHigh: %" PRIu64 "%s\n"
+                 "%sMemoryMax: %" PRIu64 "%s\n"
+                 "%sMemorySwapMax: %" PRIu64 "%s\n"
++                "%sMemoryZSwapMax: %" PRIu64 "%s\n"
+                 "%sMemoryLimit: %" PRIu64 "\n"
+                 "%sTasksMax: %" PRIu64 "\n"
+                 "%sDevicePolicy: %s\n"
+@@ -475,6 +481,7 @@ void cgroup_context_dump(Unit *u, FILE* f, const char *prefix) {
+                 prefix, c->memory_high, format_cgroup_memory_limit_comparison(cdc, sizeof(cdc), u, "MemoryHigh"),
+                 prefix, c->memory_max, format_cgroup_memory_limit_comparison(cdd, sizeof(cdd), u, "MemoryMax"),
+                 prefix, c->memory_swap_max, format_cgroup_memory_limit_comparison(cde, sizeof(cde), u, "MemorySwapMax"),
++                prefix, c->memory_zswap_max, format_cgroup_memory_limit_comparison(cde, sizeof(cde), u, "MemoryZSwapMax"),
+                 prefix, c->memory_limit,
+                 prefix, tasks_max_resolve(&c->tasks_max),
+                 prefix, cgroup_device_policy_to_string(c->device_policy),
+@@ -1075,7 +1082,7 @@ static bool unit_has_unified_memory_config(Unit *u) {
+ 
+         return unit_get_ancestor_memory_min(u) > 0 || unit_get_ancestor_memory_low(u) > 0 ||
+                c->memory_high != CGROUP_LIMIT_MAX || c->memory_max != CGROUP_LIMIT_MAX ||
+-               c->memory_swap_max != CGROUP_LIMIT_MAX;
++               c->memory_swap_max != CGROUP_LIMIT_MAX || c->memory_zswap_max != CGROUP_LIMIT_MAX;
+ }
+ 
+ static void cgroup_apply_unified_memory_limit(Unit *u, const char *file, uint64_t v) {
+@@ -1442,10 +1449,12 @@ static void cgroup_context_apply(
+ 
+                 if (cg_all_unified() > 0) {
+                         uint64_t max, swap_max = CGROUP_LIMIT_MAX;
++                        uint64_t zswap_max = CGROUP_LIMIT_MAX;
+ 
+                         if (unit_has_unified_memory_config(u)) {
+                                 max = c->memory_max;
+                                 swap_max = c->memory_swap_max;
++                                zswap_max = c->memory_zswap_max;
+                         } else {
+                                 max = c->memory_limit;
+ 
+@@ -1458,6 +1467,8 @@ static void cgroup_context_apply(
+                         cgroup_apply_unified_memory_limit(u, "memory.high", c->memory_high);
+                         cgroup_apply_unified_memory_limit(u, "memory.max", max);
+                         cgroup_apply_unified_memory_limit(u, "memory.swap.max", swap_max);
++                        if (cg_zswap_supported())
++                                cgroup_apply_unified_memory_limit(u, "memory.zswap.max", zswap_max);
+ 
+                         (void) set_attribute_and_warn(u, "memory", "memory.oom.group", one_zero(c->memory_oom_group));
+ 
+diff --git a/src/core/cgroup.h b/src/core/cgroup.h
+index 3f8cad899d..d40ac0fadc 100644
+--- a/src/core/cgroup.h
++++ b/src/core/cgroup.h
+@@ -147,6 +147,7 @@ struct CGroupContext {
+         uint64_t memory_high;
+         uint64_t memory_max;
+         uint64_t memory_swap_max;
++        uint64_t memory_zswap_max;
+ 
+         bool default_memory_min_set;
+         bool default_memory_low_set;
+diff --git a/src/core/dbus-cgroup.c b/src/core/dbus-cgroup.c
+index 84c3caf3a5..e57ceff6f4 100644
+--- a/src/core/dbus-cgroup.c
++++ b/src/core/dbus-cgroup.c
+@@ -439,6 +439,7 @@ const sd_bus_vtable bus_cgroup_vtable[] = {
+         SD_BUS_PROPERTY("MemoryHigh", "t", NULL, offsetof(CGroupContext, memory_high), 0),
+         SD_BUS_PROPERTY("MemoryMax", "t", NULL, offsetof(CGroupContext, memory_max), 0),
+         SD_BUS_PROPERTY("MemorySwapMax", "t", NULL, offsetof(CGroupContext, memory_swap_max), 0),
++        SD_BUS_PROPERTY("MemoryZSwapMax", "t", NULL, offsetof(CGroupContext, memory_zswap_max), 0),
+         SD_BUS_PROPERTY("MemoryLimit", "t", NULL, offsetof(CGroupContext, memory_limit), 0),
+         SD_BUS_PROPERTY("DevicePolicy", "s", property_get_cgroup_device_policy, offsetof(CGroupContext, device_policy), 0),
+         SD_BUS_PROPERTY("DeviceAllow", "a(ss)", property_get_device_allow, 0, 0),
+@@ -860,6 +861,7 @@ BUS_DEFINE_SET_CGROUP_WEIGHT(blockio_weight, CGROUP_MASK_BLKIO, CGROUP_BLKIO_WEI
+ BUS_DEFINE_SET_CGROUP_LIMIT(memory, CGROUP_MASK_MEMORY, physical_memory_scale, 1);
+ BUS_DEFINE_SET_CGROUP_LIMIT(memory_protection, CGROUP_MASK_MEMORY, physical_memory_scale, 0);
+ BUS_DEFINE_SET_CGROUP_LIMIT(swap, CGROUP_MASK_MEMORY, physical_memory_scale, 0);
++BUS_DEFINE_SET_CGROUP_LIMIT(zswap, CGROUP_MASK_MEMORY, physical_memory_scale, 0);
+ REENABLE_WARNING;
+ 
+ static int bus_cgroup_set_tasks_max(
+@@ -1019,6 +1021,9 @@ int bus_cgroup_set_property(
+         if (streq(name, "MemorySwapMax"))
+                 return bus_cgroup_set_swap(u, name, &c->memory_swap_max, message, flags, error);
+ 
++        if (streq(name, "MemoryZSwapMax"))
++                return bus_cgroup_set_zswap(u, name, &c->memory_zswap_max, message, flags, error);
++
+         if (streq(name, "MemoryMax"))
+                 return bus_cgroup_set_memory(u, name, &c->memory_max, message, flags, error);
+ 
+@@ -1059,6 +1064,9 @@ int bus_cgroup_set_property(
+         if (streq(name, "MemorySwapMaxScale"))
+                 return bus_cgroup_set_swap_scale(u, name, &c->memory_swap_max, message, flags, error);
+ 
++        if (streq(name, "MemoryZSwapMaxScale"))
++                return bus_cgroup_set_zswap_scale(u, name, &c->memory_zswap_max, message, flags, error);
++
+         if (streq(name, "MemoryMaxScale"))
+                 return bus_cgroup_set_memory_scale(u, name, &c->memory_max, message, flags, error);
+ 
+diff --git a/src/core/load-fragment-gperf.gperf.in b/src/core/load-fragment-gperf.gperf.in
+index 42441eab6e..27860fb973 100644
+--- a/src/core/load-fragment-gperf.gperf.in
++++ b/src/core/load-fragment-gperf.gperf.in
+@@ -196,6 +196,7 @@
+ {{type}}.MemoryHigh,                       config_parse_memory_limit,                   0,                                  offsetof({{type}}, cgroup_context)
+ {{type}}.MemoryMax,                        config_parse_memory_limit,                   0,                                  offsetof({{type}}, cgroup_context)
+ {{type}}.MemorySwapMax,                    config_parse_memory_limit,                   0,                                  offsetof({{type}}, cgroup_context)
++{{type}}.MemoryZSwapMax,                   config_parse_memory_limit,                   0,                                  offsetof({{type}}, cgroup_context)
+ {{type}}.MemoryLimit,                      config_parse_memory_limit,                   0,                                  offsetof({{type}}, cgroup_context)
+ {{type}}.DeviceAllow,                      config_parse_device_allow,                   0,                                  offsetof({{type}}, cgroup_context)
+ {{type}}.DevicePolicy,                     config_parse_device_policy,                  0,                                  offsetof({{type}}, cgroup_context.device_policy)
+diff --git a/src/core/load-fragment.c b/src/core/load-fragment.c
+index a068fdf313..b64e64d90f 100644
+--- a/src/core/load-fragment.c
++++ b/src/core/load-fragment.c
+@@ -3690,7 +3690,7 @@ int config_parse_memory_limit(
+                         bytes = physical_memory_scale(r, 10000U);
+ 
+                 if (bytes >= UINT64_MAX ||
+-                    (bytes <= 0 && !STR_IN_SET(lvalue, "MemorySwapMax", "MemoryLow", "MemoryMin", "DefaultMemoryLow", "DefaultMemoryMin"))) {
++                    (bytes <= 0 && !STR_IN_SET(lvalue, "MemorySwapMax", "MemoryZSwapMax", "MemoryLow", "MemoryMin", "DefaultMemoryLow", "DefaultMemoryMin"))) {
+                         log_syntax(unit, LOG_WARNING, filename, line, 0, "Memory limit '%s' out of range, ignoring.", rvalue);
+                         return 0;
+                 }
+@@ -3714,6 +3714,8 @@ int config_parse_memory_limit(
+                 c->memory_max = bytes;
+         else if (streq(lvalue, "MemorySwapMax"))
+                 c->memory_swap_max = bytes;
++        else if (streq(lvalue, "MemoryZSwapMax"))
++                c->memory_zswap_max = bytes;
+         else if (streq(lvalue, "MemoryLimit"))
+                 c->memory_limit = bytes;
+         else
+diff --git a/src/shared/bus-print-properties.c b/src/shared/bus-print-properties.c
+index b45921943a..31c2e3cd35 100644
+--- a/src/shared/bus-print-properties.c
++++ b/src/shared/bus-print-properties.c
+@@ -165,7 +165,7 @@ static int bus_print_property(const char *name, const char *expected_value, sd_b
+ 
+                         bus_print_property_value(name, expected_value, flags, "[not set]");
+ 
+-                else if ((STR_IN_SET(name, "DefaultMemoryLow", "DefaultMemoryMin", "MemoryLow", "MemoryHigh", "MemoryMax", "MemorySwapMax", "MemoryLimit", "MemoryAvailable") && u == CGROUP_LIMIT_MAX) ||
++                else if ((STR_IN_SET(name, "DefaultMemoryLow", "DefaultMemoryMin", "MemoryLow", "MemoryHigh", "MemoryMax", "MemorySwapMax", "MemoryZSwapMax", "MemoryLimit", "MemoryAvailable") && u == CGROUP_LIMIT_MAX) ||
+                          (STR_IN_SET(name, "TasksMax", "DefaultTasksMax") && u == UINT64_MAX) ||
+                          (startswith(name, "Limit") && u == UINT64_MAX) ||
+                          (startswith(name, "DefaultLimit") && u == UINT64_MAX))
+diff --git a/src/shared/bus-unit-util.c b/src/shared/bus-unit-util.c
+index d3a5b25d18..f89b6e7428 100644
+--- a/src/shared/bus-unit-util.c
++++ b/src/shared/bus-unit-util.c
+@@ -516,6 +516,7 @@ static int bus_append_cgroup_property(sd_bus_message *m, const char *field, cons
+                               "MemoryHigh",
+                               "MemoryMax",
+                               "MemorySwapMax",
++                              "MemoryZSwapMax",
+                               "MemoryLimit",
+                               "TasksMax")) {
+ 
+diff --git a/src/systemctl/systemctl-show.c b/src/systemctl/systemctl-show.c
+index 1f524626bf..2bba11936e 100644
+--- a/src/systemctl/systemctl-show.c
++++ b/src/systemctl/systemctl-show.c
+@@ -247,6 +247,7 @@ typedef struct UnitStatusInfo {
+         uint64_t memory_high;
+         uint64_t memory_max;
+         uint64_t memory_swap_max;
++        uint64_t memory_zswap_max;
+         uint64_t memory_limit;
+         uint64_t memory_available;
+         uint64_t cpu_usage_nsec;
+@@ -684,6 +685,7 @@ static void print_status_info(
+                 if (i->memory_min > 0 || i->memory_low > 0 ||
+                     i->memory_high != CGROUP_LIMIT_MAX || i->memory_max != CGROUP_LIMIT_MAX ||
+                     i->memory_swap_max != CGROUP_LIMIT_MAX ||
++                    i->memory_zswap_max != CGROUP_LIMIT_MAX ||
+                     i->memory_available != CGROUP_LIMIT_MAX ||
+                     i->memory_limit != CGROUP_LIMIT_MAX) {
+                         const char *prefix = "";
+@@ -709,6 +711,10 @@ static void print_status_info(
+                                 printf("%sswap max: %s", prefix, format_bytes(buf, sizeof(buf), i->memory_swap_max));
+                                 prefix = " ";
+                         }
++                        if (i->memory_zswap_max != CGROUP_LIMIT_MAX) {
++                                printf("%szswap max: %s", prefix, format_bytes(buf, sizeof(buf), i->memory_zswap_max));
++                                prefix = " ";
++                        }
+                         if (i->memory_limit != CGROUP_LIMIT_MAX) {
+                                 printf("%slimit: %s", prefix, format_bytes(buf, sizeof(buf), i->memory_limit));
+                                 prefix = " ";
+@@ -1850,6 +1856,7 @@ static int show_one(
+                 { "MemoryHigh",                     "t",               NULL,           offsetof(UnitStatusInfo, memory_high)                       },
+                 { "MemoryMax",                      "t",               NULL,           offsetof(UnitStatusInfo, memory_max)                        },
+                 { "MemorySwapMax",                  "t",               NULL,           offsetof(UnitStatusInfo, memory_swap_max)                   },
++                { "MemoryZSwapMax",                 "t",               NULL,           offsetof(UnitStatusInfo, memory_zswap_max)                  },
+                 { "MemoryLimit",                    "t",               NULL,           offsetof(UnitStatusInfo, memory_limit)                      },
+                 { "CPUUsageNSec",                   "t",               NULL,           offsetof(UnitStatusInfo, cpu_usage_nsec)                    },
+                 { "TasksCurrent",                   "t",               NULL,           offsetof(UnitStatusInfo, tasks_current)                     },
+@@ -1884,6 +1891,7 @@ static int show_one(
+                 .memory_high = CGROUP_LIMIT_MAX,
+                 .memory_max = CGROUP_LIMIT_MAX,
+                 .memory_swap_max = CGROUP_LIMIT_MAX,
++                .memory_zswap_max = CGROUP_LIMIT_MAX,
+                 .memory_limit = UINT64_MAX,
+                 .memory_available = CGROUP_LIMIT_MAX,
+                 .cpu_usage_nsec = UINT64_MAX,
+diff --git a/test/fuzz/fuzz-unit-file/directives-all.service b/test/fuzz/fuzz-unit-file/directives-all.service
+index 3039d1c0cd..81ffe4fc86 100644
+--- a/test/fuzz/fuzz-unit-file/directives-all.service
++++ b/test/fuzz/fuzz-unit-file/directives-all.service
+@@ -152,6 +152,7 @@ MemoryLimit=
+ MemoryLow=
+ MemoryMax=
+ MemorySwapMax=
++MemoryZSwapMax=
+ MessageQueueMaxMessages=
+ MessageQueueMessageSize=
+ MountAPIVFS=
+diff --git a/test/fuzz/fuzz-unit-file/directives.mount b/test/fuzz/fuzz-unit-file/directives.mount
+index 451f291988..ba5d03cc4b 100644
+--- a/test/fuzz/fuzz-unit-file/directives.mount
++++ b/test/fuzz/fuzz-unit-file/directives.mount
+@@ -103,6 +103,7 @@ MemoryLow=
+ MemoryMax=
+ MemoryMin=
+ MemorySwapMax=
++MemoryZSwapMax=
+ MountAPIVFS=
+ MountFlags=
+ MountImages=
+diff --git a/test/fuzz/fuzz-unit-file/directives.scope b/test/fuzz/fuzz-unit-file/directives.scope
+index 7e69cf816b..12e3f02b9b 100644
+--- a/test/fuzz/fuzz-unit-file/directives.scope
++++ b/test/fuzz/fuzz-unit-file/directives.scope
+@@ -46,6 +46,7 @@ MemoryLow=
+ MemoryMax=
+ MemoryMin=
+ MemorySwapMax=
++MemoryZSwapMax=
+ NetClass=
+ RestartKillSignal=
+ RuntimeMaxSec=
+diff --git a/test/fuzz/fuzz-unit-file/directives.service b/test/fuzz/fuzz-unit-file/directives.service
+index de7d2c7daf..b27b100f1a 100644
+--- a/test/fuzz/fuzz-unit-file/directives.service
++++ b/test/fuzz/fuzz-unit-file/directives.service
+@@ -225,6 +225,7 @@ MemoryLow=
+ MemoryMax=
+ MemoryMin=
+ MemorySwapMax=
++MemoryZSwapMax=
+ MountAPIVFS=
+ MountFlags=
+ MountImages=
+diff --git a/test/fuzz/fuzz-unit-file/directives.slice b/test/fuzz/fuzz-unit-file/directives.slice
+index 789ac8f0db..0004d4dfd4 100644
+--- a/test/fuzz/fuzz-unit-file/directives.slice
++++ b/test/fuzz/fuzz-unit-file/directives.slice
+@@ -43,6 +43,7 @@ MemoryLow=
+ MemoryMax=
+ MemoryMin=
+ MemorySwapMax=
++MemoryZSwapMax=
+ NetClass=
+ Slice=
+ SocketBindAllow=
+diff --git a/test/fuzz/fuzz-unit-file/directives.socket b/test/fuzz/fuzz-unit-file/directives.socket
+index 11f589e22c..02e0349009 100644
+--- a/test/fuzz/fuzz-unit-file/directives.socket
++++ b/test/fuzz/fuzz-unit-file/directives.socket
+@@ -131,6 +131,7 @@ MemoryLow=
+ MemoryMax=
+ MemoryMin=
+ MemorySwapMax=
++MemoryZSwapMax=
+ MessageQueueMaxMessages=
+ MessageQueueMessageSize=
+ MountAPIVFS=
+diff --git a/test/fuzz/fuzz-unit-file/directives.swap b/test/fuzz/fuzz-unit-file/directives.swap
+index 582a136531..4536b2a606 100644
+--- a/test/fuzz/fuzz-unit-file/directives.swap
++++ b/test/fuzz/fuzz-unit-file/directives.swap
+@@ -100,6 +100,7 @@ MemoryLow=
+ MemoryMax=
+ MemoryMin=
+ MemorySwapMax=
++MemoryZSwapMax=
+ MountAPIVFS=
+ MountFlags=
+ MountImages=
+-- 
+2.34.1
+
