@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        56%{?dist}
+Release:        58%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -751,6 +751,48 @@ Patch0698: 0698-unit-add-jobs-that-were-skipped-because-of-ratelimit.patch
 Patch0699: 0699-Revert-Revert-sysctl-Enable-ping-8-inside-rootless-P.patch
 Patch0700: 0700-sysctl-prefix-ping-port-range-setting-with-a-dash.patch
 Patch0701: 0701-mount-don-t-propagate-errors-from-mount_setup_unit-f.patch
+Patch0702: 0702-udev-net_id-introduce-naming-scheme-for-RHEL-8.5.patch
+Patch0703: 0703-udev-net_id-remove-extraneous-bracket.patch
+Patch0704: 0704-udev-net_id-introduce-naming-scheme-for-RHEL-8.6.patch
+Patch0705: 0705-define-newly-needed-constants.patch
+Patch0706: 0706-sd-netlink-support-IFLA_PROP_LIST-and-IFLA_ALT_IFNAM.patch
+Patch0707: 0707-sd-netlink-introduce-sd_netlink_message_read_strv.patch
+Patch0708: 0708-sd-netlink-introduce-sd_netlink_message_append_strv.patch
+Patch0709: 0709-test-add-a-test-for-sd_netlink_message_-append-read-.patch
+Patch0710: 0710-util-introduce-ifname_valid_full.patch
+Patch0711: 0711-rename-function.patch
+Patch0712: 0712-udev-support-AlternativeName-setting-in-.link-file.patch
+Patch0713: 0713-network-make-Name-in-Match-support-alternative-names.patch
+Patch0714: 0714-udev-extend-the-length-of-ID_NET_NAME_XXX-to-ALTIFNA.patch
+Patch0715: 0715-udev-do-not-fail-if-kernel-does-not-support-alternat.patch
+Patch0716: 0716-udev-introduce-AlternativeNamesPolicy-setting.patch
+Patch0717: 0717-network-set-AlternativeNamesPolicy-in-99-default.lin.patch
+Patch0718: 0718-random-util-call-initialize_srand-after-fork.patch
+Patch0719: 0719-sd-netlink-introduce-rtnl_resolve_link_alternative_n.patch
+Patch0720: 0720-udev-sort-alternative-names.patch
+Patch0721: 0721-netlink-introduce-rtnl_get-delete_link_alternative_n.patch
+Patch0722: 0722-netlink-do-not-fail-when-new-interface-name-is-alrea.patch
+Patch0723: 0723-udev-do-not-try-to-reassign-alternative-names.patch
+Patch0724: 0724-Do-not-fail-if-the-same-alt.-name-is-set-again.patch
+Patch0725: 0725-mount-do-not-update-exec-deps-on-mountinfo-changes.patch
+Patch0726: 0726-core-mount-add-implicit-unit-dependencies-even-if-wh.patch
+Patch0727: 0727-core-fix-unfortunate-typo-in-unit_is_unneeded.patch
+Patch0728: 0728-core-make-destructive-transaction-error-a-bit-more-u.patch
+Patch0729: 0729-tmpfiles-use-a-entry-in-hashmap-as-ItemArray-in-read.patch
+Patch0730: 0730-tmpfiles-rework-condition-check.patch
+Patch0731: 0731-TEST-22-TMPFILES-add-reproducer-for-bug-with-X.patch
+Patch0732: 0732-core-make-sure-we-don-t-get-confused-when-setting-TE.patch
+Patch0733: 0733-hash-funcs-introduce-macro-to-create-typesafe-hash_o.patch
+Patch0734: 0734-hash-func-add-destructors-for-key-and-value.patch
+Patch0735: 0735-util-define-free_func_t.patch
+Patch0736: 0736-hash-funcs-make-basic-hash_ops-typesafe.patch
+Patch0737: 0737-test-add-tests-for-destructors-of-hashmap-or-set.patch
+Patch0738: 0738-man-document-the-new-sysctl.d-prefix.patch
+Patch0739: 0739-sysctl-if-options-are-prefixed-with-ignore-write-err.patch
+Patch0740: 0740-sysctl-fix-segfault.patch
+Patch0741: 0741-ci-drop-CentOS-8-CI.patch
+Patch0742: 0742-test-adapt-to-the-new-capsh-format.patch
+Patch0743: 0743-test-ignore-IAB-capabilities-in-test-execute.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -1381,6 +1423,52 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Tue Feb 08 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58
+- ci: drop CentOS 8 CI (#2017033)
+- test: adapt to the new capsh format (#2017033)
+- test: ignore IAB capabilities in `test-execute` (#2017033)
+
+* Mon Feb 07 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-57
+- udev/net_id: introduce naming scheme for RHEL-8.5 (#2039797)
+- udev/net_id: remove extraneous bracket (#2039797)
+- udev/net_id: introduce naming scheme for RHEL-8.6 (#2039797)
+- define newly needed constants (#2005008)
+- sd-netlink: support IFLA_PROP_LIST and IFLA_ALT_IFNAME attributes (#2005008)
+- sd-netlink: introduce sd_netlink_message_read_strv() (#2005008)
+- sd-netlink: introduce sd_netlink_message_append_strv() (#2005008)
+- test: add a test for sd_netlink_message_{append,read}_strv() (#2005008)
+- util: introduce ifname_valid_full() (#2005008)
+- rename function (#2005008)
+- udev: support AlternativeName= setting in .link file (#2005008)
+- network: make Name= in [Match] support alternative names of interfaces (#2005008)
+- udev: extend the length of ID_NET_NAME_XXX= to ALTIFNAMSIZ (#2005008)
+- udev: do not fail if kernel does not support alternative names (#2005008)
+- udev: introduce AlternativeNamesPolicy= setting (#2005008)
+- network: set AlternativeNamesPolicy= in 99-default.link (#2005008)
+- random-util: call initialize_srand() after fork() (#2005008)
+- sd-netlink: introduce rtnl_resolve_link_alternative_names() (#2005008)
+- udev: sort alternative names (#2005008)
+- netlink: introduce rtnl_get/delete_link_alternative_names() (#2005008)
+- netlink: do not fail when new interface name is already used as an alternative name (#2005008)
+- udev: do not try to reassign alternative names (#2005008)
+- Do not fail if the same alt. name is set again (#2005008)
+- mount: do not update exec deps on mountinfo changes (#2008825)
+- core/mount: add implicit unit dependencies even if when mount unit is generated from /proc/self/mountinfo (#2008825)
+- core: fix unfortunate typo in unit_is_unneeded() (#2040147)
+- core: make destructive transaction error a bit more useful (#2040147)
+- tmpfiles: use a entry in hashmap as ItemArray in read_config_file() (#1944468)
+- tmpfiles: rework condition check (#1944468)
+- TEST-22-TMPFILES: add reproducer for bug with X (#1944468)
+- core: make sure we don't get confused when setting TERM for a tty fd (#2045307)
+- hash-funcs: introduce macro to create typesafe hash_ops (#2037807)
+- hash-func: add destructors for key and value (#2037807)
+- util: define free_func_t (#2037807)
+- hash-funcs: make basic hash_ops typesafe (#2037807)
+- test: add tests for destructors of hashmap or set (#2037807)
+- man: document the new sysctl.d/ - prefix (#2037807)
+- sysctl: if options are prefixed with "-" ignore write errors (#2037807)
+- sysctl: fix segfault (#2037807)
+
 * Tue Jan 25 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-56
 - Take ghost ownership of /var/log/lastlog (#1798685)
 
