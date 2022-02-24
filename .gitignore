@@ -1,5 +1,9 @@
-BUILD/
-BUILDROOT/
-RPMS/
-SOURCES/*.tar.gz
-SRPMS/
+*~
+/.mail.list
+/systemd-*/
+/.build-*.log
+/x86_64/
+/systemd-*src.rpm
+/systemd-*.tar.xz
+/systemd-*.tar.gz
+/*.rpm

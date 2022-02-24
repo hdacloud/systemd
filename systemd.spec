@@ -40,7 +40,7 @@ Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 %if %{without inplace}
 Version:        249.4
-Release:        2.12%{?dist}
+Release:        2.13%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -1100,6 +1100,12 @@ fi
 %endif
 
 %changelog
+* Thu Feb 24 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 249-2.13
+- Move to dist-git layout used by Fedora (no more SOURCES/ and SPECS/)
+- Switch to .gitignore from commit 46a40810 from the Fedora RPM repo
+- Add back removed files from commit 46a40810 from the Fedora RPM repo except
+  sources
+
 * Wed Feb 09 2022 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.12
 - Backport PR #20695: Sync if_arp.h with Linux 5.14
 - FB-only backport PR #22426: MemoryZSwapMax= to configure memory.zswap.max
