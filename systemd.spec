@@ -1103,8 +1103,7 @@ fi
 * Thu Feb 24 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 249-2.13
 - Move to dist-git layout used by Fedora (no more SOURCES/ and SPECS/)
 - Switch to .gitignore from commit 46a40810 from the Fedora RPM repo
-- Add back removed files from commit 46a40810 from the Fedora RPM repo except
-  sources
+- Add back removed files from commit 46a40810 from the Fedora RPM repo
 
 * Wed Feb 09 2022 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.12
 - Backport PR #20695: Sync if_arp.h with Linux 5.14
