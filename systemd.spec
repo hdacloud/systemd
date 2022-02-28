@@ -3,6 +3,12 @@
 
 %global stable 1
 
+%if 0%{?facebook}
+%global hs_commit c389d4c9c7a1bbc5f125c63a430d9475d672ddc3
+%else
+%global hs_commit c47889a351e56393bfb267d8a7a5655b8a86dbfd
+%endif
+
 # We ship a .pc file but don't want to have a dep on pkg-config. We
 # strip the automatically generated dep here and instead co-own the
 # directory.
@@ -17,8 +23,8 @@
 %global elf_suffix ()%{elf_bits}
 %endif
 
-# Bootstrap may be needed to break intercircular dependencies with
-# cryptsetup, e.g. when re-building cryptsetup on a json-c SONAME-bump.
+# Bootstrap may be needed to break circular dependencies with cryptsetup,
+# e.g. when re-building cryptsetup on a json-c SONAME-bump.
 %bcond_with    bootstrap
 %bcond_without tests
 %bcond_without lto
@@ -33,33 +39,23 @@
 %bcond_without selinux
 %endif
 
-# Remove this when the macro exists in CentOS
-%global version_no_tilde %(c=%{version}; echo ${c}|tr '~' '-')
-
 Name:           systemd
-Url:            https://www.freedesktop.org/wiki/Software/systemd
+Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
-Version:        249.4
-Release:        2.13%{?dist}
+Version:        250.3
+Release:        6.1%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
-Release:        1
+Release:        2
 %endif
+
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
 
 # download tarballs with "spectool -g systemd.spec"
-%if %{defined commit}
-Source0:        https://github.com/systemd/systemd%{?stable:-stable}/archive/%{commit}/%{name}-%{shortcommit}.tar.gz
-%else
-%if 0%{?stable}
-Source0:        https://github.com/systemd/systemd-stable/archive/v%{version_no_tilde}/%{name}-%{version_no_tilde}.tar.gz
-%else
-Source0:        https://github.com/systemd/systemd/archive/v%{version_no_tilde}/%{name}-%{version_no_tilde}.tar.gz
-%endif
-%endif
+Source0:        %{url}/archive/%{hs_commit}/%{name}-hs%{?facebook:+fb}-%{version}.tar.gz
 # This file must be available before %%prep.
 # It is generated during systemd build and can be found in build/src/core/.
 Source1:        triggers.systemd
@@ -71,7 +67,6 @@ Source4:        yum-protect-systemd.conf
 
 Source9:        20-yama-ptrace.conf
 Source10:       systemd-udev-trigger-no-reload.conf
-Source11:       20-grubby.install
 Source12:       systemd-user
 Source13:       libsystemd-shared.abignore
 
@@ -92,7 +87,7 @@ Source102:      systemd_hs.if
 %if 0
 GIT_DIR=../../src/systemd/.git git format-patch-ab --no-signature -M -N v235..v235-stable
 i=1; for j in 00*patch; do printf "Patch%04d:      %s\n" $i $j; i=$((i+1));done|xclip
-GIT_DIR=../../src/systemd/.git git diffab -M v233..master@{2017-06-15} -- hwdb/[67]* hwdb/parse_hwdb.py > hwdb.patch
+GIT_DIR=../../src/systemd/.git git diffab -M v233..master@{2017-06-15} -- hwdb/[67]* hwdb/parse_hwdb.py >hwdb.patch
 %endif
 
 # Backports of patches from upstream (0000–0499)
@@ -100,66 +95,12 @@ GIT_DIR=../../src/systemd/.git git diffab -M v233..master@{2017-06-15} -- hwdb/[
 # Any patches which are "in preparation" upstream should be listed
 # here, rather than in the next section. Packit CI will drop any
 # patches in this range before applying upstream pull requests.
+Patch:          https://github.com/systemd/systemd/commit/bbe53713455be38c0a587626439fd171f28c77fc.patch
 
-%if 0%{?facebook}
-Patch0001:      0001-rpm-don-t-specify-the-full-path-for-systemctl-and-ot.patch
-Patch0002:      0002-rpm-use-a-helper-script-to-actually-invoke-systemctl.patch
-Patch0003:      0003-rpm-call-needs-restart-in-parallel.patch
-Patch0004:      0004-rpm-restart-user-services-at-the-end-of-the-transact.patch
-Patch0005:      0005-update-helper-also-add-user-reexec-verb.patch
-
-# PR 18621: FB variant of quieting "proc: Bad value for 'hidepid'" messages
-Patch0006:      18621-fb.patch
-%else
-# PR 18621: Quiet "proc: Bad value for 'hidepid'" messages
-Patch0006:      https://github.com/systemd/systemd/pull/18621.patch
-%endif
-
-# PRs to support additional systemd.network and systemd.link features
-Patch0007:      https://github.com/systemd/systemd/pull/20743.patch
-Patch0008:      https://github.com/systemd/systemd/pull/20458.patch
-Patch0009:      https://github.com/systemd/systemd/pull/20472.patch
-Patch0010:      https://github.com/systemd/systemd/pull/20477.patch
-Patch0011:      https://github.com/systemd/systemd/pull/20484.patch
-Patch0012:      https://github.com/systemd/systemd/pull/20489.patch
-Patch0013:      https://github.com/systemd/systemd/pull/20450.patch
-Patch0014:      https://github.com/systemd/systemd/pull/20541.patch
-Patch0015:      https://github.com/systemd/systemd/pull/20729.patch
-Patch0016:      https://github.com/systemd/systemd/pull/20828.patch
-# Part of PR #20892; it was difficult to backport the whole PR
-Patch0017:      50783f91d44b1978c0e4ba62283131fac75d3745_cherrypicked.patch
-
-# PR 20875: allow verifying hidden (dot) files again
-Patch0018:      https://github.com/systemd/systemd/pull/20875.patch
-
-# PR 20978: serialize bpf device programs across reloads/reexecs
-Patch0019:      https://github.com/systemd/systemd/pull/20978.patch
-
-# PR 20676: don't rewrite sysctls that are already set
-Patch0020:      20676_cherrypicked.patch
-
-# PR 21221: Fixes non-deterministic Slice= assignments
-Patch0021:      21221.patch
-
-# PR 21241: fix bpf-foreign cgroup controller realization
-Patch0022:      21241.patch
-
-# PR 20695: Sync if_arp.h with Linux 5.14
-Patch0023:      20695.patch
-
-%if 0%{?facebook}
-# PR 22426: MemoryZSwapMax= to configure memory.zswap.max
-Patch0024:      22426-fb.patch
-%endif
-
-# Downstream-only patches (0500–9999)
+# Downstream-only patches (5000–9999)
 
 # https://github.com/systemd/systemd/pull/17050
 Patch0501:      https://github.com/systemd/systemd/pull/17050/commits/f58b96d3e8d1cb0dd3666bc74fa673918b586612.patch
-# Downgrade sysv-generator messages from warning to debug
-Patch0502:      0001-sysv-generator-downgrade-log-warning-about-autogener.patch
-# Update libfdisk dep version to 2.32.1-26 (has the fix for repart tests to pass)
-Patch0503:      libfdisk_version_for_centos.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -167,10 +108,12 @@ Patch0503:      libfdisk_version_for_centos.patch
 
 BuildRequires:  gcc
 BuildRequires:  gcc-c++
+BuildRequires:  clang
+BuildRequires:  llvm-toolset
 BuildRequires:  coreutils
 BuildRequires:  libcap-devel
 BuildRequires:  libmount-devel
-BuildRequires:  libfdisk-devel >= 2.32.1-26
+BuildRequires:  libfdisk-devel
 BuildRequires:  libpwquality-devel
 BuildRequires:  pam-devel
 BuildRequires:  libselinux-devel
@@ -205,6 +148,8 @@ BuildRequires:  iptables-devel
 BuildRequires:  pkgconfig(tss2-esys)
 BuildRequires:  pkgconfig(tss2-rc)
 BuildRequires:  pkgconfig(tss2-mu)
+BuildRequires:  pkgconfig(libbpf)
+BuildRequires:  bpftool
 BuildRequires:  systemtap-sdt-devel
 BuildRequires:  libxslt
 BuildRequires:  docbook-style-xsl
@@ -233,15 +178,12 @@ BuildRequires:  perl
 BuildRequires:  perl(IPC::SysV)
 
 Requires(post): coreutils
-Requires(post): sed
-Requires(post): acl
 Requires(post): grep
 # systemd-machine-id-setup requires libssl
 Requires(post): openssl-libs
-Requires(pre):  coreutils
 Requires:       dbus >= 1.9.18
 Requires:       %{name}-pam = %{version}-%{release}
-Requires:       (%{name}-rpm-macros = %{version}-%{release} if rpm-build)
+Requires:       %{name}-rpm-macros = %{version}-%{release}
 Requires:       %{name}-libs = %{version}-%{release}
 %{?fedora:Recommends:     %{name}-networkd = %{version}-%{release}}
 %{?fedora:Recommends:     %{name}-resolved = %{version}-%{release}}
@@ -278,26 +220,37 @@ Recommends:     libidn2.so.0(IDN2_0.0.0)%{?elf_bits}
 Recommends:     libpcre2-8.so.0%{?elf_suffix}
 Recommends:     libpwquality.so.1%{?elf_suffix}
 Recommends:     libpwquality.so.1(LIBPWQUALITY_1.0)%{?elf_bits}
+Recommends:     libqrencode.so.4%{?elf_suffix}
 
 %if %{with selinux}
 # Force the SELinux module to be installed
 Requires:       %{name}-selinux = %{version}-%{release}
 %endif
 
+Recommends:     libbpf.so.0%{?elf_suffix}
+Recommends:     libbpf.so.0(LIBBPF_0.4.0)%{?elf_bits}
+
+# used by systemd-coredump and systemd-analyze
+Recommends:     libdw.so.1%{?elf_suffix}
+Recommends:     libdw.so.1(ELFUTILS_0.186)%{?elf_bits}
+Recommends:     libelf.so.1%{?elf_suffix}
+Recommends:     libelf.so.1(ELFUTILS_1.7)%{?elf_bits}
+
+# used by dissect, integritysetup, veritysetyp, growfs, repart, cryptenroll, home
+Recommends:     libcryptsetup.so.12%{?elf_suffix}
+Recommends:     libcryptsetup.so.12(CRYPTSETUP_2.4)%{?elf_bits}
+
 %description
-systemd is a system and service manager that runs as PID 1 and starts
-the rest of the system. It provides aggressive parallelization
-capabilities, uses socket and D-Bus activation for starting services,
-offers on-demand starting of daemons, keeps track of processes using
-Linux control groups, maintains mount and automount points, and
-implements an elaborate transactional dependency-based service control
-logic. systemd supports SysV and LSB init scripts and works as a
+systemd is a system and service manager that runs as PID 1 and starts the rest
+of the system. It provides aggressive parallelization capabilities, uses socket
+and D-Bus activation for starting services, offers on-demand starting of
+daemons, keeps track of processes using Linux control groups, maintains mount
+and automount points, and implements an elaborate transactional dependency-based
+service control logic. systemd supports SysV and LSB init scripts and works as a
 replacement for sysvinit. Other parts of this package are a logging daemon,
-utilities to control basic system configuration like the hostname,
-date, locale, maintain a list of logged-in users, system accounts,
-runtime directories and settings, and daemons to manage simple network
-configuration, network time synchronization, log forwarding, and name
-resolution.
+utilities to control basic system configuration like the hostname, date, locale,
+maintain a list of logged-in users, system accounts, runtime directories and
+settings, and a logging daemons.
 %if 0%{?stable}
 This package was built from the %{version}-stable branch of systemd.
 %endif
@@ -312,10 +265,6 @@ Obsoletes:      systemd-compat-libs < 230
 Obsoletes:      nss-myhostname < 0.4
 Provides:       nss-myhostname = 0.4
 Provides:       nss-myhostname%{_isa} = 0.4
-Requires(post): coreutils
-Requires(post): sed
-Requires(post): grep
-Requires(post): /usr/bin/getent
 
 %description libs
 Libraries for systemd and udev.
@@ -370,6 +319,23 @@ Provides:       udev = %{version}
 Provides:       udev%{_isa} = %{version}
 Obsoletes:      udev < 183
 
+# Recommends to replace normal Requires deps for stuff that is dlopen()ed
+# used by dissect, integritysetup, veritysetyp, growfs, repart, cryptenroll, home
+Recommends:     libcryptsetup.so.12%{?elf_suffix}
+Recommends:     libcryptsetup.so.12(CRYPTSETUP_2.4)%{?elf_bits}
+
+# used by systemd-coredump and systemd-analyze
+Recommends:     libdw.so.1%{?elf_suffix}
+Recommends:     libdw.so.1(ELFUTILS_0.186)%{?elf_bits}
+Recommends:     libelf.so.1%{?elf_suffix}
+Recommends:     libelf.so.1(ELFUTILS_1.7)%{?elf_bits}
+
+# used by home, cryptsetup, cryptenroll
+Recommends:     libfido2.so.1%{?elf_suffix}
+Recommends:     libtss2-esys.so.0%{?elf_suffix}
+Recommends:     libtss2-mu.so.0%{?elf_suffix}
+Recommends:     libtss2-rc.so.0%{?elf_suffix}
+
 # https://bugzilla.redhat.com/show_bug.cgi?id=1377733#c9
 Suggests:       systemd-bootchart
 # https://bugzilla.redhat.com/show_bug.cgi?id=1408878
@@ -380,9 +346,14 @@ Provides:       u2f-hidraw-policy = 1.0.2-40
 Obsoletes:      u2f-hidraw-policy < 1.0.2-40
 
 %description udev
-This package contains systemd-udev and the rules and hardware database
-needed to manage device nodes. This package is necessary on physical
-machines and in virtual machines, but not in containers.
+This package contains systemd-udev and the rules and hardware database needed to
+manage device nodes. This package is necessary on physical machines and in
+virtual machines, but not in containers.
+
+This package also provides systemd-timesyncd, a network time protocol daemon.
+
+It also contains tools to manage encrypted home areas and secrets bound to the
+machine, and to create or grow partitions and make file systems automatically.
 
 %package container
 # Name is the same as in Debian
@@ -393,33 +364,33 @@ Requires(preun):  systemd
 Requires(postun): systemd
 # obsolete parent package so that dnf will install new subpackage on upgrade (#1260394)
 Obsoletes:      %{name} < 229-5
+# Bias the system towards libcurl-minimal if nothing pulls in full libcurl (#1997040)
+Suggests:       libcurl-minimal
 License:        LGPLv2+
 
 %description container
 Systemd tools to spawn and manage containers and virtual machines.
 
-This package contains systemd-nspawn, machinectl, systemd-machined,
-and systemd-importd.
+This package contains systemd-nspawn, machinectl, systemd-machined, and
+systemd-importd.
 
 %package journal-remote
 # Name is the same as in Debian
 Summary:        Tools to send journal events over the network
 Requires:       %{name}%{?_isa} = %{version}-%{release}
 License:        LGPLv2+
-Requires(pre):    /usr/bin/getent
-Requires(post):   systemd
-Requires(preun):  systemd
-Requires(postun): systemd
 Provides:       %{name}-journal-gateway = %{version}-%{release}
 Provides:       %{name}-journal-gateway%{_isa} = %{version}-%{release}
 Obsoletes:      %{name}-journal-gateway < 227-7
+# Bias the system towards libcurl-minimal if nothing pulls in full libcurl (#1997040)
+Suggests:       libcurl-minimal
 
 %description journal-remote
-Programs to forward journal entries over the network, using encrypted HTTP,
-and to write journal files from serialized journal contents.
+Programs to forward journal entries over the network, using encrypted HTTP, and
+to write journal files from serialized journal contents.
 
-This package contains systemd-journal-gatewayd,
-systemd-journal-remote, and systemd-journal-upload.
+This package contains systemd-journal-gatewayd, systemd-journal-remote, and
+systemd-journal-upload.
 
 %package networkd
 Summary:        System daemon that manages network configurations
@@ -427,18 +398,21 @@ Requires:       %{name}%{?_isa} = %{version}-%{release}
 License:        LGPLv2+
 
 %description networkd
-systemd-networkd is a system service that manages networks. It detects
-and configures network devices as they appear, as well as creating virtual
-network devices.
+systemd-networkd is a system service that manages networks. It detects and
+configures network devices as they appear, as well as creating virtual network
+devices.
 
 %package resolved
 Summary:        Network Name Resolution manager
 Requires:       %{name}%{?_isa} = %{version}-%{release}
+Requires:       libidn2.so.0%{?elf_suffix}
+Requires:       libidn2.so.0(IDN2_0.0.0)%{?elf_bits}
+Requires(posttrans): grep
 
 %description resolved
-systemd-resolved is a system service that provides network name resolution
-to local applications. It implements a caching and validating DNS/DNSSEC
-stub resolver, as well as an LLMNR and MulticastDNS resolver and responder.
+systemd-resolved is a system service that provides network name resolution to
+local applications. It implements a caching and validating DNS/DNSSEC stub
+resolver, as well as an LLMNR and MulticastDNS resolver and responder.
 
 %package oomd-defaults
 Summary:        Configuration files for systemd-oomd
@@ -456,8 +430,8 @@ Requires:      %{name}%{?_isa} = %{version}-%{release}
 License:       LGPLv2+
 
 %description tests
-"Installed tests" that are usually run as part of the build system.
-They can be useful to test systemd internals.
+"Installed tests" that are usually run as part of the build system. They can be
+useful to test systemd internals.
 
 %if %{with selinux}
 %package selinux
@@ -479,15 +453,24 @@ runs properly under an environment with SELinux enabled.
 %endif
 
 %prep
-%autosetup -n %{?commit:%{name}%{?stable:-stable}-%{commit}}%{!?commit:%{name}%{?stable:-stable}-%{version_no_tilde}} -p1
+%autosetup -n %{name}-hs%{?facebook:fb}-%{version} -p1
 
 %if %{with selinux}
 mkdir selinux
 cp %SOURCE100 %SOURCE101 %SOURCE102 selinux
 %endif
 
+test -f src/login/systemd-user.in
+# Restore systemd-user pam config from before "removal of Fedora-specific bits".
+# We'll systemd process it and install in the right place.
+cp %{SOURCE12} src/login/systemd-user.in
+
+# Workaround for https://bugzilla.redhat.com/show_bug.cgi?id=2057735
+cp /usr/include/linux/audit.h src/systemd/
+sed -r -i "s|generate_audit_type_list, cpp|& + ' -I/usr/include/linux'|" src/libsystemd/meson.build
+
 %build
-%define ntpvendor %(source /etc/os-release; echo ${ID})
+%global ntpvendor %(source /etc/os-release; echo ${ID})
 %{!?ntpvendor: echo 'NTP vendor zone is not set!'; exit 1}
 
 CONFIGURE_OPTS=(
@@ -506,6 +489,7 @@ CONFIGURE_OPTS=(
         -Dseccomp=true
         -Dima=true
         -Dselinux=true
+        -Dbpf-framework=true
         -Dapparmor=false
         -Dpolkit=true
         -Dxz=true
@@ -517,6 +501,8 @@ CONFIGURE_OPTS=(
         -Dacl=true
         -Dsmack=true
         -Dopenssl=true
+        -Dcryptolib=openssl
+        -Dp11kit=true
         -Dgcrypt=true
         -Daudit=true
         -Delfutils=true
@@ -526,17 +512,24 @@ CONFIGURE_OPTS=(
         -Dlibcryptsetup=false
 %endif
         -Delfutils=true
+        -Dpwquality=true
+        # C8S only ships v3.4.4 whereas v4 is required
+        -Dqrencode=false
         -Dgnutls=true
         -Dmicrohttpd=true
         -Dlibidn2=true
         -Dlibiptc=false
         -Dlibcurl=true
+        # Not available in EPEL 8 yet (https://bugzilla.redhat.com/show_bug.cgi?id=2059387).
+        -Dlibfido2=false
         -Defi=true
         -Dgnu-efi=%{?have_gnu_efi:true}%{?!have_gnu_efi:false}
         -Dtpm=true
         -Dtpm2=true
         -Dhwdb=true
         -Dsysusers=true
+        # Standalone binaries are only relevant on non-systemd systems
+        -Dstandalone-binaries=false
         -Ddefault-kill-user-processes=false
         -Dtests=unsafe
         -Dinstall-tests=true
@@ -565,18 +558,20 @@ CONFIGURE_OPTS=(
         # https://bugzilla.redhat.com/show_bug.cgi?id=1867830
         -Ddefault-mdns=no
         -Ddefault-llmnr=resolve
+        # https://bugzilla.redhat.com/show_bug.cgi?id=2028169
+        -Dstatus-unit-format-default=combined
         -Doomd=true
         -Dadm-gid=4
         -Daudio-gid=63
         -Dcdrom-gid=11
         -Ddialout-gid=18
         -Ddisk-gid=6
-        -Dinput-gid=104   # https://pagure.io/setup/pull-request/27
+        -Dinput-gid=104
         -Dkmem-gid=9
         -Dkvm-gid=36
         -Dlp-gid=7
-        -Drender-gid=105  # https://pagure.io/setup/pull-request/27
-        -Dsgx-gid=106     # https://pagure.io/setup/pull-request/27
+        -Drender-gid=105
+        -Dsgx-gid=106
         -Dtape-gid=33
         -Dtty-gid=5
         -Dusers-gid=100
@@ -589,19 +584,13 @@ CONFIGURE_OPTS=(
         # -Dsystemd-timesync-uid=, not set yet
         # Need to set this for CentOS build
         -Ddocdir=%{_pkgdocdir}
-        # CentOS is missing newer deps required to include these
-        # But also these aren't as relevant for the hyperscale use case
-        -Dp11kit=false
+        # These aren't as relevant for the hyperscale use case
         -Duserdb=false
         -Dhomed=false
-        -Dpwquality=false
-        -Dqrencode=false
-        -Dlibfido2=false
         # Old version of PAM might not support files in /usr/lib/pam.d/ so
         # stick with the old /etc/pam.d
         -Dpamconfdir=/etc/pam.d
-        # Standalone binaries are only relevant on non-systemd systems
-        -Dstandalone-binaries=false
+        -Dpcre2=true
 )
 
 %if 0%{?facebook}
@@ -666,6 +655,8 @@ mkdir -p %{buildroot}%{system_unit_dir}/dbus.target.wants
 mkdir -p %{buildroot}%{system_unit_dir}/syslog.target.wants
 mkdir -p %{buildroot}/run
 mkdir -p %{buildroot}%{_localstatedir}/log
+touch %{buildroot}%{_localstatedir}/log/lastlog
+chmod 0664 %{buildroot}%{_localstatedir}/log/lastlog
 touch %{buildroot}/run/utmp
 touch %{buildroot}%{_localstatedir}/log/{w,b}tmp
 
@@ -709,9 +700,6 @@ touch %{buildroot}%{_localstatedir}/lib/private/systemd/journal-upload/state
 # Install yum protection fragment
 install -Dm0644 %{SOURCE4} %{buildroot}/etc/dnf/protected.d/systemd.conf
 
-# Restore systemd-user pam config from before "removal of Fedora-specific bits"
-install -Dm0644 -t %{buildroot}/etc/pam.d/ %{SOURCE12}
-
 # Install additional docs
 # https://bugzilla.redhat.com/show_bug.cgi?id=1234951
 install -Dm0644 -t %{buildroot}%{_pkgdocdir}/ %{SOURCE9}
@@ -726,8 +714,6 @@ cat >%{buildroot}%{system_unit_dir}/systemd-hostnamed.service.d/disable-privated
 [Service]
 PrivateDevices=no
 EOF
-
-install -Dm0755 -t %{buildroot}%{_prefix}/lib/kernel/install.d/ %{SOURCE11}
 
 install -Dm0644 -t %{buildroot}%{_prefix}/lib/systemd/ %{SOURCE13}
 
@@ -758,9 +744,10 @@ python3 %{SOURCE2} %buildroot <<EOF
 /usr/lib/systemd/purge-nobody-user
 %ghost %config(noreplace) /etc/vconsole.conf
 %ghost %config(noreplace) /etc/X11/xorg.conf.d/00-keyboard.conf
-%ghost %attr(0664,root,utmp) /run/utmp
-%ghost %attr(0664,root,utmp) /var/log/wtmp
-%ghost %attr(0660,root,utmp) /var/log/btmp
+%ghost %attr(0664,root,root) %verify(not group) /run/utmp
+%ghost %attr(0664,root,root) %verify(not group) /var/log/wtmp
+%ghost %attr(0660,root,root) %verify(not group) /var/log/btmp
+%ghost %attr(0664,root,root) %verify(not md5 size mtime group) /var/log/lastlog
 %ghost %config(noreplace) /etc/hostname
 %ghost %config(noreplace) /etc/localtime
 %ghost %config(noreplace) /etc/locale.conf
@@ -780,7 +767,7 @@ python3 %{SOURCE2} %buildroot <<EOF
 %ghost %dir /var/lib/systemd/linger
 %ghost /var/lib/systemd/random-seed
 %ghost %dir /var/lib/systemd/rfkill
-%ghost %dir %attr(2755, root, systemd-journal) %verify(not mode) /var/log/journal
+%ghost %dir %verify(not mode group) /var/log/journal
 %ghost %dir /var/log/journal/remote
 %ghost %attr(0700,root,root) %dir /var/log/private
 EOF
@@ -876,49 +863,7 @@ fi
 # a different package version.
 systemctl --no-reload preset systemd-oomd.service &>/dev/null || :
 
-%post libs
-%{?ldconfig}
-
-function mod_nss() {
-    if [ -f "$1" ] ; then
-        # Add nss-systemd to passwd and group
-        grep -E -q '^(passwd|group):.* systemd' "$1" ||
-        sed -i.bak -r -e '
-                s/^(passwd|group):(.*)/\1:\2 systemd/
-                ' "$1" &>/dev/null || :
-    fi
-}
-
-FILE="$(readlink /etc/nsswitch.conf || echo /etc/nsswitch.conf)"
-if [ "$FILE" = "/etc/authselect/nsswitch.conf" ] && authselect check &>/dev/null; then
-        mod_nss "/etc/authselect/user-nsswitch.conf"
-        authselect apply-changes &> /dev/null || :
-else
-        mod_nss "$FILE"
-        # also apply the same changes to user-nsswitch.conf to affect
-        # possible future authselect configuration
-        mod_nss "/etc/authselect/user-nsswitch.conf"
-fi
-
-# check if nobody or nfsnobody is defined
-export SYSTEMD_NSS_BYPASS_SYNTHETIC=1
-if getent passwd nfsnobody &>/dev/null; then
-   test -f /etc/systemd/dont-synthesize-nobody || {
-       echo 'Detected system with nfsnobody defined, creating /etc/systemd/dont-synthesize-nobody'
-       mkdir -p /etc/systemd || :
-       : >/etc/systemd/dont-synthesize-nobody || :
-   }
-elif getent passwd nobody 2>/dev/null | grep -v 'nobody:[x*]:65534:65534:.*:/:/sbin/nologin' &>/dev/null; then
-   test -f /etc/systemd/dont-synthesize-nobody || {
-       echo 'Detected system with incompatible nobody defined, creating /etc/systemd/dont-synthesize-nobody'
-       mkdir -p /etc/systemd || :
-       : >/etc/systemd/dont-synthesize-nobody || :
-   }
-fi
-
-%{?ldconfig:%postun libs -p %ldconfig}
-
-%global udev_services systemd-udev{d,-settle,-trigger}.service systemd-udevd-{control,kernel}.socket systemd-timesyncd.service
+%global udev_services systemd-udev{d,-settle,-trigger}.service systemd-udevd-{control,kernel}.socket systemd-timesyncd.service %{?have_gnu_efi:systemd-boot-update.service}
 
 %post udev
 # Move old stuff around in /var/lib
@@ -953,6 +898,7 @@ grep -q -E '^KEYMAP="?fi-latin[19]"?' /etc/vconsole.conf 2>/dev/null &&
 # Restart some services.
 # Others are either oneshot services, or sockets, and restarting them causes issues (#1378974)
 %systemd_postun_with_restart systemd-udevd.service systemd-timesyncd.service
+
 
 %global journal_remote_units_restart systemd-journal-gatewayd.service systemd-journal-remote.service systemd-journal-upload.service
 %global journal_remote_units_norestart systemd-journal-gatewayd.socket systemd-journal-remote.socket
@@ -996,6 +942,14 @@ if [ $1 -eq 0 ] ; then
         systemctl disable --quiet \
                 systemd-resolved.service \
                 >/dev/null || :
+        if [ -L /etc/resolv.conf ] && \
+            realpath /etc/resolv.conf | grep ^/run/systemd/resolve/; then
+                rm -f /etc/resolv.conf # no longer useful
+                # if network manager is enabled, move to it instead
+                [ -f /run/NetworkManager/resolv.conf ] && \
+                systemctl -q is-enabled NetworkManager.service &>/dev/null && \
+                    ln -fsv ../run/NetworkManager/resolv.conf /etc/resolv.conf
+        fi
 fi
 
 %post resolved
@@ -1009,23 +963,32 @@ fi
 
 %systemd_post systemd-resolved.service
 
+%posttrans resolved
 # Create /etc/resolv.conf symlink.
 # We would also create it using tmpfiles, but let's do this here
 # too before NetworkManager gets a chance. (systemd-tmpfiles invocation above
 # does not do this, because it's marked with ! and we don't specify --boot.)
 # https://bugzilla.redhat.com/show_bug.cgi?id=1873856
 #
-# If systemd is not running, don't overwrite the symlink because that
-# will immediately break DNS resolution, since systemd-resolved is
-# also not running (https://bugzilla.redhat.com/show_bug.cgi?id=1891847).
+# *Create* the symlink if nothing is present yet.
+# (https://bugzilla.redhat.com/show_bug.cgi?id=2032085)
+#
+# *Override* the symlink if systemd is running. Don't do it if systemd
+# is not running, because that will immediately break DNS resolution,
+# since systemd-resolved is also not running
+# (https://bugzilla.redhat.com/show_bug.cgi?id=1891847).
 #
 # Also don't create the symlink to the stub when the stub is disabled (#1891847 again).
-if test -d /run/systemd/system/ &&
-   systemctl -q is-enabled systemd-resolved.service &>/dev/null &&
-   ! mountpoint /etc/resolv.conf &>/dev/null &&
-   ! systemd-analyze cat-config systemd/resolved.conf 2>/dev/null | \
-        grep -qE '^DNSStubListener\s*=\s*([nN][oO]?|[fF]|[fF][aA][lL][sS][eE]|0|[oO][fF][fF])$'; then
-  ln -fsv ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+if systemctl -q is-enabled systemd-resolved.service &>/dev/null &&
+   ! systemd-analyze cat-config systemd/resolved.conf 2>/dev/null |
+        grep -iqE '^DNSStubListener\s*=\s*(no?|false|0|off)\s*$'; then
+
+  if ! test -e /etc/resolv.conf && ! test -L /etc/resolv.conf; then
+    ln -sv ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf || :
+  elif test -d /run/systemd/system/ &&
+     ! mountpoint /etc/resolv.conf &>/dev/null; then
+    ln -fsv ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf || :
+  fi
 fi
 
 %if %{with selinux}
@@ -1051,8 +1014,10 @@ fi
 
 %files -f %{name}.lang -f .file-list-rest
 %doc %{_pkgdocdir}
-%exclude %{_pkgdocdir}/LICENSE.*
+%exclude %{_pkgdocdir}/LICENSE*
+# Only the licenses texts for the licenses in License line are included.
 %license LICENSE.GPL2 LICENSE.LGPL2.1
+%license LICENSES/MIT.txt
 %ghost %dir %attr(0755,-,-) /etc/systemd/system/basic.target.wants
 %ghost %dir %attr(0755,-,-) /etc/systemd/system/bluetooth.target.wants
 %ghost %dir %attr(0755,-,-) /etc/systemd/system/default.target.wants
@@ -1068,6 +1033,7 @@ fi
 %ghost %dir %attr(0755,-,-) /etc/systemd/system/sysinit.target.wants
 %ghost %dir %attr(0755,-,-) /etc/systemd/system/system-update.target.wants
 %ghost %dir %attr(0755,-,-) /etc/systemd/system/timers.target.wants
+%ghost %dir %attr(0700,-,-) /var/lib/portables
 %ghost %dir %attr(0755,-,-) /var/lib/rpm-state/systemd
 
 %files libs -f .file-list-libs
@@ -1084,6 +1050,7 @@ fi
 %files udev -f .file-list-udev
 
 %files container -f .file-list-container
+%ghost %dir %attr(0700,-,-) /var/lib/machines
 
 %files journal-remote -f .file-list-remote
 
@@ -1100,14 +1067,103 @@ fi
 %endif
 
 %changelog
+* Mon Feb 28 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.1
+- New release for v250
+- Sync latest changes from Fedora rawhide
+- Use source archives from https://pagure.io/centos-sig-hyperscale/systemd
+  instead of github. All Hyperscale patches have moved to pagure
+- Added llvm-toolset to BuildRequires (for llvm-strip) to make build succeed
+- Enable p11kit and pwquality options in the systemd build
+
+* Thu Feb 24 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250.3-6
+- Avoid trying to create the symlink if there's a dangling symlink already in
+  place (#2058388)
+
 * Thu Feb 24 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 249-2.13
 - Move to dist-git layout used by Fedora (no more SOURCES/ and SPECS/)
 - Switch to .gitignore from commit 46a40810 from the Fedora RPM repo
 - Add back removed files from commit 46a40810 from the Fedora RPM repo
 
+* Wed Feb 23 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250.3-5
+- Move part of %%post scriptlet for resolved to %%posttrans (#2018913)
+- Specify owner of utmp/wtmp/btmp/lastlog as root in the rpm listing
+
+* Wed Feb 16 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250.3-4
+- Drop scriptlet for handling nobody user upgrades from Fedora <28
+- Specify owner of /var/log/journal as root in the rpm listing (#2018913)
+
+* Thu Feb 10 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250.3-3
+- Add pam_namespace to systemd-user pam config (rhbz#2053098)
+- Drop 20-grubby.install plugin for kernel-install (rhbz#2033646)
+
 * Wed Feb 09 2022 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.12
 - Backport PR #20695: Sync if_arp.h with Linux 5.14
 - FB-only backport PR #22426: MemoryZSwapMax= to configure memory.zswap.max
+
+* Sat Jan 22 2022 Fedora Release Engineering <releng@fedoraproject.org>
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_36_Mass_Rebuild
+
+* Tue Jan 18 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250.3-2
+- Take ghost ownership of /var/log/lastlog (#1798685)
+
+* Tue Jan 18 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250.3-1
+- Third stable release after v250: fixes for sd-boot on fringe hardware (e.g. VirtualBox),
+  various man page updates, sd-journal file verification is now stricter,
+  systemd-networkd by default will not add routes for wireguard AllowedIPs=
+  systemd nss modules shouldn't try to read kernel command line
+- Don't do sd-boot updates when not installed (#2038289)
+- xdg-autostart-service will ignore ExecCondition= when the helper binary is missing
+- kernel-install does cleanup better (#2016630)
+
+* Fri Jan  7 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250.2-1
+- Second stable release after v250: various bugfixes
+  (systemd-resolved, systemd-journald, userdbctl, homed).
+- The manager should now gracefully handle the case where BPF LSM
+  cannot be initialized (#2036145). The BPF filters are enabled again
+  on all architectures, so *other* filter should also work on the
+  affected architectures.
+- kernel-install now checks paths used by grub2 before sd-boot paths again
+  (#2036199)
+- fstab-generator now ignores root-on-nfs/cifs/iscsi and live (#2037233)
+- CVE-2021-3997, #2024639: systemd-tmpfiles would exhaust the stack and crash
+  during excessive recursion on a very deeply nested directory structure.
+
+* Tue Jan  4 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250.1-1
+- First stable version after v250: various bugfixes, in particular for
+  sd-boot, systemd-networkd, and various build issues.
+- Fixes #2036517, #2035608, #2036217.
+
+* Thu Dec 30 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250-3
+- Disable bpf filters on arm64 (#2036145)
+
+* Sat Dec 25 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250-2
+- Fix warning about systemd-boot-update.service not existing on
+  non-uefi architectures
+- Enable all bpf features (#2035608)
+
+* Thu Dec 23 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250-1
+- Version 250, only some very small changes since -rc3.
+- Switch unit status name format to 'combined' (#2028169)
+
+* Mon Dec 20 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250~rc3-1
+- Latest prerelease, see
+  https://raw.githubusercontent.com/systemd/systemd/v250-rc3/NEWS for
+  details.
+- Fixes rhbz#2006761, rhbz#2027627, rhbz#1926323, rhbz#1919538.
+
+* Sun Dec 12 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250~rc1-4
+- Move systemd-boot-update.service to -udev subpackage
+  and add it the the installation scriptlets (#2031400)
+- Move libcryptsetup-token-systemd plugins to -udev (#2031873)
+- Create /etc/resolv.conf symlink if nothing is present yet (#2032085)
+
+* Fri Dec 10 2021 Pavel Březina <pbrezina@redhat.com> - 250~rc1-3
+- Remove nsswitch.conf scriptlets (#2023743)
+
+* Thu Dec  9 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250~rc1-1
+- Version 250-rc1,
+  see https://raw.githubusercontent.com/systemd/systemd/v250-rc1/NEWS for
+  details.
 
 * Tue Nov 30 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.11
 - Backport PR #21241: fix bpf-foreign cgroup controller realization
@@ -1119,15 +1175,51 @@ fi
 * Wed Nov 24 2021 Davide Cavalca <dcavalca@centosproject.org> - 249.4-2.9
 - Disable legacy iptables support
 
+* Fri Nov 19 2021 Davide Cavalca <dcavalca@fedoraproject.org> - 249.7-3
+- Disable legacy iptables support
+
+* Mon Nov 15 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 249.7-2
+- Supress errors from update-helper when selinux is enabled (see #2023332)
+
+* Sun Nov 14 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 249.7-1
+- Latest bugfix release (better erofs detection, sd-event memory
+  corruption bugfix, logind, documentation)
+- Really fix helper to restart user units with older systemd (#2020415)
+
+* Sun Nov 14 2021 Petr Menšík <pemensik@redhat.com> - 249.7-1
+- Switch /etc/resolv.conf over to NM when systemd-resolved is uninstalled
+
 * Thu Nov 11 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.8
 - Remove revert_d219a2b07cc5dc8ffd5010f08561fab2780d8616.patch and replace with
   proper fix (PR #21221)
 
+* Wed Nov 10 2021 Kir Kolyshkin <kolyshkin@gmail.com> - 249.7-1
+- Fix scope activation from a user instance (#2022041)
+
 * Wed Nov 10 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.7
 - Add meson >= 0.57 for el8 builds. This version uses python 3.8.
 
+* Mon Nov  8 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 249.6-3
+- Fix helper to restart user units with older systemd (#2020415)
+
+* Thu Nov  4 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 249.6-2
+- Latest bugfix release (networkd, coredumpctl, varlink, udev,
+  systemctl, systemd itself, better detection of Hyper-V and
+  Virtualbox virtualization, documentation updates)
+- Fix helper to restart user units
+
+* Fri Oct 29 2021 Adam Williamson <awilliam@redhat.com> - 249.5-2
+- Backport PR #133 to fix boot
+
 * Wed Oct 20 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.6
 - Revert d219a2b because it creates non-determinisitic Slice= assignments
+
+* Tue Oct 12 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 249.5-1
+- Latest bugfix release (various fixes in systemd-networkd,
+  -timesyncd, -journald, -udev, homed, -resolved, -repart, -oomd,
+  -coredump, systemd itself, seccomp filters, TPM2 handling,
+  -documentation, sd-event, sd-journal, journalctl, and nss-systemd).
+- Fixes #1976445.
 
 * Mon Oct 11 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.5
 - Remove duplicate Address= properties in network configs (part of PR #20892)
