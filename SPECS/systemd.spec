@@ -20,8 +20,8 @@
 
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
-Version:        249
-Release:        9%{?dist}
+Version:        250
+Release:        3%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -79,52 +79,32 @@ GIT_DIR=../../src/systemd/.git git diffab -M v233..master@{2017-06-15} -- hwdb/[
 
 # RHEL-specific
 Patch0001: 0001-logind-set-RemoveIPC-to-false-by-default.patch
-Patch0002: 0002-basic-unit-name-do-not-use-strdupa-on-a-path.patch
-Patch0003: 0003-basic-unit-name-adjust-comments.patch
-Patch0004: 0004-tmpfiles-don-t-create-resolv.conf-stub-resolv.conf-s.patch
-Patch0005: 0005-Copy-40-redhat.rules-from-RHEL-8.patch
-Patch0006: 0006-Avoid-tmp-being-mounted-as-tmpfs-without-the-user-s-.patch
-Patch0007: 0007-unit-don-t-add-Requires-for-tmp.mount.patch
-Patch0008: 0008-units-add-Install-section-to-tmp.mount.patch
-Patch0009: 0009-rc-local-order-after-network-online.target.patch
-Patch0010: 0010-ci-drop-CIs-irrelevant-for-downstream.patch
-Patch0011: 0011-ci-reconfigure-Packit-for-RHEL-9.patch
-Patch0012: 0012-ci-run-unit-tests-on-z-stream-branches-as-well.patch
-Patch0013: 0013-Check-return-value-of-pam_get_item-pam_get_data-func.patch
-Patch0014: 0014-random-util-increase-random-seed-size-to-1024.patch
-Patch0015: 0015-journal-don-t-enable-systemd-journald-audit.socket-b.patch
-Patch0016: 0016-journald.conf-don-t-touch-current-audit-settings.patch
-Patch0017: 0017-Revert-udev-remove-WAIT_FOR-key.patch
-Patch0018: 0018-Really-don-t-enable-systemd-journald-audit.socket.patch
-Patch0019: 0019-rules-add-elevator-kernel-command-line-parameter.patch
-Patch0020: 0020-boot-don-t-build-bootctl-when-Dgnu-efi-false-is-set.patch
-Patch0021: 0021-unit-install-the-systemd-bless-boot.service-only-if-.patch
-Patch0022: 0022-units-don-t-enable-tmp.mount-statically-in-local-fs..patch
-Patch0023: 0023-pid1-bump-DefaultTasksMax-to-80-of-the-kernel-pid.ma.patch
-Patch0024: 0024-sd-device-introduce-device_has_devlink.patch
-Patch0025: 0025-udev-node-split-out-permission-handling-from-udev_no.patch
-Patch0026: 0026-udev-node-stack-directory-must-exist-when-adding-dev.patch
-Patch0027: 0027-udev-node-save-information-about-device-node-and-pri.patch
-Patch0028: 0028-udev-node-always-update-timestamp-of-stack-directory.patch
-Patch0029: 0029-udev-node-assume-no-new-claim-to-a-symlink-if-run-ud.patch
-Patch0030: 0030-udev-node-always-atomically-create-symlink-to-device.patch
-Patch0031: 0031-udev-node-check-stack-directory-change-even-if-devli.patch
-Patch0032: 0032-udev-node-shorten-code-a-bit-and-update-log-message.patch
-Patch0033: 0033-udev-node-add-random-delay-on-conflict-in-updating-d.patch
-Patch0034: 0034-udev-node-drop-redundant-trial-of-devlink-creation.patch
-Patch0035: 0035-udev-node-simplify-the-example-of-race.patch
-Patch0036: 0036-udev-node-do-not-ignore-unexpected-errors-on-removin.patch
-Patch0037: 0037-basic-time-util-introduce-FORMAT_TIMESPAN.patch
-Patch0038: 0038-udev-net-setup-link-change-the-default-MACAddressPol.patch
-Patch0039: 0039-set-core-ulimit-to-0-like-on-RHEL-7.patch
-Patch0040: 0040-test-don-t-install-test-network-generator-conversion.patch
-Patch0041: 0041-meson.build-change-operator-combining-bools-from-to-.patch
-Patch0042: 0042-openssl-util-use-EVP-API-to-get-RSA-bits.patch
-Patch0043: 0043-procfs-util-fix-confusion-wrt.-quantity-limit-and-ma.patch
-Patch0044: 0044-test-process-util-also-add-EROFS-to-the-list-of-good.patch
-Patch0045: 0045-ci-use-C9S-chroots-in-Packit.patch
-Patch0046: 0046-test-mountpointutil-util-do-not-assert-in-test_mnt_i.patch
-Patch0047: 0047-core-mount-add-implicit-unit-dependencies-even-if-wh.patch
+Patch0002: 0002-tmpfiles-don-t-create-resolv.conf-stub-resolv.conf-s.patch
+Patch0003: 0003-Copy-40-redhat.rules-from-RHEL-8.patch
+Patch0004: 0004-Avoid-tmp-being-mounted-as-tmpfs-without-the-user-s-.patch
+Patch0005: 0005-unit-don-t-add-Requires-for-tmp.mount.patch
+Patch0006: 0006-units-add-Install-section-to-tmp.mount.patch
+Patch0007: 0007-rc-local-order-after-network-online.target.patch
+Patch0008: 0008-ci-drop-CIs-irrelevant-for-downstream.patch
+Patch0009: 0009-ci-reconfigure-Packit-for-RHEL-9.patch
+Patch0010: 0010-ci-run-unit-tests-on-z-stream-branches-as-well.patch
+Patch0011: 0011-random-util-increase-random-seed-size-to-1024.patch
+Patch0012: 0012-journal-don-t-enable-systemd-journald-audit.socket-b.patch
+Patch0013: 0013-journald.conf-don-t-touch-current-audit-settings.patch
+Patch0014: 0014-Revert-udev-remove-WAIT_FOR-key.patch
+Patch0015: 0015-Really-don-t-enable-systemd-journald-audit.socket.patch
+Patch0016: 0016-rules-add-elevator-kernel-command-line-parameter.patch
+Patch0017: 0017-units-don-t-enable-tmp.mount-statically-in-local-fs..patch
+Patch0018: 0018-pid1-bump-DefaultTasksMax-to-80-of-the-kernel-pid.ma.patch
+Patch0019: 0019-set-core-ulimit-to-0-like-on-RHEL-7.patch
+Patch0020: 0020-ci-use-C9S-chroots-in-Packit.patch
+Patch0021: 0021-test-mountpointutil-util-do-not-assert-in-test_mnt_i.patch
+Patch0022: 0022-Treat-EPERM-as-not-available-too.patch
+Patch0023: 0023-test-copy-portable-profiles-into-the-image-if-they-d.patch
+Patch0024: 0024-test-introduce-get_cgroup_hierarchy-helper.patch
+Patch0025: 0025-test-require-unified-cgroup-hierarchy-for-TEST-56.patch
+Patch0026: 0026-tests-rework-test-macros-to-not-take-code-as-paramet.patch
+Patch0027: 0027-test-allow-to-set-NULL-to-intro-or-outro.patch
 
 # Downstream-only patches (9000–9999)
 
@@ -178,6 +158,9 @@ BuildRequires:  gettext
 # We use RUNNING_ON_VALGRIND in tests, so the headers need to be available
 BuildRequires:  valgrind-devel
 BuildRequires:  pkgconfig(bash-completion)
+BuildRequires:  pkgconfig(tss2-esys)
+BuildRequires:  pkgconfig(tss2-rc)
+BuildRequires:  pkgconfig(tss2-mu)
 BuildRequires:  perl
 BuildRequires:  perl(IPC::SysV)
 
@@ -309,6 +292,11 @@ Suggests:       systemd-bootchart
 # https://bugzilla.redhat.com/show_bug.cgi?id=1408878
 Requires:       kbd
 
+# Requires deps for stuff that is dlopen()ed
+Requires:       cryptsetup-libs%{?_isa}
+# https://bugzilla.redhat.com/show_bug.cgi?id=2017541
+Requires:       tpm2-tss%{?_isa}
+
 # https://bugzilla.redhat.com/show_bug.cgi?id=1753381
 Provides:       u2f-hidraw-policy = 1.0.2-40
 Obsoletes:      u2f-hidraw-policy < 1.0.2-40
@@ -430,6 +418,7 @@ CONFIGURE_OPTS=(
         -Dacl=true
         -Dsmack=true
         -Dopenssl=true
+        -Dcryptolib=openssl
         -Dp11kit=true
         -Dgcrypt=true
         -Daudit=true
@@ -450,6 +439,7 @@ CONFIGURE_OPTS=(
         -Dlibfido2=false
         -Dgnu-efi=false
         -Dtpm=true
+        -Dtpm2=true
         -Dhwdb=true
         -Dsysusers=true
         -Dstandalone-binaries=true
@@ -470,7 +460,7 @@ CONFIGURE_OPTS=(
 %endif
         -Db_ndebug=false
         -Dman=true
-        -Dversion-tag=v%{version}-%{release}
+        -Dversion-tag=%{version}-%{release}
 %if 0%{?fedora}
         -Dfallback-hostname=fedora
 %else
@@ -529,6 +519,8 @@ mkdir -p %{buildroot}%{system_unit_dir}/dbus.target.wants
 mkdir -p %{buildroot}%{system_unit_dir}/syslog.target.wants
 mkdir -p %{buildroot}/run
 mkdir -p %{buildroot}%{_localstatedir}/log
+touch %{buildroot}%{_localstatedir}/log/lastlog
+chmod 0664 %{buildroot}%{_localstatedir}/log/lastlog
 touch %{buildroot}/run/utmp
 touch %{buildroot}%{_localstatedir}/log/{w,b}tmp
 
@@ -625,6 +617,7 @@ python3 %{SOURCE2} %buildroot <<EOF
 %ghost %attr(0664,root,utmp) /run/utmp
 %ghost %attr(0664,root,utmp) /var/log/wtmp
 %ghost %attr(0600,root,utmp) /var/log/btmp
+%ghost %attr(0664,root,utmp) %verify(not md5 size mtime) /var/log/lastlog
 %ghost %config(noreplace) /etc/hostname
 %ghost %config(noreplace) /etc/localtime
 %ghost %config(noreplace) /etc/locale.conf
@@ -893,6 +886,20 @@ getent passwd systemd-oom &>/dev/null || useradd -r -l -g systemd-oom -d / -s /s
 %files standalone-sysusers -f .file-list-standalone-sysusers
 
 %changelog
+* Tue Feb 08 2022 systemd maintenance team <systemd-maint@redhat.com> - 250-3
+- Treat EPERM as "not available" too (#2017035)
+- test: copy portable profiles into the image if they don't exist there (#2017035)
+- test: introduce `get_cgroup_hierarchy() helper (#2047768)
+- test: require unified cgroup hierarchy for TEST-56 (#2047768)
+- tests: rework test macros to not take code as parameters (#2017035)
+- test: allow to set NULL to intro or outro (#2017035)
+
+* Tue Feb 01 2022 Michal Sekletar <msekleta@redhat.com> - 250-2
+- spec: make sure version string starts with version number (#2049054)
+
+* Mon Jan 31 2022 Jan Macku <jamacku@redhat.com> - 250-1
+- Rebase to v250 (#2047768)
+
 * Thu Nov 18 2021 systemd maintenance team <systemd-maint@redhat.com> - 249-9
 - test: don't install test-network-generator-conversion.sh w/o networkd (#2017035)
 - meson.build: change operator combining bools from + to and (#2017035)

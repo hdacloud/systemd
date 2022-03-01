@@ -1,4 +1,4 @@
-From 5ce0a9b91add22f2a21f1bc7c0f888307f7e58e8 Mon Sep 17 00:00:00 2001
+From 5a66d993a5be88524d9952193b053eac607a5c17 Mon Sep 17 00:00:00 2001
 From: rpm-build <rpm-build>
 Date: Wed, 1 Aug 2018 10:58:28 +0200
 Subject: [PATCH] logind: set RemoveIPC to false by default
@@ -6,8 +6,6 @@ Subject: [PATCH] logind: set RemoveIPC to false by default
 RHEL-only
 
 Resolves: #1959836
-
-(cherry picked from commit 0b3833d6c3b751c6dfb40eeb2ef852984c58f546)
 ---
  man/logind.conf.xml      | 2 +-
  src/login/logind-core.c  | 2 +-
@@ -15,10 +13,10 @@ Resolves: #1959836
  3 files changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/man/logind.conf.xml b/man/logind.conf.xml
-index be62b6b572..bec7ff44af 100644
+index 3045c1b9ba..96fa076239 100644
 --- a/man/logind.conf.xml
 +++ b/man/logind.conf.xml
-@@ -346,7 +346,7 @@
+@@ -354,7 +354,7 @@
          user fully logs out. Takes a boolean argument. If enabled, the user may not consume IPC resources after the
          last of the user's sessions terminated. This covers System V semaphores, shared memory and message queues, as
          well as POSIX shared memory and message queues. Note that IPC objects of the root user and other system users
@@ -28,7 +26,7 @@ index be62b6b572..bec7ff44af 100644
  
      </variablelist>
 diff --git a/src/login/logind-core.c b/src/login/logind-core.c
-index 22031f485a..f5e1126adc 100644
+index 254a1a69fb..616c08132a 100644
 --- a/src/login/logind-core.c
 +++ b/src/login/logind-core.c
 @@ -34,7 +34,7 @@ void manager_reset_config(Manager *m) {
@@ -41,10 +39,10 @@ index 22031f485a..f5e1126adc 100644
          m->user_stop_delay = 10 * USEC_PER_SEC;
  
 diff --git a/src/login/logind.conf.in b/src/login/logind.conf.in
-index 27ba77ce79..f9c5099865 100644
+index 2d084e134d..79d685b3de 100644
 --- a/src/login/logind.conf.in
 +++ b/src/login/logind.conf.in
-@@ -39,6 +39,6 @@
+@@ -40,6 +40,6 @@
  #IdleActionSec=30min
  #RuntimeDirectorySize=10%
  #RuntimeDirectoryInodes=400k

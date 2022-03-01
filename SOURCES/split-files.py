@@ -85,6 +85,7 @@ for file in files(buildroot):
         o = o_networkd
     elif re.search(r'''resolved|
                        resolvectl|
+                       resolvconf|
                        org.freedesktop.resolve1|
                        systemd-resolve|
                        nss-resolve
@@ -105,6 +106,7 @@ for file in files(buildroot):
                        random-seed|
                        modules-load|
                        timesync|
+                       cryptenroll|
                        cryptsetup|
                        kmod|
                        quota|
