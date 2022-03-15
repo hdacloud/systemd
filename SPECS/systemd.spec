@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        51%{?dist}.2
+Release:        51%{?dist}.5
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -715,6 +715,28 @@ Patch0662: 0662-test-seccomp-accept-ENOSYS-from-sysctl-2-too.patch
 Patch0663: 0663-Disable-libpitc-to-fix-CentOS-Stream-CI.patch
 Patch0664: 0664-test-accept-that-char-device-0-0-can-now-be-created-.patch
 Patch0665: 0665-core-return-true-from-cg_is_empty-on-ENOENT.patch
+Patch0666: 0666-Do-not-fail-if-the-same-alt.-name-is-set-again.patch
+Patch0667: 0667-meson-avoid-bogus-meson-warning.patch
+Patch0668: 0668-meson-do-not-fail-if-rsync-is-not-installed-with-mes.patch
+Patch0669: 0669-mount-don-t-propagate-errors-from-mount_setup_unit-f.patch
+Patch0670: 0670-test-make-TEST-47-less-racy.patch
+Patch0671: 0671-macro-define-HAS_FEATURE_ADDRESS_SANITIZER-also-on-g.patch
+Patch0672: 0672-tests-add-helper-function-to-autodetect-CI-environme.patch
+Patch0673: 0673-strv-rework-FOREACH_STRING-macro.patch
+Patch0674: 0674-test-systemctl-use-const-char-instead-of-char.patch
+Patch0675: 0675-ci-pass-the-GITHUB_ACTIONS-variable-to-the-CentOS-co.patch
+Patch0676: 0676-core-rename-unit_-start_limit-condition-assert-_test.patch
+Patch0677: 0677-core-Check-unit-start-rate-limiting-earlier.patch
+Patch0678: 0678-sd-event-introduce-callback-invoked-when-event-sourc.patch
+Patch0679: 0679-core-rename-generalize-UNIT-u-test_start_limit-hook.patch
+Patch0680: 0680-mount-make-mount-units-start-jobs-not-runnable-if-p-.patch
+Patch0681: 0681-mount-retrigger-run-queue-after-ratelimit-expired-to.patch
+Patch0682: 0682-pid1-add-a-manager_trigger_run_queue-helper.patch
+Patch0683: 0683-unit-add-jobs-that-were-skipped-because-of-ratelimit.patch
+Patch0684: 0684-udev-net_id-introduce-naming-scheme-for-RHEL-8.5.patch
+Patch0685: 0685-udev-net_id-remove-extraneous-bracket.patch
+Patch0686: 0686-mount-do-not-update-exec-deps-on-mountinfo-changes.patch
+Patch0687: 0687-core-mount-add-implicit-unit-dependencies-even-if-wh.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -1342,6 +1364,34 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Tue Jan 25 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-51.5
+- mount: do not update exec deps on mountinfo changes (#2038878)
+- core/mount: add implicit unit dependencies even if when mount unit is generated from /proc/self/mountinfo (#2038878)
+
+* Thu Jan 13 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-51.4
+- mount: don't propagate errors from mount_setup_unit() further up (#2039327)
+- test: make TEST-47 less racy (#2039327)
+- macro: define HAS_FEATURE_ADDRESS_SANITIZER also on gcc (#2039327)
+- tests: add helper function to autodetect CI environments (#2039327)
+- strv: rework FOREACH_STRING() macro (#2039327)
+- test,systemctl: use "const char*" instead of "char*" (#2039327)
+- ci: pass the $GITHUB_ACTIONS variable to the CentOS container (#2039327)
+- core: rename unit_{start_limit|condition|assert}_test() to unit_test_xyz() (#2037395)
+- core: Check unit start rate limiting earlier (#2037395)
+- sd-event: introduce callback invoked when event source ratelimit expires (#2037395)
+- core: rename/generalize UNIT(u)->test_start_limit() hook (#2037395)
+- mount: make mount units start jobs not runnable if /p/s/mountinfo ratelimit is in effect (#2037395)
+- mount: retrigger run queue after ratelimit expired to run delayed mount start jobs (#2037395)
+- pid1: add a manager_trigger_run_queue() helper (#2037395)
+- unit: add jobs that were skipped because of ratelimit back to run_queue (#2037395)
+- udev/net_id: introduce naming scheme for RHEL-8.5 (#2040244)
+- udev/net_id: remove extraneous bracket (#2040244)
+
+* Fri Dec 10 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-51.3
+- Do not fail if the same alt. name is set again (#2030027)
+- meson: avoid bogus meson warning (#2030027)
+- meson: do not fail if rsync is not installed with meson 0.57.2 (#2030027)
+
 * Fri Dec 03 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-51.2
 - core: return true from cg_is_empty* on ENOENT (#2024903)
 

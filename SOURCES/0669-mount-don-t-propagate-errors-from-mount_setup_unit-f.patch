@@ -1,0 +1,51 @@
+From 4662575605089b38d611a911c03c60ec260fde05 Mon Sep 17 00:00:00 2001
+From: Lennart Poettering <lennart@poettering.net>
+Date: Wed, 28 Nov 2018 12:41:44 +0100
+Subject: [PATCH] mount: don't propagate errors from mount_setup_unit() further
+ up
+
+If we can't process a specific line in /proc/self/mountinfo we should
+log about it (which we do), but this should not affect other lines, nor
+further processing of mount units. Let's keep these failures local.
+
+Fixes: #10874
+
+(cherry picked from commit ba0d56f55f2073164799be714b5bd1aad94d059a)
+
+Resolves: #2039327
+---
+ src/core/mount.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
+
+diff --git a/src/core/mount.c b/src/core/mount.c
+index 7e80a0c974..9b1c59b1c3 100644
+--- a/src/core/mount.c
++++ b/src/core/mount.c
+@@ -1621,12 +1621,10 @@ static int mount_load_proc_self_mountinfo(Manager *m, bool set_flags) {
+         if (r < 0)
+                 return log_error_errno(r, "Failed to parse /proc/self/mountinfo: %m");
+ 
+-        r = 0;
+         for (;;) {
+                 struct libmnt_fs *fs;
+                 const char *device, *path, *options, *fstype;
+                 _cleanup_free_ char *d = NULL, *p = NULL;
+-                int k;
+ 
+                 r = mnt_table_next_fs(table, iter, &fs);
+                 if (r == 1)
+@@ -1650,12 +1648,10 @@ static int mount_load_proc_self_mountinfo(Manager *m, bool set_flags) {
+ 
+                 device_found_node(m, d, DEVICE_FOUND_MOUNT, DEVICE_FOUND_MOUNT);
+ 
+-                k = mount_setup_unit(m, d, p, options, fstype, set_flags);
+-                if (r == 0 && k < 0)
+-                        r = k;
++                (void) mount_setup_unit(m, d, p, options, fstype, set_flags);
+         }
+ 
+-        return r;
++        return 0;
+ }
+ 
+ static void mount_shutdown(Manager *m) {
