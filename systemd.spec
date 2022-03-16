@@ -4,9 +4,9 @@
 %global stable 1
 
 %if 0%{?facebook}
-%global hs_commit c389d4c9c7a1bbc5f125c63a430d9475d672ddc3
+%global hs_commit ebf4af4ffa19cf1de7627b6464c1aef4a25ae0ab
 %else
-%global hs_commit c47889a351e56393bfb267d8a7a5655b8a86dbfd
+%global hs_commit 006cad0d7fee57520db542a2cfa5ce3688325beb
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -43,7 +43,7 @@ Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
 Version:        250.3
-Release:        6.1%{?dist}
+Release:        6.2%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -1067,6 +1067,9 @@ fi
 %endif
 
 %changelog
+* Wed Mar 16 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.2
+- Backport PR #22757: BPF error logging improvements
+
 * Mon Feb 28 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.1
 - New release for v250
 - Sync latest changes from Fedora rawhide
