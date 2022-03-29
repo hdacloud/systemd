@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        50%{?dist}
+Release:        58%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -686,6 +686,113 @@ Patch0633: 0633-logind-improve-error-propagation-of-user_check_linge.patch
 Patch0634: 0634-logind-automatically-GC-lingering-users-for-who-now-.patch
 Patch0635: 0635-pam_systemd-simplify-code-which-with-we-set-environm.patch
 Patch0636: 0636-logind-validate-run-user-1000-before-we-set-it.patch
+Patch0637: 0637-sd-hwdb-allow-empty-properties.patch
+Patch0638: 0638-Update-hwdb.patch
+Patch0639: 0639-Disable-libpitc-to-fix-CentOS-Stream-CI.patch
+Patch0640: 0640-rpm-Fix-typo-in-_environmentdir.patch
+Patch0641: 0641-rpm-Add-misspelled-_environmentdir-macro-for-tempora.patch
+Patch0642: 0642-rpm-emit-warning-when-macro-with-typo-is-used.patch
+Patch0643: 0643-Remove-unintended-additions-to-systemd-analyze-man-p.patch
+Patch0644: 0644-Disable-iptables-for-CI.patch
+Patch0645: 0645-core-fix-SIGABRT-on-empty-exec-command-argv.patch
+Patch0646: 0646-core-service-also-check-path-in-exec-commands.patch
+Patch0647: 0647-mount-util-fix-fd_is_mount_point-when-both-the-paren.patch
+Patch0648: 0648-basic-add-vmware-hypervisor-detection-from-device-tr.patch
+Patch0649: 0649-pam-do-not-require-a-non-expired-password-for-user-..patch
+Patch0650: 0650-udev-rules-add-rule-to-create-dev-ptp_hyperv.patch
+Patch0651: 0651-process-util-explicitly-handle-processes-lacking-par.patch
+Patch0652: 0652-errno-util-add-ERRNO_IS_PRIVILEGE-helper.patch
+Patch0653: 0653-procfs-util-fix-confusion-wrt.-quantity-limit-and-ma.patch
+Patch0654: 0654-test-process-util-also-add-EROFS-to-the-list-of-good.patch
+Patch0655: 0655-journal-refresh-cached-credentials-of-stdout-streams.patch
+Patch0656: 0656-util-lib-introduce-HAS_FEATURE_ADDRESS_SANITIZER.patch
+Patch0657: 0657-ci-skip-test-execute-on-GH-Actions-under-ASan.patch
+Patch0658: 0658-test-seccomp-accept-ENOSYS-from-sysctl-2-too.patch
+Patch0659: 0659-test-accept-that-char-device-0-0-can-now-be-created-.patch
+Patch0660: 0660-meson-do-not-fail-if-rsync-is-not-installed-with-mes.patch
+Patch0661: 0661-pid1-fix-free-of-uninitialized-pointer-in-unit_fail_.patch
+Patch0662: 0662-sd-event-take-ref-on-event-loop-object-before-dispat.patch
+Patch0663: 0663-core-consider-service-with-no-start-command-immediat.patch
+Patch0664: 0664-man-move-description-of-Action-modes-to-FailureActio.patch
+Patch0665: 0665-core-define-exit-and-exit-force-actions-for-user-uni.patch
+Patch0666: 0666-core-accept-system-mode-emergency-action-specifiers-.patch
+Patch0667: 0667-core-allow-services-with-no-commands-but-SuccessActi.patch
+Patch0668: 0668-core-limit-service-watchdogs-no-to-actual-watchdog-c.patch
+Patch0669: 0669-units-use-SuccessAction-exit-force-in-systemd-exit.s.patch
+Patch0670: 0670-units-use-SuccessAction-reboot-force-in-systemd-rebo.patch
+Patch0671: 0671-units-use-SuccessAction-poweroff-force-in-systemd-po.patch
+Patch0672: 0672-units-allow-and-use-SuccessAction-exit-force-in-syst.patch
+Patch0673: 0673-core-do-not-warn-about-mundane-emergency-actions.patch
+Patch0674: 0674-core-return-true-from-cg_is_empty-on-ENOENT.patch
+Patch0675: 0675-macro-define-HAS_FEATURE_ADDRESS_SANITIZER-also-on-g.patch
+Patch0676: 0676-tests-add-helper-function-to-autodetect-CI-environme.patch
+Patch0677: 0677-strv-rework-FOREACH_STRING-macro.patch
+Patch0678: 0678-test-systemctl-use-const-char-instead-of-char.patch
+Patch0679: 0679-ci-pass-the-GITHUB_ACTIONS-variable-to-the-CentOS-co.patch
+Patch0680: 0680-lgtm-detect-uninitialized-variables-using-the-__clea.patch
+Patch0681: 0681-lgtm-replace-the-query-used-for-looking-for-fgets-wi.patch
+Patch0682: 0682-lgtm-beef-up-list-of-dangerous-questionnable-API-cal.patch
+Patch0683: 0683-lgtm-warn-about-strerror-use.patch
+Patch0684: 0684-lgtm-complain-about-accept-people-should-use-accept4.patch
+Patch0685: 0685-lgtm-don-t-treat-the-custom-note-as-a-list-of-tags.patch
+Patch0686: 0686-lgtm-ignore-certain-cleanup-functions.patch
+Patch0687: 0687-lgtm-detect-more-possible-problematic-scenarios.patch
+Patch0688: 0688-lgtm-enable-more-and-potentially-useful-queries.patch
+Patch0689: 0689-meson-avoid-bogus-meson-warning.patch
+Patch0690: 0690-test-make-TEST-47-less-racy.patch
+Patch0691: 0691-core-rename-unit_-start_limit-condition-assert-_test.patch
+Patch0692: 0692-core-Check-unit-start-rate-limiting-earlier.patch
+Patch0693: 0693-sd-event-introduce-callback-invoked-when-event-sourc.patch
+Patch0694: 0694-core-rename-generalize-UNIT-u-test_start_limit-hook.patch
+Patch0695: 0695-mount-make-mount-units-start-jobs-not-runnable-if-p-.patch
+Patch0696: 0696-mount-retrigger-run-queue-after-ratelimit-expired-to.patch
+Patch0697: 0697-pid1-add-a-manager_trigger_run_queue-helper.patch
+Patch0698: 0698-unit-add-jobs-that-were-skipped-because-of-ratelimit.patch
+Patch0699: 0699-Revert-Revert-sysctl-Enable-ping-8-inside-rootless-P.patch
+Patch0700: 0700-sysctl-prefix-ping-port-range-setting-with-a-dash.patch
+Patch0701: 0701-mount-don-t-propagate-errors-from-mount_setup_unit-f.patch
+Patch0702: 0702-udev-net_id-introduce-naming-scheme-for-RHEL-8.5.patch
+Patch0703: 0703-udev-net_id-remove-extraneous-bracket.patch
+Patch0704: 0704-udev-net_id-introduce-naming-scheme-for-RHEL-8.6.patch
+Patch0705: 0705-define-newly-needed-constants.patch
+Patch0706: 0706-sd-netlink-support-IFLA_PROP_LIST-and-IFLA_ALT_IFNAM.patch
+Patch0707: 0707-sd-netlink-introduce-sd_netlink_message_read_strv.patch
+Patch0708: 0708-sd-netlink-introduce-sd_netlink_message_append_strv.patch
+Patch0709: 0709-test-add-a-test-for-sd_netlink_message_-append-read-.patch
+Patch0710: 0710-util-introduce-ifname_valid_full.patch
+Patch0711: 0711-rename-function.patch
+Patch0712: 0712-udev-support-AlternativeName-setting-in-.link-file.patch
+Patch0713: 0713-network-make-Name-in-Match-support-alternative-names.patch
+Patch0714: 0714-udev-extend-the-length-of-ID_NET_NAME_XXX-to-ALTIFNA.patch
+Patch0715: 0715-udev-do-not-fail-if-kernel-does-not-support-alternat.patch
+Patch0716: 0716-udev-introduce-AlternativeNamesPolicy-setting.patch
+Patch0717: 0717-network-set-AlternativeNamesPolicy-in-99-default.lin.patch
+Patch0718: 0718-random-util-call-initialize_srand-after-fork.patch
+Patch0719: 0719-sd-netlink-introduce-rtnl_resolve_link_alternative_n.patch
+Patch0720: 0720-udev-sort-alternative-names.patch
+Patch0721: 0721-netlink-introduce-rtnl_get-delete_link_alternative_n.patch
+Patch0722: 0722-netlink-do-not-fail-when-new-interface-name-is-alrea.patch
+Patch0723: 0723-udev-do-not-try-to-reassign-alternative-names.patch
+Patch0724: 0724-Do-not-fail-if-the-same-alt.-name-is-set-again.patch
+Patch0725: 0725-mount-do-not-update-exec-deps-on-mountinfo-changes.patch
+Patch0726: 0726-core-mount-add-implicit-unit-dependencies-even-if-wh.patch
+Patch0727: 0727-core-fix-unfortunate-typo-in-unit_is_unneeded.patch
+Patch0728: 0728-core-make-destructive-transaction-error-a-bit-more-u.patch
+Patch0729: 0729-tmpfiles-use-a-entry-in-hashmap-as-ItemArray-in-read.patch
+Patch0730: 0730-tmpfiles-rework-condition-check.patch
+Patch0731: 0731-TEST-22-TMPFILES-add-reproducer-for-bug-with-X.patch
+Patch0732: 0732-core-make-sure-we-don-t-get-confused-when-setting-TE.patch
+Patch0733: 0733-hash-funcs-introduce-macro-to-create-typesafe-hash_o.patch
+Patch0734: 0734-hash-func-add-destructors-for-key-and-value.patch
+Patch0735: 0735-util-define-free_func_t.patch
+Patch0736: 0736-hash-funcs-make-basic-hash_ops-typesafe.patch
+Patch0737: 0737-test-add-tests-for-destructors-of-hashmap-or-set.patch
+Patch0738: 0738-man-document-the-new-sysctl.d-prefix.patch
+Patch0739: 0739-sysctl-if-options-are-prefixed-with-ignore-write-err.patch
+Patch0740: 0740-sysctl-fix-segfault.patch
+Patch0741: 0741-ci-drop-CentOS-8-CI.patch
+Patch0742: 0742-test-adapt-to-the-new-capsh-format.patch
+Patch0743: 0743-test-ignore-IAB-capabilities-in-test-execute.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -992,6 +1099,8 @@ mkdir -p %{buildroot}%{system_unit_dir}/dbus.target.wants
 mkdir -p %{buildroot}%{system_unit_dir}/syslog.target.wants
 mkdir -p %{buildroot}%{_localstatedir}/run
 mkdir -p %{buildroot}%{_localstatedir}/log
+touch %{buildroot}%{_localstatedir}/log/lastlog
+chmod 0664 %{buildroot}%{_localstatedir}/log/lastlog
 touch %{buildroot}%{_localstatedir}/run/utmp
 touch %{buildroot}%{_localstatedir}/log/{w,b}tmp
 
@@ -1076,6 +1185,7 @@ python3 %{SOURCE2} %buildroot <<EOF
 %ghost %attr(0664,root,utmp) /var/run/utmp
 %ghost %attr(0664,root,utmp) /var/log/wtmp
 %ghost %attr(0660,root,utmp) /var/log/btmp
+%ghost %attr(0664,root,utmp) %verify(not md5 size mtime) /var/log/lastlog
 %ghost %config(noreplace) /etc/hostname
 %ghost %config(noreplace) /etc/localtime
 %ghost %config(noreplace) /etc/locale.conf
@@ -1313,6 +1423,124 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Tue Feb 08 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58
+- ci: drop CentOS 8 CI (#2017033)
+- test: adapt to the new capsh format (#2017033)
+- test: ignore IAB capabilities in `test-execute` (#2017033)
+
+* Mon Feb 07 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-57
+- udev/net_id: introduce naming scheme for RHEL-8.5 (#2039797)
+- udev/net_id: remove extraneous bracket (#2039797)
+- udev/net_id: introduce naming scheme for RHEL-8.6 (#2039797)
+- define newly needed constants (#2005008)
+- sd-netlink: support IFLA_PROP_LIST and IFLA_ALT_IFNAME attributes (#2005008)
+- sd-netlink: introduce sd_netlink_message_read_strv() (#2005008)
+- sd-netlink: introduce sd_netlink_message_append_strv() (#2005008)
+- test: add a test for sd_netlink_message_{append,read}_strv() (#2005008)
+- util: introduce ifname_valid_full() (#2005008)
+- rename function (#2005008)
+- udev: support AlternativeName= setting in .link file (#2005008)
+- network: make Name= in [Match] support alternative names of interfaces (#2005008)
+- udev: extend the length of ID_NET_NAME_XXX= to ALTIFNAMSIZ (#2005008)
+- udev: do not fail if kernel does not support alternative names (#2005008)
+- udev: introduce AlternativeNamesPolicy= setting (#2005008)
+- network: set AlternativeNamesPolicy= in 99-default.link (#2005008)
+- random-util: call initialize_srand() after fork() (#2005008)
+- sd-netlink: introduce rtnl_resolve_link_alternative_names() (#2005008)
+- udev: sort alternative names (#2005008)
+- netlink: introduce rtnl_get/delete_link_alternative_names() (#2005008)
+- netlink: do not fail when new interface name is already used as an alternative name (#2005008)
+- udev: do not try to reassign alternative names (#2005008)
+- Do not fail if the same alt. name is set again (#2005008)
+- mount: do not update exec deps on mountinfo changes (#2008825)
+- core/mount: add implicit unit dependencies even if when mount unit is generated from /proc/self/mountinfo (#2008825)
+- core: fix unfortunate typo in unit_is_unneeded() (#2040147)
+- core: make destructive transaction error a bit more useful (#2040147)
+- tmpfiles: use a entry in hashmap as ItemArray in read_config_file() (#1944468)
+- tmpfiles: rework condition check (#1944468)
+- TEST-22-TMPFILES: add reproducer for bug with X (#1944468)
+- core: make sure we don't get confused when setting TERM for a tty fd (#2045307)
+- hash-funcs: introduce macro to create typesafe hash_ops (#2037807)
+- hash-func: add destructors for key and value (#2037807)
+- util: define free_func_t (#2037807)
+- hash-funcs: make basic hash_ops typesafe (#2037807)
+- test: add tests for destructors of hashmap or set (#2037807)
+- man: document the new sysctl.d/ - prefix (#2037807)
+- sysctl: if options are prefixed with "-" ignore write errors (#2037807)
+- sysctl: fix segfault (#2037807)
+
+* Tue Jan 25 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-56
+- Take ghost ownership of /var/log/lastlog (#1798685)
+
+* Mon Jan 10 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-55
+- lgtm: detect uninitialized variables using the __cleanup__ attribute (#2017033)
+- lgtm: replace the query used for looking for fgets with a more general query (#2017033)
+- lgtm: beef up list of dangerous/questionnable API calls not to make (#2017033)
+- lgtm: warn about strerror() use (#2017033)
+- lgtm: complain about accept() [people should use accept4() instead, due to O_CLOEXEC] (#2017033)
+- lgtm: don't treat the custom note as a list of tags (#2017033)
+- lgtm: ignore certain cleanup functions (#2017033)
+- lgtm: detect more possible problematic scenarios (#2017033)
+- lgtm: enable more (and potentially useful) queries (#2017033)
+- test: make TEST-47 less racy (#2017033)
+- core: rename unit_{start_limit|condition|assert}_test() to unit_test_xyz() (#2036608)
+- core: Check unit start rate limiting earlier (#2036608)
+- sd-event: introduce callback invoked when event source ratelimit expires (#2036608)
+- core: rename/generalize UNIT(u)->test_start_limit() hook (#2036608)
+- mount: make mount units start jobs not runnable if /p/s/mountinfo ratelimit is in effect (#2036608)
+- mount: retrigger run queue after ratelimit expired to run delayed mount start jobs (#2036608)
+- pid1: add a manager_trigger_run_queue() helper (#2036608)
+- unit: add jobs that were skipped because of ratelimit back to run_queue (#2036608)
+- Revert "Revert "sysctl: Enable ping(8) inside rootless Podman containers"" (#2037807)
+- sysctl: prefix ping port range setting with a dash (#2037807)
+- mount: don't propagate errors from mount_setup_unit() further up (#2036853)
+
+* Wed Dec 01 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-54
+- core: consider service with no start command immediately started (#1860899)
+- man: move description of *Action= modes to FailureAction=/SuccessAction= (#1860899)
+- core: define "exit" and "exit-force" actions for user units and only accept that (#1860899)
+- core: accept system mode emergency action specifiers with a warning (#1860899)
+- core: allow services with no commands but SuccessAction set (#1860899)
+- core: limit service-watchdogs=no to actual "watchdog" commands (#1860899)
+- units: use SuccessAction=exit-force in systemd-exit.service (#1860899)
+- units: use SuccessAction=reboot-force in systemd-reboot.service (#1860899)
+- units: use SuccessAction=poweroff-force in systemd-poweroff.service (#1860899)
+- units: allow and use SuccessAction=exit-force in system systemd-exit.service (#1860899)
+- core: do not "warn" about mundane emergency actions (#1860899)
+- core: return true from cg_is_empty* on ENOENT (#1860899)
+- macro: define HAS_FEATURE_ADDRESS_SANITIZER also on gcc (#2017033)
+- tests: add helper function to autodetect CI environments (#2017033)
+- strv: rework FOREACH_STRING() macro (#2017033)
+- test,systemctl: use "const char*" instead of "char*" (#2017033)
+- ci: pass the $GITHUB_ACTIONS variable to the CentOS container (#2017033)
+
+* Wed Nov 24 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-53
+- sd-hwdb: allow empty properties (#2005009)
+- Update hwdb (#2005009)
+- Disable libpitc to fix CentOS Stream CI (#2017033)
+- rpm: Fix typo in %_environmentdir (#2018024)
+- rpm: Add misspelled %_environmentdir macro for temporary compatibility (#2018024)
+- rpm: emit warning when macro with typo is used (#2018024)
+- Remove unintended additions to systemd-analyze man page (#2004765)
+- core: fix SIGABRT on empty exec command argv (#2020239)
+- core/service: also check path in exec commands (#2020239)
+- mount-util: fix fd_is_mount_point() when both the parent and directory are network fs (#2015057)
+- basic: add vmware hypervisor detection from device-tree (#1959150)
+- pam: do not require a non-expired password for user@.service (#1961746)
+- udev rules: add rule to create /dev/ptp_hyperv (#1991834)
+- process-util: explicitly handle processes lacking parents in get_process_ppid() (#1977569)
+- errno-util: add ERRNO_IS_PRIVILEGE() helper (#1977569)
+- procfs-util: fix confusion wrt. quantity limit and maximum value (#1977569)
+- test-process-util: also add EROFS to the list of "good" errors (#1977569)
+- journal: refresh cached credentials of stdout streams (#1931806)
+- util-lib: introduce HAS_FEATURE_ADDRESS_SANITIZER (#2017033)
+- ci: skip test-execute on GH Actions under ASan (#2017033)
+- test-seccomp: accept ENOSYS from sysctl(2) too (#2017033)
+- test: accept that char device 0/0 can now be created witout privileges (#2017033)
+- meson: do not fail if rsync is not installed with meson 0.57.2 (#2017033)
+- pid1: fix free of uninitialized pointer in unit_fail_if_noncanonical() (#1970945)
+- sd-event: take ref on event loop object before dispatching event sources (#1970945)
+
 * Fri Aug 27 2021 systemd maintenance team <systemd-maint@redhat.com> - 239-50
 - Added option --check-inhibitors for non-tty usage (#1269726)
 - logind: Introduce RebootWithFlags and others (#1269726)
