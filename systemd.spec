@@ -43,7 +43,7 @@ Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
 Version:        250.3
-Release:        6.2%{?dist}
+Release:        6.3%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -1067,6 +1067,10 @@ fi
 %endif
 
 %changelog
+* Wed Apr 01 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.3
+- Move systemd-network-generator and networkd man pages to networkd package to
+  avoid conflicts with systemd-extras from EPEL
+
 * Wed Mar 16 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.2
 - Backport PR #22757: BPF error logging improvements
 

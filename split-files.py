@@ -80,7 +80,10 @@ for file in files(buildroot):
     elif re.search(r'''/usr/lib/systemd/network/80-|
                        networkd|
                        networkctl|
-                       org.freedesktop.network1
+                       org.freedesktop.network1|
+                       systemd.netdev|
+                       systemd.network|
+                       systemd-network-generator
     ''', n, re.X):
         o = o_networkd
     elif '.so.' in n:
