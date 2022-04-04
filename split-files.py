@@ -1,8 +1,23 @@
 import re, sys, os, collections
 
 buildroot = sys.argv[1]
+release = sys.argv[2]
 known_files = sys.stdin.read().splitlines()
 known_files = {line.split()[-1]:line for line in known_files}
+
+networkd_regex = r'''
+    /usr/lib/systemd/network/80-|
+    networkd|
+    networkctl|
+    org.freedesktop.network1
+'''
+
+if release == "8":
+    networkd_regex += r'''|
+        systemd.netdev|
+        systemd.network|
+        systemd-network-generator
+    '''
 
 def files(root):
     os.chdir(root)
@@ -77,14 +92,7 @@ for file in files(buildroot):
                        org.freedesktop.(import|machine)1
     ''', n, re.X):
         o = o_container
-    elif re.search(r'''/usr/lib/systemd/network/80-|
-                       networkd|
-                       networkctl|
-                       org.freedesktop.network1|
-                       systemd.netdev|
-                       systemd.network|
-                       systemd-network-generator
-    ''', n, re.X):
+    elif re.search(networkd_regex, n, re.X):
         o = o_networkd
     elif '.so.' in n:
         o = o_libs

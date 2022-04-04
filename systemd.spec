@@ -43,7 +43,7 @@ Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
 Version:        250.3
-Release:        6.3%{?dist}
+Release:        6.4%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -279,6 +279,11 @@ Systemd PAM module registers the session with systemd-logind.
 %package rpm-macros
 Summary:        Macros that define paths and scriptlets related to systemd
 BuildArch:      noarch
+# Make sure we obsolete the existing version and any possible future versions
+# of epel-rpm-macros-systemd in c8s and c9s.
+Conflicts:      epel-rpm-macros-systemd < 10-0
+Obsoletes:      epel-rpm-macros-systemd < 10-0
+Provides:       epel-rpm-macros-systemd = 10-0
 
 %description rpm-macros
 Just the definitions of rpm macros.
@@ -318,6 +323,12 @@ Obsoletes:      systemd < 245.6-1
 Provides:       udev = %{version}
 Provides:       udev%{_isa} = %{version}
 Obsoletes:      udev < 183
+Conflicts:      systemd-boot < %{version}-%{release}
+Obsoletes:      systemd-boot < %{version}-%{release}
+Provides:       systemd-boot = %{version}-%{release}
+Conflicts:      systemd-timesyncd < %{version}-%{release}
+Obsoletes:      systemd-timesyncd < %{version}-%{release}
+Provides:       systemd-timesyncd = %{version}-%{release}
 
 # Recommends to replace normal Requires deps for stuff that is dlopen()ed
 # used by dissect, integritysetup, veritysetyp, growfs, repart, cryptenroll, home
@@ -737,7 +748,7 @@ install -m 0755 -D -t %{buildroot}%{_rpmconfigdir}/ %{SOURCE24}
 # Split files in build root into rpms. See split-files.py for the
 # rules towards the end, anything which is an exception needs a line
 # here.
-python3 %{SOURCE2} %buildroot <<EOF
+python3 %{SOURCE2} %buildroot "%{rhel}" <<EOF
 %ghost %config(noreplace) /etc/crypttab
 %ghost /etc/udev/hwdb.bin
 /etc/inittab
@@ -1067,6 +1078,11 @@ fi
 %endif
 
 %changelog
+* Wed Apr 04 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.4
+- Make sure our packages override the corresponding backports from EPEL.
+- Modify the networkd fix from the previous release so that it can be merged
+  into the c9s branch.
+
 * Wed Apr 01 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.3
 - Move systemd-network-generator and networkd man pages to networkd package to
   avoid conflicts with systemd-extras from EPEL
