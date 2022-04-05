@@ -21,7 +21,7 @@
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 Version:        250
-Release:        3%{?dist}
+Release:        4%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -105,6 +105,12 @@ Patch0024: 0024-test-introduce-get_cgroup_hierarchy-helper.patch
 Patch0025: 0025-test-require-unified-cgroup-hierarchy-for-TEST-56.patch
 Patch0026: 0026-tests-rework-test-macros-to-not-take-code-as-paramet.patch
 Patch0027: 0027-test-allow-to-set-NULL-to-intro-or-outro.patch
+Patch0028: 0028-udev-net-setup-link-change-the-default-MACAddressPol.patch
+Patch0029: 0029-man-mention-System-Administrator-s-Guide-in-systemct.patch
+Patch0030: 0030-Net-naming-scheme-for-RHEL-9.0.patch
+Patch0031: 0031-core-decrease-log-level-of-messages-about-use-of-Kil.patch
+Patch0032: 0032-ci-replace-apt-key-with-signed-by.patch
+Patch0033: 0033-ci-fix-clang-13-installation.patch
 
 # Downstream-only patches (9000–9999)
 
@@ -886,6 +892,14 @@ getent passwd systemd-oom &>/dev/null || useradd -r -l -g systemd-oom -d / -s /s
 %files standalone-sysusers -f .file-list-standalone-sysusers
 
 %changelog
+* Wed Feb 23 2022 systemd maintenance team <systemd-maint@redhat.com> - 250-4
+- udev/net-setup-link: change the default MACAddressPolicy to "none" (#2009237)
+- man: mention System Administrator's Guide in systemctl manpage (#1982596)
+- Net naming scheme for RHEL-9.0 (#2052106)
+- core: decrease log level of messages about use of KillMode=none (#2013213)
+- ci: replace apt-key with signed-by (#2013213)
+- ci: fix clang-13 installation (#2013213)
+
 * Tue Feb 08 2022 systemd maintenance team <systemd-maint@redhat.com> - 250-3
 - Treat EPERM as "not available" too (#2017035)
 - test: copy portable profiles into the image if they don't exist there (#2017035)
