@@ -4,9 +4,9 @@
 %global stable 1
 
 %if 0%{?facebook}
-%global hs_commit ebf4af4ffa19cf1de7627b6464c1aef4a25ae0ab
+%global hs_commit 7398fa7259fb3b805bc8e6770db21eab7ed8bc0d
 %else
-%global hs_commit 006cad0d7fee57520db542a2cfa5ce3688325beb
+%global hs_commit ee232c833a604e2075703065811fd5619aad4dec
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -43,7 +43,7 @@ Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
 Version:        250.3
-Release:        6.4%{?dist}
+Release:        6.5%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -1078,12 +1078,15 @@ fi
 %endif
 
 %changelog
-* Wed Apr 04 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.4
+* Wed Apr  6 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.5
+- Backport systemd-analyze verify regression fix
+
+* Wed Apr  4 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.4
 - Make sure our packages override the corresponding backports from EPEL.
 - Modify the networkd fix from the previous release so that it can be merged
   into the c9s branch.
 
-* Wed Apr 01 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.3
+* Wed Apr  1 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.3
 - Move systemd-network-generator and networkd man pages to networkd package to
   avoid conflicts with systemd-extras from EPEL
 
