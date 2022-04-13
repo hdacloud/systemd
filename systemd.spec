@@ -43,7 +43,7 @@ Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
 Version:        250.3
-Release:        6.5%{?dist}
+Release:        6.6%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -1078,6 +1078,11 @@ fi
 %endif
 
 %changelog
+* Wed Apr 13 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.6
+- Fixed bug in networkd changes to split-files.py that caused the
+  /etc/systemd/network to get moved to the networkd package (which we don't
+  want because that's where link files for udev are also stored).
+
 * Wed Apr  6 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.5
 - Backport systemd-analyze verify regression fix
 
