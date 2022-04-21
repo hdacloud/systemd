@@ -1086,12 +1086,12 @@ fi
 * Wed Apr  6 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.5
 - Backport systemd-analyze verify regression fix
 
-* Wed Apr  4 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.4
+* Mon Apr  4 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.4
 - Make sure our packages override the corresponding backports from EPEL.
 - Modify the networkd fix from the previous release so that it can be merged
   into the c9s branch.
 
-* Wed Apr  1 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.3
+* Fri Apr  1 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.3
 - Move systemd-network-generator and networkd man pages to networkd package to
   avoid conflicts with systemd-extras from EPEL
 
