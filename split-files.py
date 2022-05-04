@@ -9,14 +9,14 @@ networkd_regex = r'''
     /usr/lib/systemd/network/80-|
     networkd|
     networkctl|
-    org\.freedesktop\.network1
+    org\.freedesktop\.network1|
+    systemd\.network|
+    systemd-network\.conf|
+    systemd\.netdev
 '''
 
 if release == "8":
     networkd_regex += r'''|
-        systemd\.netdev|
-        systemd\.network|
-        systemd-network\.conf|
         systemd-network-generator
     '''
 

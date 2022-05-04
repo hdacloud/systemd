@@ -4,9 +4,9 @@
 %global stable 1
 
 %if 0%{?facebook}
-%global hs_commit 7398fa7259fb3b805bc8e6770db21eab7ed8bc0d
+%global hs_commit 469e5686ae61dbcf04a6d87fbc8e00fd932a1e3f
 %else
-%global hs_commit ee232c833a604e2075703065811fd5619aad4dec
+%global hs_commit 45a3b57ecf40f316450313d20a4069bfe0c80eb5
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -43,7 +43,7 @@ Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
 Version:        250.3
-Release:        6.6%{?dist}
+Release:        6.7%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -1078,6 +1078,11 @@ fi
 %endif
 
 %changelog
+* Wed May  4 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.7
+- Backported https://github.com/systemd/systemd/pull/23254 and
+  https://github.com/systemd/systemd/pull/23205
+- Move more files to the networkd package
+
 * Wed Apr 13 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.6
 - Fixed bug in networkd changes to split-files.py that caused the
   /etc/systemd/network to get moved to the networkd package (which we don't
