@@ -608,7 +608,7 @@ CONFIGURE_OPTS=(
 CONFIGURE_OPTS+=(
         -Dntp-servers='1.ntp.vip.facebook.com 2.ntp.vip.facebook.com 3.ntp.vip.facebook.com 4.ntp.vip.facebook.com'
         -Ddns-servers='10.127.255.51 10.191.255.51 2401:db00:eef0:a53:: 2401:db00:eef0:b53::'
-        -Dsupport-url='https://www.facebook.com/groups/systemd.and.friends/'
+        -Dsupport-url='https://www.facebook.com/groups/systemd.and.friends'
         -Dcontainer-uid-base-min=10485760
 )
 %endif
