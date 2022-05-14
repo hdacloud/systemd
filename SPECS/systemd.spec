@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        58%{?dist}
+Release:        58%{?dist}.1
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -793,6 +793,13 @@ Patch0740: 0740-sysctl-fix-segfault.patch
 Patch0741: 0741-ci-drop-CentOS-8-CI.patch
 Patch0742: 0742-test-adapt-to-the-new-capsh-format.patch
 Patch0743: 0743-test-ignore-IAB-capabilities-in-test-execute.patch
+Patch0744: 0744-acpi-fpdt-mark-structures-as-packed.patch
+Patch0745: 0745-core-slice-make-slice_freezer_action-return-0-if-fre.patch
+Patch0746: 0746-core-unit-fix-use-after-free.patch
+Patch0747: 0747-sd-bus-fix-reference-counter-to-be-incremented.patch
+Patch0748: 0748-sd-bus-do-not-read-unused-value.patch
+Patch0749: 0749-sd-bus-do-not-return-negative-errno-when-unknown-nam.patch
+Patch0750: 0750-sd-bus-switch-to-a-manual-overflow-check-in-sd_bus_t.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -1423,6 +1430,15 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Wed May 11 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58.1
+- acpi-fpdt: mark structures as packed (#2084052)
+- core/slice: make slice_freezer_action() return 0 if freezing state is unchanged (#2084052)
+- core/unit: fix use-after-free (#2084052)
+- sd-bus: fix reference counter to be incremented (#2084052)
+- sd-bus: do not read unused value (#2084052)
+- sd-bus: do not return negative errno when unknown name is specified (#2084052)
+- sd-bus: switch to a manual overflow check in sd_bus_track_add_name() (#2084052)
+
 * Tue Feb 08 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58
 - ci: drop CentOS 8 CI (#2017033)
 - test: adapt to the new capsh format (#2017033)
