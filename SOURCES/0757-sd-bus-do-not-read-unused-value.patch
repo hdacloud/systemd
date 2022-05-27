@@ -1,11 +1,11 @@
-From 6f8278097070d77e39d15e5f5d11e1c8b83871c2 Mon Sep 17 00:00:00 2001
+From 480658d6c79f494e820eb3da59a1818b5b7c3c8b Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Sun, 17 Apr 2022 07:25:09 +0900
 Subject: [PATCH] sd-bus: do not read unused value
 
 (cherry picked from commit 6a7ca27740be4229b4c9f540cd610b205ca5752c)
 
-Related: #2084052
+Related: #2047373
 ---
  src/libsystemd/sd-bus/bus-track.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)

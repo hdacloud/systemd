@@ -1,4 +1,4 @@
-From 78b5b6dbd0bb4e5644e798748d186cca88fc523d Mon Sep 17 00:00:00 2001
+From 598eecf5c1c948535ca626833bc5cea59060913f Mon Sep 17 00:00:00 2001
 From: Lennart Poettering <lennart@poettering.net>
 Date: Wed, 20 Apr 2022 22:30:22 +0200
 Subject: [PATCH] sd-bus: switch to a manual overflow check in
@@ -17,7 +17,7 @@ https://github.com/systemd/systemd/pull/23099#discussion_r854341850
 in c2d7dd35d2 hence we still had potential undefined behavior related to
 overflow check and this commit fixes that.]
 
-Related: #2084052
+Related: #2047373
 ---
  src/libsystemd/sd-bus/bus-track.c | 10 +++++++---
  1 file changed, 7 insertions(+), 3 deletions(-)

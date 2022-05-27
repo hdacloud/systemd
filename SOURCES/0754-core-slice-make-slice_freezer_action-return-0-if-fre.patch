@@ -1,4 +1,4 @@
-From 9e3aefa21a631e7f47a8121097384a8b08ae8502 Mon Sep 17 00:00:00 2001
+From 1f4af2e456675c6226857ee0c8127ff4b3d1d18a Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Fri, 6 May 2022 14:01:22 +0900
 Subject: [PATCH] core/slice: make slice_freezer_action() return 0 if freezing
@@ -8,7 +8,7 @@ Fixes #23278.
 
 (cherry picked from commit d171e72e7afa11b238ba20758384d223b0c76e39)
 
-Related: #2084052
+Related: #2047373
 ---
  src/core/slice.c | 6 +-----
  src/core/unit.c  | 2 ++

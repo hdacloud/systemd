@@ -1,4 +1,4 @@
-From 96bc9caf3216b391a1da88b92ca507fa617177f7 Mon Sep 17 00:00:00 2001
+From 45670b65ccc1d41a32b83217ba9a78c9eed5fc02 Mon Sep 17 00:00:00 2001
 From: Lennart Poettering <lennart@poettering.net>
 Date: Thu, 23 Apr 2020 08:49:10 +0200
 Subject: [PATCH] acpi-fpdt: mark structures as packed
@@ -7,7 +7,7 @@ Let's make sure the alignment doesn't matter.
 
 (cherry picked from commit 49490c1d353bc920cbf73f4c71e9c35d2e3eb8b1)
 
-Related: #2084052
+Related: #2047373
 ---
  src/shared/acpi-fpdt.c | 8 ++++----
  1 file changed, 4 insertions(+), 4 deletions(-)

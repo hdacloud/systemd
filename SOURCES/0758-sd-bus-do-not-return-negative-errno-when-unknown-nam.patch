@@ -1,4 +1,4 @@
-From 3005733945670cc4a77920bb55e5cdda331cff4d Mon Sep 17 00:00:00 2001
+From 805e13f7016f37c882069f43b5f0c0972d5fdf95 Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Sun, 17 Apr 2022 07:29:24 +0900
 Subject: [PATCH] sd-bus: do not return negative errno when unknown name is
@@ -10,7 +10,7 @@ same pattern for the case that 'recursive' is true.
 
 (cherry picked from commit 55bfacc6c33eaf3475762e71172b2ef504be5af8)
 
-Related: #2084052
+Related: #2047373
 ---
  src/libsystemd/sd-bus/bus-track.c | 5 +----
  1 file changed, 1 insertion(+), 4 deletions(-)

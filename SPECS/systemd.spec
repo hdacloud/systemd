@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        58%{?dist}.1
+Release:        59%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -793,13 +793,23 @@ Patch0740: 0740-sysctl-fix-segfault.patch
 Patch0741: 0741-ci-drop-CentOS-8-CI.patch
 Patch0742: 0742-test-adapt-to-the-new-capsh-format.patch
 Patch0743: 0743-test-ignore-IAB-capabilities-in-test-execute.patch
-Patch0744: 0744-acpi-fpdt-mark-structures-as-packed.patch
-Patch0745: 0745-core-slice-make-slice_freezer_action-return-0-if-fre.patch
-Patch0746: 0746-core-unit-fix-use-after-free.patch
-Patch0747: 0747-sd-bus-fix-reference-counter-to-be-incremented.patch
-Patch0748: 0748-sd-bus-do-not-read-unused-value.patch
-Patch0749: 0749-sd-bus-do-not-return-negative-errno-when-unknown-nam.patch
-Patch0750: 0750-sd-bus-switch-to-a-manual-overflow-check-in-sd_bus_t.patch
+Patch0744: 0744-core-disallow-using-.service-as-a-service-name.patch
+Patch0745: 0745-shared-dropin-support-.service.d-top-level-drop-in-f.patch
+Patch0746: 0746-core-change-top-level-drop-in-from-.service.d-to-ser.patch
+Patch0747: 0747-shared-dropin-fix-assert-for-invalid-drop-in.patch
+Patch0748: 0748-udev-fix-slot-based-network-names-on-s390.patch
+Patch0749: 0749-udev-add-missing-initialization-to-fix-freeing-inval.patch
+Patch0750: 0750-udev-it-is-not-necessary-that-the-path-is-readable.patch
+Patch0751: 0751-udev-allow-onboard-index-up-to-65535.patch
+Patch0752: 0752-Revert-basic-use-comma-as-separator-in-cpuset-cgroup.patch
+Patch0753: 0753-acpi-fpdt-mark-structures-as-packed.patch
+Patch0754: 0754-core-slice-make-slice_freezer_action-return-0-if-fre.patch
+Patch0755: 0755-core-unit-fix-use-after-free.patch
+Patch0756: 0756-sd-bus-fix-reference-counter-to-be-incremented.patch
+Patch0757: 0757-sd-bus-do-not-read-unused-value.patch
+Patch0758: 0758-sd-bus-do-not-return-negative-errno-when-unknown-nam.patch
+Patch0759: 0759-sd-bus-switch-to-a-manual-overflow-check-in-sd_bus_t.patch
+Patch0760: 0760-resolved-let-s-preferably-route-reverse-lookups-for-.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -863,6 +873,7 @@ Requires:       %{name}-pam = %{version}-%{release}
 Requires:       %{name}-libs = %{version}-%{release}
 Recommends:     diffutils
 Requires:       util-linux
+Requires:       timedatex
 Recommends:     libxkbcommon%{?_isa}
 Provides:       /bin/systemctl
 Provides:       /sbin/shutdown
@@ -1430,14 +1441,23 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
-* Wed May 11 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58.1
-- acpi-fpdt: mark structures as packed (#2084052)
-- core/slice: make slice_freezer_action() return 0 if freezing state is unchanged (#2084052)
-- core/unit: fix use-after-free (#2084052)
-- sd-bus: fix reference counter to be incremented (#2084052)
-- sd-bus: do not read unused value (#2084052)
-- sd-bus: do not return negative errno when unknown name is specified (#2084052)
-- sd-bus: switch to a manual overflow check in sd_bus_track_add_name() (#2084052)
+* Wed May 18 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-59
+- core: disallow using '-.service' as a service name (#2051520)
+- shared/dropin: support -.service.d/ top level drop-in for service units (#2051520)
+- core: change top-level drop-in from -.service.d to service.d (#2051520)
+- shared/dropin: fix assert for invalid drop-in (#2051520)
+- udev: fix slot based network names on s390 (#1939914)
+- udev: it is not necessary that the path is readable (#1939914)
+- udev: allow onboard index up to 65535 (#1939914)
+- Revert "basic: use comma as separator in cpuset cgroup cpu ranges" (#1858220)
+- acpi-fpdt: mark structures as packed (#2047373)
+- core/slice: make slice_freezer_action() return 0 if freezing state is unchanged (#2047373)
+- core/unit: fix use-after-free (#2047373)
+- sd-bus: fix reference counter to be incremented (#2047373)
+- sd-bus: do not read unused value (#2047373)
+- sd-bus: do not return negative errno when unknown name is specified (#2047373)
+- sd-bus: switch to a manual overflow check in sd_bus_track_add_name() (#2047373)
+- spec: Add dependency on timedatex (#2066946)
 
 * Tue Feb 08 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58
 - ci: drop CentOS 8 CI (#2017033)

@@ -1,4 +1,4 @@
-From d3d0969d7c366d6bb2f66501e61cbcd11a60face Mon Sep 17 00:00:00 2001
+From 39e9bd0412bef0c37d487834b8be3a78e28cb804 Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Sun, 17 Apr 2022 07:05:07 +0900
 Subject: [PATCH] sd-bus: fix reference counter to be incremented
@@ -12,7 +12,7 @@ Fixes #23097.
 fully because of conflicts and because its was made largely irrelevant
 by 7f40cb7c86]
 
-Related: #2084052
+Related: #2047373
 ---
  src/libsystemd/sd-bus/bus-track.c | 15 +++++++--------
  1 file changed, 7 insertions(+), 8 deletions(-)
