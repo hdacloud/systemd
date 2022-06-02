@@ -464,6 +464,8 @@ runs properly under an environment with SELinux enabled.
 %endif
 
 %prep
+# pagure strips the '+' from 'hs+fb' for the top directory in the tar archive so
+# the top directory is hsfb-250.3 instead of hs+fb-250.3.
 %autosetup -n %{name}-hs%{?facebook:fb}-%{version} -p1
 
 %if %{with selinux}
