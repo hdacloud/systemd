@@ -619,8 +619,6 @@ CONFIGURE_OPTS+=(
 %global _lto_cflags %nil
 %endif
 
-export LANG=en_US.UTF-8
-export LC_ALL=en_US.UTF-8
 # Do configuration. If doing an inplace build, try to do
 # reconfiguration to pick up new options.
 %if %{with inplace}
@@ -646,8 +644,6 @@ cd selinux
 %endif
 
 %install
-export LANG=en_US.UTF-8
-export LC_ALL=en_US.UTF-8
 %meson_install
 
 # udev links
@@ -794,8 +790,6 @@ install -p -m 0644 selinux/systemd_hs.pp.bz2 %{buildroot}%{_datadir}/selinux/pac
 
 %check
 %if %{with tests}
-export LANG=en_US.UTF-8
-export LC_ALL=en_US.UTF-8
 meson test -C %{_vpath_builddir} -t 6 --print-errorlogs
 %endif
 
