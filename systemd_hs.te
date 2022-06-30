@@ -1,0 +1,68 @@
+policy_module(systemd_hs,0.0.1)
+
+# systemd overrides for 247
+gen_require(`
+	type avahi_t;
+	type cgroup_t;
+	type init_t;
+	type init_var_run_t;
+	type initrc_t;
+	class dbus send_msg;
+	type install_t;
+	type kmsg_device_t;
+	type policykit_auth_t;
+	type policykit_t;
+	type proc_kmsg_t;
+	type rpm_t;
+	type system_dbusd_t;
+	type system_dbusd_var_run_t;
+	type systemd_hostnamed_t;
+	type systemd_localed_t;
+	type systemd_logind_t;
+	type systemd_machined_t;
+	type systemd_resolved_t;
+	type systemd_tmpfiles_t;
+	type security_t;
+	type sssd_t;
+	type syslogd_t;
+	type udev_var_run_t;
+	type user_tmp_t;
+	type useradd_t;
+	type xdm_t;
+')
+
+allow avahi_t init_var_run_t:dir read;
+allow init_t kmsg_device_t:chr_file mounton;
+allow init_t proc_kmsg_t:file { getattr mounton };
+allow init_t system_dbusd_var_run_t:sock_file read;
+allow init_t systemd_machined_t:unix_stream_socket connectto;
+allow policykit_auth_t init_var_run_t:dir read;
+allow policykit_auth_t systemd_machined_t:unix_stream_socket connectto;
+allow policykit_t systemd_machined_t:unix_stream_socket connectto;
+allow sssd_t cgroup_t:filesystem getattr;
+allow syslogd_t user_tmp_t:lnk_file read;
+allow system_dbusd_t systemd_machined_t:unix_stream_socket connectto;
+allow systemd_hostnamed_t init_var_run_t:dir write;
+allow systemd_hostnamed_t init_var_run_t:file { getattr ioctl open read };
+allow systemd_hostnamed_t initrc_t:dbus send_msg;
+allow systemd_hostnamed_t install_t:dbus send_msg;
+allow systemd_hostnamed_t udev_var_run_t:file getattr;
+allow systemd_hostnamed_t udev_var_run_t:file open;
+allow systemd_hostnamed_t udev_var_run_t:file read;
+allow systemd_logind_t self:netlink_selinux_socket bind;
+allow systemd_logind_t self:netlink_selinux_socket create;
+allow systemd_logind_t systemd_machined_t:unix_stream_socket connectto;
+allow systemd_logind_t user_tmp_t:chr_file unlink;
+allow systemd_machined_t init_var_run_t:sock_file create;
+allow sssd_t cgroup_t:dir search;
+allow sssd_t cgroup_t:filesystem getattr;
+allow useradd_t init_var_run_t:dir read;
+allow xdm_t systemd_machined_t:unix_stream_socket connectto;
+
+selinux_use_status_page(init_t)
+selinux_use_status_page(rpm_t)
+selinux_use_status_page(systemd_hostnamed_t)
+selinux_use_status_page(systemd_localed_t)
+selinux_use_status_page(systemd_logind_t)
+selinux_use_status_page(systemd_resolved_t)
+selinux_use_status_page(systemd_tmpfiles_t)

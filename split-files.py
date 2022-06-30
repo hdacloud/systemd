@@ -1,6 +1,7 @@
 import re, sys, os, collections
 
 buildroot = sys.argv[1]
+release = sys.argv[2]
 known_files = sys.stdin.read().splitlines()
 known_files = {line.split()[-1]:line for line in known_files}
 
@@ -91,7 +92,7 @@ for file in files(buildroot):
                        tmpfiles\.d/systemd-network.conf|
                        systemd\.network|
                        systemd\.netdev
-    ''', n, re.X):
+    ''' + r'|systemd-network-generator' if release == "8" else r'', n, re.X):
         o = o_networkd
 
     elif '.so.' in n:

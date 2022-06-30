@@ -7,3 +7,4 @@
 /systemd-*.tar.xz
 /systemd-*.tar.gz
 /*.rpm
+/SRPMS
