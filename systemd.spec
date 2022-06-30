@@ -3,12 +3,6 @@
 
 %global stable 1
 
-%if 0%{?facebook}
-%global hs_commit 469e5686ae61dbcf04a6d87fbc8e00fd932a1e3f
-%else
-%global hs_commit 45a3b57ecf40f316450313d20a4069bfe0c80eb5
-%endif
-
 # We ship a .pc file but don't want to have a dep on pkg-config. We
 # strip the automatically generated dep here and instead co-own the
 # directory.
@@ -33,17 +27,11 @@
 # See README.build-in-place.
 %bcond_with    inplace
 
-%if 0%{?facebook}
-%bcond_with selinux
-%else
-%bcond_without selinux
-%endif
-
 Name:           systemd
-Url:            https://pagure.io/centos-sig-hyperscale/systemd
+Url:            https://www.freedesktop.org/wiki/Software/systemd
 %if %{without inplace}
-Version:        250.3
-Release:        6.7%{?dist}
+Version:        251.3
+Release:        1%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -55,7 +43,15 @@ License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
 
 # download tarballs with "spectool -g systemd.spec"
-Source0:        %{url}/archive/%{hs_commit}/%{name}-hs%{?facebook:+fb}-%{version}.tar.gz
+%if %{defined commit}
+Source0:        https://github.com/systemd/systemd%{?stable:-stable}/archive/%{commit}/%{name}-%{shortcommit}.tar.gz
+%else
+%if 0%{?stable}
+Source0:        https://github.com/systemd/systemd-stable/archive/v%{version_no_tilde}/%{name}-%{version_no_tilde}.tar.gz
+%else
+Source0:        https://github.com/systemd/systemd/archive/v%{version_no_tilde}/%{name}-%{version_no_tilde}.tar.gz
+%endif
+%endif
 # This file must be available before %%prep.
 # It is generated during systemd build and can be found in build/src/core/.
 Source1:        triggers.systemd
@@ -65,6 +61,10 @@ Source3:        purge-nobody-user
 # Prevent accidental removal of the systemd package
 Source4:        yum-protect-systemd.conf
 
+Source5:        inittab
+Source6:        sysctl.conf.README
+Source7:        systemd-journal-remote.xml
+Source8:        systemd-journal-gatewayd.xml
 Source9:        20-yama-ptrace.conf
 Source10:       systemd-udev-trigger-no-reload.conf
 Source12:       systemd-user
@@ -79,11 +79,6 @@ Source22:       sysusers.attr
 Source23:       sysusers.prov
 Source24:       sysusers.generate-pre.sh
 
-# Needed for selinux subpackage
-Source100:      Makefile.selinux
-Source101:      systemd_hs.te
-Source102:      systemd_hs.if
-
 %if 0
 GIT_DIR=../../src/systemd/.git git format-patch-ab --no-signature -M -N v235..v235-stable
 i=1; for j in 00*patch; do printf "Patch%04d:      %s\n" $i $j; i=$((i+1));done|xclip
@@ -92,13 +87,16 @@ GIT_DIR=../../src/systemd/.git git diffab -M v233..master@{2017-06-15} -- hwdb/[
 
 # Backports of patches from upstream (0000–0499)
 #
-# Any patches which are "in preparation" upstream should be listed
-# here, rather than in the next section. Packit CI will drop any
-# patches in this range before applying upstream pull requests.
-Patch:          https://github.com/systemd/systemd/commit/bbe53713455be38c0a587626439fd171f28c77fc.patch
+# Any patches which are "in preparation" upstream should be listed here, rather
+# than in the next section. Packit CI will drop any patches in this range before
+# applying upstream pull requests.
 
-# Downstream-only patches (5000–9999)
 
+# Those are downstream-only patches, but we don't want them in packit builds:
+# https://bugzilla.redhat.com/show_bug.cgi?id=1738828
+Patch0490:      use-bfq-scheduler.patch
+
+# Other downstream-only patches (5000–9999)
 # https://github.com/systemd/systemd/pull/17050
 Patch0501:      https://github.com/systemd/systemd/pull/17050/commits/f58b96d3e8d1cb0dd3666bc74fa673918b586612.patch
 
@@ -109,7 +107,6 @@ Patch0501:      https://github.com/systemd/systemd/pull/17050/commits/f58b96d3e8
 BuildRequires:  gcc
 BuildRequires:  gcc-c++
 BuildRequires:  clang
-BuildRequires:  llvm-toolset
 BuildRequires:  coreutils
 BuildRequires:  libcap-devel
 BuildRequires:  libmount-devel
@@ -139,17 +136,16 @@ BuildRequires:  libcurl-devel
 BuildRequires:  kmod-devel
 BuildRequires:  elfutils-devel
 BuildRequires:  openssl-devel
-BuildRequires:  libgcrypt-devel
-BuildRequires:  libgpg-error-devel
 BuildRequires:  gnutls-devel
+BuildRequires:  qrencode-devel
 BuildRequires:  libmicrohttpd-devel
 BuildRequires:  libxkbcommon-devel
 BuildRequires:  iptables-devel
+BuildRequires:  pkgconfig(libfido2)
 BuildRequires:  pkgconfig(tss2-esys)
 BuildRequires:  pkgconfig(tss2-rc)
 BuildRequires:  pkgconfig(tss2-mu)
 BuildRequires:  pkgconfig(libbpf)
-BuildRequires:  bpftool
 BuildRequires:  systemtap-sdt-devel
 BuildRequires:  libxslt
 BuildRequires:  docbook-style-xsl
@@ -158,18 +154,14 @@ BuildRequires:  gperf
 BuildRequires:  gawk
 BuildRequires:  tree
 BuildRequires:  hostname
-BuildRequires:  python3-devel
-BuildRequires:  python3-lxml
-BuildRequires:  python3-jinja2
+BuildRequires:  python3dist(lxml)
+BuildRequires:  python3dist(jinja2)
+BuildRequires:  firewalld-filesystem
 %if 0%{?have_gnu_efi}
 BuildRequires:  gnu-efi gnu-efi-devel
 %endif
 BuildRequires:  libseccomp-devel
-%if 0%{?el8}
-BuildRequires:  meson >= 0.57
-%else
 BuildRequires:  meson >= 0.43
-%endif
 BuildRequires:  gettext
 # We use RUNNING_ON_VALGRIND in tests, so the headers need to be available
 BuildRequires:  valgrind-devel
@@ -177,13 +169,19 @@ BuildRequires:  pkgconfig(bash-completion)
 BuildRequires:  perl
 BuildRequires:  perl(IPC::SysV)
 
+%ifnarch %ix86
+# bpftool is not built for i368
+BuildRequires:  bpftool
+%global have_bpf 1
+%endif
+
 Requires(post): coreutils
 Requires(post): grep
 # systemd-machine-id-setup requires libssl
 Requires(post): openssl-libs
 Requires:       dbus >= 1.9.18
 Requires:       %{name}-pam = %{version}-%{release}
-Requires:       %{name}-rpm-macros = %{version}-%{release}
+Requires(meta): (%{name}-rpm-macros = %{version}-%{release} if rpm-build)
 Requires:       %{name}-libs = %{version}-%{release}
 %{?fedora:Recommends:     %{name}-networkd = %{version}-%{release}}
 %{?fedora:Recommends:     %{name}-resolved = %{version}-%{release}}
@@ -198,21 +196,19 @@ Obsoletes:      system-setup-keyboard < 0.9
 Provides:       system-setup-keyboard = 0.9
 # systemd-sysv-convert was removed in f20: https://fedorahosted.org/fpc/ticket/308
 Obsoletes:      systemd-sysv < 206
-%if 0%{?facebook} == 0
 # self-obsoletes so that dnf will install new subpackages on upgrade (#1260394)
 Obsoletes:      %{name} < 249~~
-Conflicts:      initscripts < 9.56.1
-%endif
 Provides:       systemd-sysv = 206
+Conflicts:      initscripts < 9.56.1
 %if 0%{?fedora}
 Conflicts:      fedora-release < 23-0.12
 %endif
 Obsoletes:      timedatex < 0.6-3
 Provides:       timedatex = 0.6-3
-Conflicts:      %{name}-standalone-tmpfiles < %{version}-%{release}
-Obsoletes:      %{name}-standalone-tmpfiles < %{version}-%{release}
-Conflicts:      %{name}-standalone-sysusers < %{version}-%{release}
-Obsoletes:      %{name}-standalone-sysusers < %{version}-%{release}
+Conflicts:      %{name}-standalone-tmpfiles < %{version}-%{release}^
+Provides:       %{name}-tmpfiles = %{version}-%{release}
+Conflicts:      %{name}-standalone-sysusers < %{version}-%{release}^
+Provides:       %{name}-sysusers = %{version}-%{release}
 
 # Recommends to replace normal Requires deps for stuff that is dlopen()ed
 Recommends:     libidn2.so.0%{?elf_suffix}
@@ -221,12 +217,6 @@ Recommends:     libpcre2-8.so.0%{?elf_suffix}
 Recommends:     libpwquality.so.1%{?elf_suffix}
 Recommends:     libpwquality.so.1(LIBPWQUALITY_1.0)%{?elf_bits}
 Recommends:     libqrencode.so.4%{?elf_suffix}
-
-%if %{with selinux}
-# Force the SELinux module to be installed
-Requires:       %{name}-selinux = %{version}-%{release}
-%endif
-
 Recommends:     libbpf.so.0%{?elf_suffix}
 Recommends:     libbpf.so.0(LIBBPF_0.4.0)%{?elf_bits}
 
@@ -279,11 +269,6 @@ Systemd PAM module registers the session with systemd-logind.
 %package rpm-macros
 Summary:        Macros that define paths and scriptlets related to systemd
 BuildArch:      noarch
-# Make sure we obsolete the existing version and any possible future versions
-# of epel-rpm-macros-systemd in c8s and c9s.
-Conflicts:      epel-rpm-macros-systemd < 10-0
-Obsoletes:      epel-rpm-macros-systemd < 10-0
-Provides:       epel-rpm-macros-systemd = 10-0
 
 %description rpm-macros
 Just the definitions of rpm macros.
@@ -316,19 +301,11 @@ Requires(preun):  systemd
 Requires(postun): systemd
 Requires(post): grep
 Requires:       kmod >= 18-4
-%if 0%{?facebook} == 0
 # https://bodhi.fedoraproject.org/updates/FEDORA-2020-dd43dd05b1
 Obsoletes:      systemd < 245.6-1
-%endif
 Provides:       udev = %{version}
 Provides:       udev%{_isa} = %{version}
 Obsoletes:      udev < 183
-Conflicts:      systemd-boot < %{version}-%{release}
-Obsoletes:      systemd-boot < %{version}-%{release}
-Provides:       systemd-boot = %{version}-%{release}
-Conflicts:      systemd-timesyncd < %{version}-%{release}
-Obsoletes:      systemd-timesyncd < %{version}-%{release}
-Provides:       systemd-timesyncd = %{version}-%{release}
 
 # Recommends to replace normal Requires deps for stuff that is dlopen()ed
 # used by dissect, integritysetup, veritysetyp, growfs, repart, cryptenroll, home
@@ -390,6 +367,7 @@ systemd-importd.
 Summary:        Tools to send journal events over the network
 Requires:       %{name}%{?_isa} = %{version}-%{release}
 License:        LGPLv2+
+Requires:       firewalld-filesystem
 Provides:       %{name}-journal-gateway = %{version}-%{release}
 Provides:       %{name}-journal-gateway%{_isa} = %{version}-%{release}
 Obsoletes:      %{name}-journal-gateway < 227-7
@@ -407,6 +385,8 @@ systemd-journal-upload.
 Summary:        System daemon that manages network configurations
 Requires:       %{name}%{?_isa} = %{version}-%{release}
 License:        LGPLv2+
+# https://src.fedoraproject.org/rpms/systemd/pull-request/34
+Obsoletes:      systemd < 246.6-2
 
 %description networkd
 systemd-networkd is a system service that manages networks. It detects and
@@ -416,6 +396,7 @@ devices.
 %package resolved
 Summary:        Network Name Resolution manager
 Requires:       %{name}%{?_isa} = %{version}-%{release}
+Obsoletes:      %{name} < 249~~
 Requires:       libidn2.so.0%{?elf_suffix}
 Requires:       libidn2.so.0(IDN2_0.0.0)%{?elf_bits}
 Requires(posttrans): grep
@@ -444,43 +425,33 @@ License:       LGPLv2+
 "Installed tests" that are usually run as part of the build system. They can be
 useful to test systemd internals.
 
-%if %{with selinux}
-%package selinux
-Summary:        SELinux module for systemd
-BuildArch:      noarch
-BuildRequires:  bzip2
-BuildRequires:  make
-BuildRequires:  selinux-policy
-BuildRequires:  selinux-policy-devel
-Requires(post): selinux-policy-base >= %{_selinux_policy_version}
-Requires(post): policycoreutils
-Requires(post): policycoreutils-python-utils
-Requires(pre):  libselinux-utils
-Requires(post): libselinux-utils
+%package standalone-tmpfiles
+Summary:       Standalone tmpfiles binary for use in non-systemd systems
+Provides:      %{name}-tmpfiles = %{version}-%{release}
+RemovePathPostfixes: .standalone
 
-%description selinux
-This package provides the SELinux policy module to ensure systemd
-runs properly under an environment with SELinux enabled.
-%endif
+%description standalone-tmpfiles
+Standalone tmpfiles binary with no dependencies on the systemd-shared library or
+other libraries from systemd-libs. This package conflicts with the main systemd
+package and is meant for use in non-systemd systems.
+
+%package standalone-sysusers
+Summary:       Standalone sysusers binary for use in non-systemd systems
+Provides:      %{name}-sysusers = %{version}-%{release}
+RemovePathPostfixes: .standalone
+
+%description standalone-sysusers
+Standalone sysusers binary with no dependencies on the systemd-shared library or
+other libraries from systemd-libs. This package conflicts with the main systemd
+package and is meant for use in non-systemd systems.
 
 %prep
-# pagure strips the '+' from 'hs+fb' for the top directory in the tar archive so
-# the top directory is hsfb-250.3 instead of hs+fb-250.3.
-%autosetup -n %{name}-hs%{?facebook:fb}-%{version} -p1
-
-%if %{with selinux}
-mkdir selinux
-cp %SOURCE100 %SOURCE101 %SOURCE102 selinux
-%endif
+%autosetup -n %{?commit:%{name}%{?stable:-stable}-%{commit}}%{!?commit:%{name}%{?stable:-stable}-%{version_no_tilde}} -p1
 
 test -f src/login/systemd-user.in
 # Restore systemd-user pam config from before "removal of Fedora-specific bits".
 # We'll systemd process it and install in the right place.
 cp %{SOURCE12} src/login/systemd-user.in
-
-# Workaround for https://bugzilla.redhat.com/show_bug.cgi?id=2057735
-cp /usr/include/linux/audit.h src/systemd/
-sed -r -i "s|generate_audit_type_list, cpp|& + ' -I/usr/include/linux'|" src/libsystemd/meson.build
 
 %build
 %global ntpvendor %(source /etc/os-release; echo ${ID})
@@ -502,7 +473,7 @@ CONFIGURE_OPTS=(
         -Dseccomp=true
         -Dima=true
         -Dselinux=true
-        -Dbpf-framework=true
+        -Dbpf-framework=%[0%{?have_bpf}?"true":"false"]
         -Dapparmor=false
         -Dpolkit=true
         -Dxz=true
@@ -516,33 +487,26 @@ CONFIGURE_OPTS=(
         -Dopenssl=true
         -Dcryptolib=openssl
         -Dp11kit=true
-        -Dgcrypt=true
+        -Dgcrypt=false
         -Daudit=true
         -Delfutils=true
-%if %{without bootstrap}
-        -Dlibcryptsetup=true
-%else
-        -Dlibcryptsetup=false
-%endif
+        -Dlibcryptsetup=%[%{with bootstrap}?"false":"true"]
         -Delfutils=true
         -Dpwquality=true
-        # C8S only ships v3.4.4 whereas v4 is required
-        -Dqrencode=false
+        -Dqrencode=true
         -Dgnutls=true
         -Dmicrohttpd=true
         -Dlibidn2=true
         -Dlibiptc=false
         -Dlibcurl=true
-        # Not available in EPEL 8 yet (https://bugzilla.redhat.com/show_bug.cgi?id=2059387).
-        -Dlibfido2=false
+        -Dlibfido2=true
         -Defi=true
-        -Dgnu-efi=%{?have_gnu_efi:true}%{?!have_gnu_efi:false}
+        -Dgnu-efi=%[%{?have_gnu_efi}?"true":"false"]
         -Dtpm=true
         -Dtpm2=true
         -Dhwdb=true
         -Dsysusers=true
-        # Standalone binaries are only relevant on non-systemd systems
-        -Dstandalone-binaries=false
+        -Dstandalone-binaries=true
         -Ddefault-kill-user-processes=false
         -Dtests=unsafe
         -Dinstall-tests=true
@@ -553,21 +517,15 @@ CONFIGURE_OPTS=(
         -Dcompat-mutable-uid-boundaries=true
         -Dsplit-usr=false
         -Dsplit-bin=true
-%if %{with lto}
-        -Db_lto=true
-%else
-        -Db_lto=false
-%endif
+        -Db_lto=%[%{with lto}?"true":"false"]
         -Db_ndebug=false
         -Dman=true
-        -Dversion-tag=v%{version}-%{release}
-%if 0%{?fedora}
-        -Dfallback-hostname=fedora
-%else
-        -Dfallback-hostname=localhost
-%endif
+        -Dversion-tag=%{version}-%{release}
+        # https://bugzilla.redhat.com/show_bug.cgi?id=1906010
+        -Dshared-lib-tag=%{version_no_tilde}-%{release}
+        -Dfallback-hostname=%[0%{?fedora}?"fedora":"localhost"]
         -Ddefault-dnssec=no
-        -Ddefault-dns-over-tls=opportunistic
+        -Ddefault-dns-over-tls=no
         # https://bugzilla.redhat.com/show_bug.cgi?id=1867830
         -Ddefault-mdns=no
         -Ddefault-llmnr=resolve
@@ -595,25 +553,7 @@ CONFIGURE_OPTS=(
         -Dsystemd-network-uid=192
         -Dsystemd-resolve-uid=193
         # -Dsystemd-timesync-uid=, not set yet
-        # Need to set this for CentOS build
-        -Ddocdir=%{_pkgdocdir}
-        # These aren't as relevant for the hyperscale use case
-        -Duserdb=false
-        -Dhomed=false
-        # Old version of PAM might not support files in /usr/lib/pam.d/ so
-        # stick with the old /etc/pam.d
-        -Dpamconfdir=/etc/pam.d
-        -Dpcre2=true
 )
-
-%if 0%{?facebook}
-CONFIGURE_OPTS+=(
-        -Dntp-servers='1.ntp.vip.facebook.com 2.ntp.vip.facebook.com 3.ntp.vip.facebook.com 4.ntp.vip.facebook.com'
-        -Ddns-servers='10.127.255.51 10.191.255.51 2401:db00:eef0:a53:: 2401:db00:eef0:b53::'
-        -Dsupport-url='https://www.facebook.com/groups/systemd.and.friends'
-        -Dcontainer-uid-base-min=10485760
-)
-%endif
 
 %if %{without lto}
 %global _lto_cflags %nil
@@ -638,11 +578,6 @@ if ! diff -u %{SOURCE1} ${new_triggers}; then
    sleep 5
 fi
 
-%if %{with selinux}
-cd selinux
-%{__make} -f Makefile.selinux SHARE="%{_datadir}" TARGETS="systemd_hs"
-%endif
-
 %install
 %meson_install
 
@@ -654,7 +589,11 @@ ln -sf ../bin/udevadm %{buildroot}%{_sbindir}/udevadm
 touch %{buildroot}/etc/crypttab
 chmod 600 %{buildroot}/etc/crypttab
 
+# /etc/initab
+install -Dm0644 -t %{buildroot}/etc/ %{SOURCE5}
+
 # /etc/sysctl.conf compat
+install -Dm0644 %{SOURCE6} %{buildroot}/etc/sysctl.conf
 ln -s ../sysctl.conf %{buildroot}/etc/sysctl.d/99-sysctl.conf
 
 # Make sure these directories are properly owned
@@ -709,20 +648,14 @@ touch %{buildroot}%{_localstatedir}/lib/private/systemd/journal-upload/state
 # Install yum protection fragment
 install -Dm0644 %{SOURCE4} %{buildroot}/etc/dnf/protected.d/systemd.conf
 
+install -Dm0644 -t %{buildroot}/usr/lib/firewalld/services/ %{SOURCE7} %{SOURCE8}
+
 # Install additional docs
 # https://bugzilla.redhat.com/show_bug.cgi?id=1234951
 install -Dm0644 -t %{buildroot}%{_pkgdocdir}/ %{SOURCE9}
 
 # https://bugzilla.redhat.com/show_bug.cgi?id=1378974
-mkdir -p %{buildroot}%{system_unit_dir}/systemd-udev-trigger.service.d/
 install -Dm0644 -t %{buildroot}%{system_unit_dir}/systemd-udev-trigger.service.d/ %{SOURCE10}
-
-# A temporary work-around for https://bugzilla.redhat.com/show_bug.cgi?id=1663040
-mkdir -p %{buildroot}%{system_unit_dir}/systemd-hostnamed.service.d/
-cat >%{buildroot}%{system_unit_dir}/systemd-hostnamed.service.d/disable-privatedevices.conf <<EOF
-[Service]
-PrivateDevices=no
-EOF
 
 install -Dm0644 -t %{buildroot}%{_prefix}/lib/systemd/ %{SOURCE13}
 
@@ -736,7 +669,6 @@ install -Dm0644 -t %{buildroot}%{system_unit_dir}/user@.service.d/ %{SOURCE16}
 sed -i 's|#!/usr/bin/env python3|#!%{__python3}|' %{buildroot}/usr/lib/systemd/tests/run-unit-tests.py
 
 install -m 0644 -D -t %{buildroot}%{_rpmconfigdir}/macros.d/ %{SOURCE21}
-mkdir -p %{buildroot}%{_rpmconfigdir}/fileattrs/
 install -m 0644 -D -t %{buildroot}%{_rpmconfigdir}/fileattrs/ %{SOURCE22}
 install -m 0755 -D -t %{buildroot}%{_rpmconfigdir}/ %{SOURCE23}
 install -m 0755 -D -t %{buildroot}%{_rpmconfigdir}/ %{SOURCE24}
@@ -746,7 +678,7 @@ install -m 0755 -D -t %{buildroot}%{_rpmconfigdir}/ %{SOURCE24}
 # Split files in build root into rpms. See split-files.py for the
 # rules towards the end, anything which is an exception needs a line
 # here.
-python3 %{SOURCE2} %buildroot "%{rhel}" <<EOF
+python3 %{SOURCE2} %buildroot <<EOF
 %ghost %config(noreplace) /etc/crypttab
 %ghost /etc/udev/hwdb.bin
 /etc/inittab
@@ -781,13 +713,6 @@ python3 %{SOURCE2} %buildroot "%{rhel}" <<EOF
 %ghost %attr(0700,root,root) %dir /var/log/private
 EOF
 
-%if %{with selinux}
-install -d -p %{buildroot}%{_datadir}/selinux/devel/include/contrib
-install -p -m 0644 selinux/systemd_hs.if %{buildroot}%{_datadir}/selinux/devel/include/contrib
-install -d -p %{buildroot}%{_datadir}/selinux/packages
-install -p -m 0644 selinux/systemd_hs.pp.bz2 %{buildroot}%{_datadir}/selinux/packages
-%endif
-
 %check
 %if %{with tests}
 meson test -C %{_vpath_builddir} -t 6 --print-errorlogs
@@ -808,6 +733,11 @@ systemd-machine-id-setup &>/dev/null || :
 # about needed daemon-reload.
 
 oomd_state=$(systemctl is-active systemd-oomd 2>/dev/null || :)
+
+# Work-around for #1931034. Remove after F34 is released.
+if [ "$oomd_state" == "active" ]; then
+   systemctl stop -q systemd-oomd 2>/dev/null || :
+fi
 
 systemctl daemon-reexec &>/dev/null || {
   # systemd v239 had bug #9553 in D-Bus authentication of the private socket,
@@ -864,6 +794,22 @@ fi
 # FIXME: systemd-logind.service is excluded (https://github.com/systemd/systemd/pull/17558)
 # FIXME: user@*.service needs to be restarted, but using systemctl --user daemon-reexec
 
+%triggerun resolved -- systemd < 246.1-1
+# This is for upgrades from previous versions before systemd-resolved became the default.
+systemctl --no-reload preset systemd-resolved.service &>/dev/null || :
+
+if systemctl -q is-enabled systemd-resolved.service &>/dev/null; then
+  systemctl -q is-enabled NetworkManager.service 2>/dev/null && \
+  ! test -L /etc/resolv.conf 2>/dev/null && \
+  ! mountpoint /etc/resolv.conf &>/dev/null && \
+  grep -q 'Generated by NetworkManager' /etc/resolv.conf 2>/dev/null && \
+  echo -e '/etc/resolv.conf was generated by NetworkManager.\nRemoving it to let systemd-resolved manage this file.' && \
+  mv -v /etc/resolv.conf /etc/resolv.conf.orig-with-nm && \
+  ln -sv ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf 2>/dev/null || :
+
+  systemctl start systemd-resolved.service &>/dev/null || :
+fi
+
 %triggerpostun -- systemd < 247.3-2
 # This is for upgrades from previous versions before oomd-defaults is available.
 # We use %%triggerpostun here because rpm doesn't allow a second %%triggerun with
@@ -911,6 +857,7 @@ grep -q -E '^KEYMAP="?fi-latin[19]"?' /etc/vconsole.conf 2>/dev/null &&
 %global journal_remote_units_norestart systemd-journal-gatewayd.socket systemd-journal-remote.socket
 %post journal-remote
 %systemd_post %journal_remote_units_restart %journal_remote_units_norestart
+%firewalld_reload
 
 %preun journal-remote
 %systemd_preun %journal_remote_units_restart %journal_remote_units_norestart
@@ -924,6 +871,7 @@ fi
 
 %postun journal-remote
 %systemd_postun_with_restart %journal_remote_units_restart
+%firewalld_reload
 
 %post networkd
 # systemd-networkd was split out in systemd-246.6-2.
@@ -960,7 +908,8 @@ if [ $1 -eq 0 ] ; then
 fi
 
 %post resolved
-[ $1 -gt 1 ] && exit 0
+[ $1 -eq 1 ] || exit 0
+# Initial installation
 
 # Related to https://bugzilla.redhat.com/show_bug.cgi?id=1943263
 if ls /usr/lib/systemd/libsystemd-shared-24[0-8].so &>/dev/null; then
@@ -971,6 +920,9 @@ fi
 %systemd_post systemd-resolved.service
 
 %posttrans resolved
+[ $1 -eq 1 ] || exit 0
+# Initial installation
+
 # Create /etc/resolv.conf symlink.
 # We would also create it using tmpfiles, but let's do this here
 # too before NetworkManager gets a chance. (systemd-tmpfiles invocation above
@@ -998,28 +950,9 @@ if systemctl -q is-enabled systemd-resolved.service &>/dev/null &&
   fi
 fi
 
-%if %{with selinux}
-%pre selinux
-%selinux_relabel_pre
-
-%post selinux
-%selinux_modules_install %{_datadir}/selinux/packages/systemd_hs.pp.bz2
-%selinux_relabel_post
-
-%posttrans selinux
-%selinux_relabel_post
-
-%postun selinux
-%selinux_modules_uninstall systemd_hs
-
-if [ $1 -eq 0 ]; then
-    %selinux_relabel_post
-fi
-%endif
-
 %global _docdir_fmt %{name}
 
-%files -f %{name}.lang -f .file-list-rest
+%files -f %{name}.lang -f .file-list-main
 %doc %{_pkgdocdir}
 %exclude %{_pkgdocdir}/LICENSE*
 # Only the licenses texts for the licenses in License line are included.
@@ -1067,54 +1000,75 @@ fi
 
 %files tests -f .file-list-tests
 
-%if %{with selinux}
-%files selinux
-%{_datadir}/selinux/devel/include/contrib/systemd_hs.if
-%{_datadir}/selinux/packages/systemd_hs.pp.bz2
-%endif
+%files standalone-tmpfiles -f .file-list-standalone-tmpfiles
+
+%files standalone-sysusers -f .file-list-standalone-sysusers
 
 %changelog
-* Wed May  4 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.7
-- Backported https://github.com/systemd/systemd/pull/23254 and
-  https://github.com/systemd/systemd/pull/23205
-- Move more files to the networkd package
+* Wed Jul 13 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 251.3-1
+- Update to latest bugfix release
+- Drop forgotten "temporary" workaround for #1663040
 
-* Wed Apr 13 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.6
-- Fixed bug in networkd changes to split-files.py that caused the
-  /etc/systemd/network to get moved to the networkd package (which we don't
-  want because that's where link files for udev are also stored).
+* Wed Jun 29 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 251.2-2
+- Drop forward-secure-sealing code from sd-journal and tools
 
-* Wed Apr  6 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.5
-- Backport systemd-analyze verify regression fix
+* Thu Jun  2 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 251.2-1
+- A bunch of man page fixes, a few memory-access correctness fixes,
+  remove excessive messages to utmp sessions, suppress messages about
+  bpf setup in the user manager (#2084955)
 
-* Mon Apr  4 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.4
-- Make sure our packages override the corresponding backports from EPEL.
-- Modify the networkd fix from the previous release so that it can be merged
-  into the c9s branch.
+* Wed May 25 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 251.1-2
+- Supress errors from useradd/groupadd (#2090129)
+- Drop "v" from the version tag, add tilde back
+- The tag for shared-libraries is reintroduced (#1906010)
 
-* Fri Apr  1 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.3
-- Move systemd-network-generator and networkd man pages to networkd package to
-  avoid conflicts with systemd-extras from EPEL
+* Tue May 24 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 251.1-1
+- First bugfix release for 250
+- Two fixes for kernel-install and a revert for #2087225, #2088788.
 
-* Wed Mar 16 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.2
-- Backport PR #22757: BPF error logging improvements
+* Sat May 21 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 251-1
+- Latest upstream release, for details see
+  https://raw.githubusercontent.com/systemd/systemd/v251/NEWS.
+- Fixes for #2071034, #2084955, #2086166.
 
-* Mon Feb 28 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 250.3-6.1
-- New release for v250
-- Sync latest changes from Fedora rawhide
-- Use source archives from https://pagure.io/centos-sig-hyperscale/systemd
-  instead of github. All Hyperscale patches have moved to pagure
-- Added llvm-toolset to BuildRequires (for llvm-strip) to make build succeed
-- Enable p11kit and pwquality options in the systemd build
+* Mon May 16 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 251~rc3-1
+- Update to latest upstream prerelease (just various bugfixes)
+- Udev rule processing should be now fixed (#2076459)
+- Run sysusers and hwdb and catalog updates also if systemd is not running
+  (#2085481)
+
+* Wed May 11 2022 Adam Williamson <awilliam@redhat.com> - 251~rc2-2
+- Backport #23352 to fix RHBZ #2083374
+
+* Thu May  5 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 251~rc2-1
+- New upstream prerelease, for details see
+  https://raw.githubusercontent.com/systemd/systemd/v251-rc2/NEWS.
+
+* Tue Apr 12 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 251~rc1-3
+- Do not touch /etc/resolv.conf on upgrades (#2074122)
+- Add bugfix patch and revert one patch which might be causing
+  problems with the compose
+
+* Mon Apr  4 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 251~rc1-2
+- Merge libsystemd-core back into individual binaries and drop the
+  private shared library suffix (this should server as a work-around
+  for rhbz#2071069)
+
+* Tue Mar 29 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 251~rc1-1
+- First release candidate in the new cycle
+- Fixes rhbz#1449751, rhbz#1906010
+
+* Fri Mar 18 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250.4-2
+- Fix the wrong file assignment done in previous version
+
+* Thu Mar 17 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250.4-1
+- Move libcryptsetup plugins to -udev (#2031873)
+- Move systemd-cryptenroll to -udev (David Tardon)
+- Disable default DNS over TLS (#1889901) (Michael Catanzaro)
 
 * Thu Feb 24 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250.3-6
 - Avoid trying to create the symlink if there's a dangling symlink already in
   place (#2058388)
-
-* Thu Feb 24 2022 Daan De Meyer <daan.j.demeyer@gmail.com> - 249-2.13
-- Move to dist-git layout used by Fedora (no more SOURCES/ and SPECS/)
-- Switch to .gitignore from commit 46a40810 from the Fedora RPM repo
-- Add back removed files from commit 46a40810 from the Fedora RPM repo
 
 * Wed Feb 23 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250.3-5
 - Move part of %%post scriptlet for resolved to %%posttrans (#2018913)
@@ -1127,10 +1081,6 @@ fi
 * Thu Feb 10 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 250.3-3
 - Add pam_namespace to systemd-user pam config (rhbz#2053098)
 - Drop 20-grubby.install plugin for kernel-install (rhbz#2033646)
-
-* Wed Feb 09 2022 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.12
-- Backport PR #20695: Sync if_arp.h with Linux 5.14
-- FB-only backport PR #22426: MemoryZSwapMax= to configure memory.zswap.max
 
 * Sat Jan 22 2022 Fedora Release Engineering <releng@fedoraproject.org>
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_36_Mass_Rebuild
@@ -1197,16 +1147,6 @@ fi
   see https://raw.githubusercontent.com/systemd/systemd/v250-rc1/NEWS for
   details.
 
-* Tue Nov 30 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.11
-- Backport PR #21241: fix bpf-foreign cgroup controller realization
-
-* Tue Nov 30 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.10
-- Re-enable fdisk and repart since util-linux-2.32.1-26 in C8s has the fix
-  it needs for tests to pass.
-
-* Wed Nov 24 2021 Davide Cavalca <dcavalca@centosproject.org> - 249.4-2.9
-- Disable legacy iptables support
-
 * Fri Nov 19 2021 Davide Cavalca <dcavalca@fedoraproject.org> - 249.7-3
 - Disable legacy iptables support
 
@@ -1221,15 +1161,8 @@ fi
 * Sun Nov 14 2021 Petr Menšík <pemensik@redhat.com> - 249.7-1
 - Switch /etc/resolv.conf over to NM when systemd-resolved is uninstalled
 
-* Thu Nov 11 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.8
-- Remove revert_d219a2b07cc5dc8ffd5010f08561fab2780d8616.patch and replace with
-  proper fix (PR #21221)
-
 * Wed Nov 10 2021 Kir Kolyshkin <kolyshkin@gmail.com> - 249.7-1
 - Fix scope activation from a user instance (#2022041)
-
-* Wed Nov 10 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.7
-- Add meson >= 0.57 for el8 builds. This version uses python 3.8.
 
 * Mon Nov  8 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 249.6-3
 - Fix helper to restart user units with older systemd (#2020415)
@@ -1243,39 +1176,12 @@ fi
 * Fri Oct 29 2021 Adam Williamson <awilliam@redhat.com> - 249.5-2
 - Backport PR #133 to fix boot
 
-* Wed Oct 20 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.6
-- Revert d219a2b because it creates non-determinisitic Slice= assignments
-
 * Tue Oct 12 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 249.5-1
 - Latest bugfix release (various fixes in systemd-networkd,
   -timesyncd, -journald, -udev, homed, -resolved, -repart, -oomd,
   -coredump, systemd itself, seccomp filters, TPM2 handling,
   -documentation, sd-event, sd-journal, journalctl, and nss-systemd).
 - Fixes #1976445.
-
-* Mon Oct 11 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.5
-- Remove duplicate Address= properties in network configs (part of PR #20892)
-- Serialize bpf device programs across reloads/reexecs (PR #20978)
-- Don't rewrite sysctls that are already set (PR #20676)
-
-* Wed Oct 06 2021 Davide Cavalca <dcavalca@centosproject.org> - 249.4-2.4
-- Drop qrencode-devel from BuildRequires as it's not actually used
-
-* Wed Sep 29 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.3
-- Fix to allow verifying hidden (dot) files again (PR #20875)
-
-* Fri Sep 24 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.2
-- Backport more feature support for systemd-networkd
-  (#20450, #20541, #20729, #20828)
-
-* Wed Sep 22 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-2.1
-- Sync changes from Fedora
-- Backport one more feature for systemd-networkd (#20489)
-
-* Mon Sep 20 2021 Anita Zhang <the.anitazha@gmail.com> - 249.4-1.1
-- New stable point release
-- Backport optimization for read_virtual_file() (#20743)
-- Backport new features for systemd-networkd (#20743, #20472, #20477, #20484)
 
 * Tue Sep 14 2021 Sahana Prasad <sahana@redhat.com>
 - Rebuilt with OpenSSL 3.0.0
@@ -1291,19 +1197,6 @@ fi
   other minor fixes.
 - systemctl set-property accepts glob patterns now (#1986258)
 
-* Thu Jul 29 2021 Anita Zhang <the.anitazha@gmail.com> - 249.2-1.2
-- Remove Obsoletes lines on systemd-resolved and systemd-networkd since we don't
-  want to install these by default.
-
-* Wed Jul 28 2021 Anita Zhang <the.anitazha@gmail.com> - 249.2-1.1
-- New release for 249
-- Drop merged patches
-- Split networkd and resolved into their own subpackages.
-
-* Tue Jul 27 2021 Davide Cavalca <dcavalca@centosproject.org> - 248.5-1.3
-- Add missing SELinux rules for the GNOME and KDE LiveDVD spins
-  (https://pagure.io/centos-sig-hyperscale/package-bugs/issue/7)
-
 * Fri Jul 23 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 249.2-1
 - Latest bugfix release (a minor hwdb regression bugfix, and correction
   to kernel commandline handling when reexecuting PID 1 in a container)
@@ -1312,24 +1205,11 @@ fi
 - Build with -Ddefault-dns-over-tls=opportunistic
   (https://fedoraproject.org/wiki/Changes/DNS_Over_TLS, #1889901)
 
-* Wed Jul 21 2021 Davide Cavalca <dcavalca@centosproject.org> - 248.5-1.2
-- Add missing SELinux rules for 248
-  (https://pagure.io/centos-sig-hyperscale/package-bugs/issue/1)
-
-* Wed Jul 21 2021 Anita Zhang <anitazha@fb.com> - 248.5-1.1
-- Update to systemd-stable 248.5 (includes fix for CVE-2021-33910)
-
-* Tue Jul 20 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248.5-1
+* Tue Jul 20 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 249.1-1
 - Various minor documentation and correctness fixes.
 - CVE-2021-33910, #1984020: an unchecked stack allocation could be used to
   crash systemd and cause the system to reboot by creating a very long
   fuse mountpoint path.
-
-* Mon Jul 12 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248.4-1
-- Assorted fixes (some systemd-resolved crashes, invalid
-  systemd-tmpfiles assertion, etc.)
-- systemd-networkd workaround for TALOS-2020-1142, CVE-2020-13529.
-- A big update of hardware descriptions.
 
 * Wed Jul  7 2021 Neal Gompa <ngompa13@gmail.com> - 249-2
 - Use correct NEWS URLs for systemd 249 releases in changelog entries
@@ -1359,28 +1239,9 @@ fi
 - Move systemd-resolved into systemd-resolved subpackage (#1923727)
   [patch from Petr Menšík]
 
-* Mon Jun 14 2021 Anita Zhang <anitazha@fb.com> - 248.2-1.5
-- Remove backport PR #19811 since it's still buggy
-- Remove d586f642fd90e3bb378f7b6d3e3a64a753e51756 to fix rate limiting instead
-  (at least until sd-event rate limiting is fixed in 249).
-
-* Thu Jun 10 2021 Anita Zhang <anitazha@fb.com> - 248.2-1.4
-- Backport PR #19811 to fix issues with mount sd-event rate limiting
-
-* Wed May 19 2021 Davide Cavalca <dcavalca@centosproject.org> - 248.2-1.3
-- Add BuildRequires for python-jinja2 in preparation for 249 (see PR#19630)
-
-* Mon May 17 2021 Davide Cavalca <dcavalca@centosproject.org> - 248.2-1.2
-- Add systemd-oomd-defaults subpackage from Fedora
-
 * Sat May 15 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248.3-1
 - A fix for resolved crashes (#1946386, #1960227, #1950241)
 - Some minor fixes for documentation, systemd-networkd, systemd-run, bootctl.
-
-* Mon May 10 2021 Anita Zhang <anitazha@fb.com> - 248.2-1.1
-- New release for 248
-- Drop patches merged in 248.2
-- FB only backport PR #13496 (Extend bpf cgroup program support)
 
 * Fri May  7 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248.2-1
 - Pull in some more patches from upstream (#1944646, #1885090, #1941340)
@@ -1391,22 +1252,8 @@ fi
   (#1955475, #911766, #1958167, #1952919)
 - Enable tpm2-tss dependency (#1949505)
 
-* Wed Apr 14 2021 Anita Zhang <anitazha@fb.com> - 247.3-10
-- Remove systemd-resolved enablement
-
-* Wed Apr  7 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-9
-- Reenable LTO now that binutils has been fixed
-- Update FB configure options
-
-* Tue Apr  6 2021 Adam Williamson <awilliam@redhat.com> - 248-2
+* Tue Apr 06 2021 Adam Williamson <awilliam@redhat.com> - 248-2
 - Re-enable resolved caching, we hope all major bugs are resolved now
-
-* Thu Apr  1 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-8
-- Backport https://github.com/SELinuxProject/refpolicy/pull/308 to fix
-  systemd-hostnamed and systemd-localed when SELinux is enabled.
-
-* Thu Apr  1 2021 Anita Zhang <anitazha@fb.com> - 247.3-7
-- Downgrade sysv-generator warning even more (to debug)
 
 * Wed Mar 31 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248-1
 - Latest upstream release, see
@@ -1414,13 +1261,6 @@ fi
 - The changes since -rc4 are rather small, various fixes all over the place.
   A fix to how systemd-oomd selects a candidate to kill, and more debug logging
   to make this more transparent.
-
-* Wed Mar 31 2021 Anita Zhang <anitazha@fb.com> - 247.3-6
-- Backport PR#18621 (Ignore attempts at hidepid and subset for older kernels)
-- Downgrade sysv-generator warning about missing native systemd unit
-
-* Wed Mar 31 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-5
-- Add selinux subpackage
 
 * Tue Mar 30 2021 Anita Zhang <the.anitazha@gmail.com> - 248~rc4-6
 - Increase oomd user memory pressure limit to 50% (#1941170)
@@ -1450,11 +1290,6 @@ fi
   https://github.com/systemd/systemd/blob/v248-rc4/NEWS.
 - A bunch of documentation updates, and correctness fixes.
 
-* Wed Mar 17 2021 Anita Zhang <anitazha@fb.com> - 247.3-4
-- Backport PR #18955 (Fixes fstab parsing)
-- FB only backport PR #18886 (systemd-shutdown logs to /dev/console not stderr)
-- Reenable tests by disabling LTO (work around binutils bug)
-
 * Tue Mar 16 2021 Adam Williamson <awilliam@redhat.com> - 248~rc3-2
 - Backport PR #19009 to fix CNAME redirect resolving some more (#1933433)
 
@@ -1474,9 +1309,6 @@ fi
 * Mon Mar 01 2021 Josh Boyer <jwboyer@fedoraproject.org> - 248~rc2-2
 - Don't set the fallback hostname to Fedora on non-Fedora OSes
 
-* Wed Feb 24 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-3
-- Remove careinversion usage to make the package usable on older mock versions
-
 * Tue Feb 23 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248~rc2-1
 - Latest upstream prelease, just a bunch of small fixes.
 - Fixes #1931957.
@@ -1484,27 +1316,16 @@ fi
 * Tue Feb 23 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248~rc1-2
 - Rebuild with the newest scriptlets
 
-* Fri Feb 19 2021 Davide Cavalca <dcavalca@fb.com> - 247.3-2
-- Disable some tests to workaround a binutils bug triggered by enabling audit
-- Refresh patches
+* Tue Feb 23 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 248~rc1-1
+- Latest upstream prerelease, see
+  https://github.com/systemd/systemd/blob/v248-rc1/NEWS.
+- Fixes #1614751 by only restarting services at the end of transcation.
+  Various packages need to be rebuilt to have the updated macros.
+- Fixes #1879028, though probably not completely.
+- Fixes #1925805, #1928235.
 
 * Wed Feb 17 2021 Michel Alexandre Salim <salimma@fedoraproject.org> - 247.3-3
 - Increase oomd user memory pressure limit to 10% (#1929856)
-
-* Wed Feb 17 2021 Anita Zhang <anitazha@fb.com> - 247.3-1
-- New release for 247
-- Backport PR #18211 (Fixes ExecCondition= dependency bug)
-- Backport PR #17872 (Fixes PrivateUsers=yes with other sandboxing properties)
-- FB only backport PR #17495 (Fixes BPF pinning post-coldplug)
-- Reenable audit support
-
-* Sun Feb  7 2021 Davide Cavalca <dcavalca@fb.com> - 246.1-2
-- Initial Hyperscale SIG package
-- Update release to use %%dist macro
-- Drop el7 logic
-- Explicitly default non-FB built to the legacy hierarchy
-- Drop no longer needed FB FusionIO patch
-- Temporarily disable audit support while debugging a link issue
 
 * Fri Feb  5 2021 Anita Zhang <the.anitazha@gmail.com> - 247.3-2
 - Changes for https://fedoraproject.org/wiki/Changes/EnableSystemdOomd.
@@ -1519,9 +1340,6 @@ fi
 
 * Wed Jan 27 2021 Fedora Release Engineering <releng@fedoraproject.org>
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_34_Mass_Rebuild
-
-* Mon Jan 25 2021 Anita Zhang <anitazha@fb.com> - 246.1-1.fb6
-- Backport PR #16803 to fix ConditionEnvironment=
 
 * Wed Jan 13 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 247.2-2
 - Fix bfq patch again (#1813219)
@@ -1538,7 +1356,7 @@ fi
 * Tue Dec  8 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 247.1-3
 - Rebuild with fallback hostname change reverted.
 
-* Fri Dec  4 2020 Bastien Nocera <bnocera@redhat.com> - 247.1-2
+* Fri Dec 04 2020 Bastien Nocera <bnocera@redhat.com> - 247.1-2
 - Unset fallback-hostname as plenty of applications expected localhost
   to mean "default hostname" without ever standardising it (#1892235)
 
@@ -1552,14 +1370,6 @@ fi
 * Thu Nov 26 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 247-1
 - Update to the latest version
 - #1900878 should be fixed
-
-* Thu Nov 19 2020 Chris Down <cdown@fb.com> - 246.1-1.fb5
-- Updated version of PR #17495 to fix program leak
-
-* Thu Nov 19 2020 Chris Down <cdown@fb.com> - 246.1-1.fb4
-- Backport PR #17495 to fix BPF program lifecycle
-- Backport PR #17422 to clean up cgroups more reliably after exit
-- Backport PR #17497 to add FixedRandomDelay= support
 
 * Tue Oct 20 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 247~rc2
 - New upstream pre-release. See
@@ -1595,12 +1405,6 @@ fi
   fstab-generator, documentation) (#1876905)
 - Do not fail in test because of kernel bug (#1803070)
 
-* Fri Sep 18 2020 Anita Zhang <anitazha@fb.com> - 246.1-1.fb3
-- Backport PR #16838 and #16857 to improve $PATH handling
-- Backport PR #16940 to fix ECONN handling in sockets
-- Backport PR #17031 to fix rate limiting on units in restart loop
-- Backport PR #17082 to get nspawn TTY tweaks
-
 * Sun Sep 13 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 246.5-1
 - Update to latest stable release (a bunch of small network-related
   fixes in systemd-networkd and socket handling, documentation updates,
@@ -1623,15 +1427,10 @@ fi
   fixes, relax handling of various error conditions, other fixlets for
   bugs without bugzilla numbers).
 
-* Tue Aug 18 2020 Anita Zhang <anitazha@fb.com> - 246.1-1.fb2
-- Gate "Obsoletes: systemd < 245.6-1" out due to dependency issues on Facebook
-  systems
-
-* Mon Aug 17 2020 Anita Zhang <anitazha@fb.com> - 246.1-1.fb1
-- Facebook rebuild
-- Don't compile in systemd-repart (needs libfdisk >= 2.33 and C8 has 2.32)
-- Remove unused systemd-journal-remote.xml and systemd-journal-gatewayd.xml
-  files since we never used firewalld
+* Mon Aug 17 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 246.2-1
+- A few minor bugfixes
+- Adjust seccomp filter for kernel 5.8 and glibc 2.32 (#1869030)
+- Create /etc/resolv.conf symlink on upgrade (#1867865)
 
 * Fri Aug  7 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 246.1-1
 - A few minor bugfixes
@@ -1673,24 +1472,12 @@ fi
 - Set fallback-hostname to fedora so that unset hostnames are still
   recognisable (#1392925)
 
-* Fri Jun  5 2020 Anita Zhang <anitazha@fb.com> - 245.5-2.fb3
-- Backport 156a5fd to mitigate CVE-2020-13776
-
-* Thu Jun  4 2020 Anita Zhang <anitazha@fb.com> - 245.5-2.fb2
-- Revert c7d26ac which is causing SMI count to go up leading to increased
-  microstalls during Chef runs
-
 * Tue Jun  2 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 245.6-2
 - Add self-obsoletes to fix upgrades from F31
 
 * Sun May 31 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 245.6-1
 - Update to latest stable version (some documentation updates, minor
   memory correctness issues) (#1815605, #1827467, #1842067)
-
-* Thu Apr 30 2020 Anita Zhang <anitazha@fb.com> - 245.5-2.fb1
-- Facebook rebuild
-- Don't compile in systemd-homed, systemd-userdb, and p11kit
-- Backport PR #15544 and #15551 (drops FB rlimit_memlock patch)
 
 * Tue Apr 21 2020 Björn Esser <besser82@fedoraproject.org> - 245.5-2
 - Add explicit BuildRequires: acl
@@ -1710,9 +1497,6 @@ fi
 
 * Wed Mar 18 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 245.2-1
 - Update to latest stable version (a few bug fixes for random things) (#1798776)
-
-* Wed Mar 18 2020 Andrew Gallagher <agallagher@fb.com> - 244-2.fb4
-- Bump HIGH_RLIMIT_MEMLOCK to 512M
 
 * Fri Mar  6 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 245-1
 - Update to latest version (#1807485)
@@ -1738,9 +1522,6 @@ fi
   systemd as PID 1 and check whether we're upgrading before using kill -TERM
   on PID 1 (#1803240)
 
-* Thu Feb 20 2020 Filipe Brandenburger <filbranden@fb.com> - 244-2.fb3
-- Only kill -TERM 1 when systemd is actually running.
-
 * Tue Feb 18 2020 Adam Williamson <awilliam@redhat.com> - 245~rc1-3
 - Revert 097537f0 to fix plymouth etc. running when they shouldn't (#1803293)
 
@@ -1751,9 +1532,6 @@ fi
   and autogenerate user() and group() virtual provides (#1792462),
   see https://fedoraproject.org/wiki/Changes/Adopting_sysusers.d_format.
 - Revert patch to udev rules causing regression with usb hubs (#1800820).
-
-* Thu Feb  6 2020 Anita Zhang <anitazha@fb.com> - 244-2.fb2
-- Backport PR#14815 (Permissive syscall filtering in dbus-execute)
 
 * Wed Feb  5 2020 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 245~rc1-1
 - New upstream release, see
@@ -1772,11 +1550,6 @@ fi
 
 * Fri Jan 31 2020 Fedora Release Engineering <releng@fedoraproject.org>
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_32_Mass_Rebuild
-
-* Thu Jan  9 2020 Anita Zhang <anitazha@fb.com> - 244-2.fb1
-- Facebook rebuild
-- Backport PR#13823 (PrivateUsers=true for unprivileged user managers)
-- Backport PR#14441 (Fix type.d drop-in ordering)
 
 * Sat Dec 21 2019  <zbyszek@nano-f31> - 244.1-2
 - Disable service watchdogs (for systemd units)
@@ -1808,26 +1581,12 @@ fi
 - Fix regression with crypttab keys with colons
 - Various memleaks and minor memory access issues, warning adjustments
 
-* Thu Oct 31 2019 Davide Cavalca <dcavalca@fb.com> - 243-2.fb3
-- Backport PR#13754 (allow restart for oneshot units)
-- Misc specfiles fixes to support building on el8 as well
-- Default el8 builds to the unified hierarchy
-
 * Fri Oct 18 2019 Adam Williamson <awilliam@redhat.com> - 243-4.gitef67743
 - Backport PR #13792 to fix nomodeset+BIOS CanGraphical bug (#1728240)
 
 * Thu Oct 10 2019 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 243-3.gitef67743
 - Various minor documentation and error message cleanups
 - Do not use cgroup v1 hierarchy in nspawn on groups v2 (#1756143)
-
-* Wed Oct  2 2019 Davide Cavalca <dcavalca@fb.com> - 243-2.fb2
-- Backport PR#13689 (a bunch of protection-related fixes)
-
-* Fri Sep 27 2019 Davide Cavalca <dcavalca@fb.com> - 243-2.fb1
-- Facebook rebuild
-- drop "use bfq as the default scheduler" patch
-- backport PR#13369 (ExecXYZEx= bus hook ups)
-- disable udev-test.pl for now due to flakiness
 
 * Sat Sep 21 2019 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 243-2.gitfab6f01
 - Backport a bunch of patches (memory access issues, improvements to error
@@ -1862,11 +1621,6 @@ fi
 * Wed Aug 07 2019 Adam Williamson <awilliam@redhat.com> - 243~rc1-2
 - Backport PR #1737362 so we own /etc/systemd/system again (#1737362)
 
-* Wed Aug 7 2019 Anita Zhang <anitazha@fb.com> - 242-2.fb4
-- Backport PR#12933 (core: ExecCondition= for services)
-- Backport PR#13096 (Preparatory work for the unit loading rework)
-- Backport PR#13119 (Rework unit loading to take into account all aliases)
-
 * Tue Jul 30 2019 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 243~rc1-1
 - Update to latest version (#1715699, #1696373, #1711065, #1718192)
 
@@ -1878,20 +1632,11 @@ fi
 - A bunch of backported patches from upstream: documentation, memory
   access fixups, command output tweaks (#1708996)
 
-* Thu Jul 18 2019 Anita Zhang <anitazha@fb.com> - 242-2.fb3
-- Backport PR#12346 (make sure accept_flush() doesn't hang on EOPNOTSUPP)
-- Backport PR#12979 (add SystemCallErrorNumber=EPERM to systemd-portabled.service)
-
 * Tue Jun 25 2019 Björn Esser <besser82@fedoraproject.org>- 242-5.git7a6d834
 - Rebuilt (libqrencode.so.4)
 
 * Tue Jun 25 2019 Miro Hrončok <mhroncok@redhat.com>- 242-4.git7a6d834
 - Rebuilt for iptables update (libip4tc.so.2)
-
-* Thu Jun 20 2019 Anita Zhang <anitazha@fb.com> - 242-2.fb2
-- Backport PR#11778 (ExecStartXYZEx= dbus support)
-- Backport PR#12729 (nspawn: don't hard fail when setting capabilities)
-- Backport PR#12745 (IPAddressXYZ="any" for users with CAP_NET_ADMIN)
 
 * Fri Apr 26 2019 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 242-3.git7a6d834
 - Add symbol to mark vtable format changes (anything using sd_add_object_vtable
@@ -1900,10 +1645,6 @@ fi
 - Fix hang in flush_accept (#1702358)
 - Fix handling of RUN keys in udevd
 - Some documentation and shell completion updates and minor fixes
-
-* Thu Apr 25 2019 Davide Cavalca <dcavalca@fb.com> - 242-2.fb1
-- Facebook rebuild
-- Backport PR#12336 (support DisableControllers= for transient units)
 
 * Tue Apr 16 2019 Adam Williamson <awilliam@redhat.com> - 242-2
 - Rebuild with Meson fix for #1699099
@@ -1929,20 +1670,8 @@ fi
   various bash completion improvements (#1183769),
   memory leaks and such (#1685286).
 
-* Fri Mar 22 2019 Davide Cavalca <dcavalca@fb.com> - 241-1.fb2
-- Backport PR#11754 (sd-bus fixes for CVE-2019-6454)
-- Backport PR#12078 (nspawn fix)
-
 * Thu Mar 14 2019 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 241-3.gitc1f8ff8
 - Declare hyperv and framebuffer devices master-of-seat again (#1683197)
-
-* Wed Feb 27 2019 Davide Cavalca <dcavalca@fb.com> - 241-1.fb1
-- Facebook rebuild
-- Rebase fio udev patch (this will likely be dropped in the next release)
-- Drop the mock testing patches, not needed anymore
-- Ignore errors for Python bytecompiling due to run-unit-tests.py
-- Fix the run-unit-tests.py shebang to use python36
-- Backport PR#11831 (missing include) and PR#11836 (test-chown-rec fix)
 
 * Wed Feb 20 2019 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 241-2.gita09c170
 - Prevent buffer overread in systemd-udevd
@@ -1994,12 +1723,6 @@ fi
   - Fixes for misleading bugs in documentation
 - net.ipv4.conf.all.rp_filter is changed from 1 to 2
 
-* Mon Dec 10 2018 Davide Cavalca <dcavalca@fb.com> - 239-1.fb6
-- Backport PR#10411 and PR#10493 (systemd-analyze timespan command)
-- Rebase our PR#10507 and PR#10567 backports onto the version merged upstream
-- Backport PR#10757 (cgroup2 BPF devices fixes)
-- Backport PR#10876 (cgroup_subtree_mask propagation fix)
-
 * Thu Nov 29 2018 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl>
 - Adjust scriptlets to modify /etc/authselect/user-nsswitch.conf
   (see https://github.com/pbrezina/authselect/issues/77)
@@ -2017,10 +1740,6 @@ fi
 
 * Mon Nov  5 2018 Yu Watanabe <watanabe.yu@gmail.com>
 - Set proper attributes to private directories
-
-* Fri Nov  2 2018 Davide Cavalca <dcavalca@fb.com> - 239-1.fb5
-- Backport PR#10507 (don't require CPU controller for CPU accounting)
-- Backport PR#10567 (DisableControllers= directive)
 
 * Fri Nov  2 2018 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 239-7.git9f3aed1
 - Split out the rpm macros into systemd-rpm-macros subpackage (#1645298)
@@ -2061,22 +1780,12 @@ fi
 - If suspend fails, the post-suspend hooks are still called.
 - Various build issues on less-common architectures are fixed
 
-* Fri Oct 12 2018 Davide Cavalca <dcavalca@fb.com> - 239-1.fb4
-- Backport PR#10062 (cgroup2 BPF device controller support)
-- Backport PR#10203, PR#10363 (tests fixes for supplementary groups)
-- Backport PR#10368 (%g, %G specifiers support)
-- Add hostname to BuildRequires (it's needed by test-execute)
-- Reenable test-execute now that it's finally working
-
 * Wed Oct  3 2018 Jan Synáček <jsynacek@redhat.com> - 239-5
 - Fix meson using -Ddebug, which results in FTBFS
 - Fix line_begins() to accept word matching full string (#1631840)
 
 * Mon Sep 10 2018 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 239-4
 - Move /etc/yum/protected.d/systemd.conf to /etc/dnf/ (#1626969)
-
-* Fri Aug 24 2018 Davide Cavalca <dcavalca@fb.com> - 239-1.fb3
-- backport new version of guro's cgroup2 BPF device controller patch
 
 * Wed Jul 18 2018 Terje Rosten <terje.rosten@ntnu.no> - 239-3
 - Ignore return value from systemd-binfmt in scriptlet (#1565425)
@@ -2087,18 +1796,8 @@ fi
 * Sat Jul 14 2018 Fedora Release Engineering <releng@fedoraproject.org>
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_29_Mass_Rebuild
 
-* Wed Jul  4 2018 Davide Cavalca <dcavalca@fb.com> - 239-1.fb2
-- backport PR#9460 (followup to PR#9410)
-- backport PR#9500 (support for StandardOutput=append:)
-- revert c58fd46 (part of PR#8403) to workaround a FB-specific build issue
-
 * Mon Jun 25 2018 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl>
 - Rebuild for Python 3.7 again
-
-* Mon Jun 25 2018 Davide Cavalca <dcavalca@fb.com> - 239-1.fb1
-- Facebook rebuild
-- backport PR#9244 and PR#9247 (new cgroup2 features)
-- backport PR#9410 (gnutls detection, fix for #9403)
 
 * Fri Jun 22 2018 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 239-1
 - Update to latest version, mostly bug fixes and new functionality,
@@ -2107,14 +1806,6 @@ fi
 
 * Tue Jun 19 2018 Miro Hrončok <mhroncok@redhat.com>
 - Rebuilt for Python 3.7
-
-* Thu May 31 2018 Davide Cavalca <dcavalca@fb.com> - 238-7.fb3
-- Update cgroup2 BPF device controller patches
-- Backport PR#9148 to mitigate pid watching issue on git
-
-* Tue May 15 2018 Davide Cavalca <dcavalca@fb.com> - 238-7.fb2
-- Backport htejun's io.latency patch
-- Backport guro's cgroup2 BPF device controller patch
 
 * Fri May 11 2018 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 238-8.git0e0aa59
 - Backport a number of patches (documentation, hwdb updates)
@@ -2125,10 +1816,6 @@ fi
 
 * Wed Apr 18 2018 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 238-7.fc28.1
 - Allow fake Delegate= setting on slices (#1568594)
-
-* Thu Apr  5 2018 Davide Cavalca <dcavalca@fb.com> - 238-7.fb1
-- Facebook rebuild
-- Reenable tests (except test-execute which is still broken)
 
 * Wed Mar 28 2018 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 238-7
 - Move udev transfiletriggers to the right package, fix quoting
@@ -2159,17 +1846,11 @@ fi
 * Tue Feb 27 2018 Javier Martinez Canillas <javierm@redhat.com> - 237-7.git84c8da5
 - Add patch to install kernel images for GRUB BootLoaderSpec support
 
-* Mon Feb 26 2018 Davide Cavalca <dcavalca@fb.com> - 237-1.fb3
-- Backport PR#8115 to properly fix GH#8194
-
 * Sat Feb 24 2018 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 237-6.git84c8da5
 - Create /etc/systemd in %%post libs if necessary (#1548607)
 
 * Fri Feb 23 2018 Adam Williamson <awilliam@redhat.com> - 237-5.git84c8da5
 - Use : not touch to create file in -libs %%post
-
-* Thu Feb 22 2018 Davide Cavalca <dcavalca@fb.com> - 237-1.fb2
-- Add workaround for an issue with systemd-nspawn -u affecting mock (GH#8194)
 
 * Thu Feb 22 2018 Patrick Uiterwijk <patrick@puiterwijk.org> - 237-4.git84c8da5
 - Add coreutils dep for systemd-libs %%post
@@ -2187,16 +1868,6 @@ fi
 - Switch to new ldconfig macros that do nothing in F28+
 - /etc/systemd/dont-synthesize-nobody is created in %%post if nfsnobody
   or nobody users are defined (#1537262)
-
-* Mon Feb 12 2018 Davide Cavalca <dcavalca@fb.com> - 237-1.fb1
-- Facebook rebuild
-- Backport configurable docdir patch from master (PR#8068)
-- Ensure split-files.py is run with python36
-- Set nfs/nfsnobody as nobody users
-- Add pcre2-devel dependecy for journalctl --grep
-- Disable tests for now as they're failing randomly when building in mock
-- Use 10485760 as container base for Facebook to avoid conflicting with LDAP
-- Backport PID file symlink chain checks fix from master (PR#8133)
 
 * Fri Feb  9 2018 Zbigniew Jędrzejeweski-Szmek <zbyszek@in.waw.pl> - 237-1.git78bd769
 - Update to first stable snapshot (various minor memory leaks and misaccesses,
@@ -2233,9 +1904,6 @@ fi
 * Wed Oct 18 2017 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 235-2
 - Patches for cryptsetup _netdev
 
-* Mon Oct  9 2017 Davide Cavalca <dcavalca@fb.com> - 235-1.fb1
-- Facebook rebuild
-
 * Fri Oct  6 2017 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 235-1
 - Update to latest version
 
@@ -2247,16 +1915,6 @@ fi
 
 * Mon Sep 18 2017 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 234-6
 - Bump xslt recursion limit for libxslt-1.30
-
-* Mon Sep 18 2017 Davide Cavalca <dcavalca@fb.com> - 234-5.fb2
-- backport build fix for O_TMPFILE from PR#6816
-
-* Tue Aug  8 2017 Davide Cavalca <dcavalca@fb.com> - 234-5.fb1
-- new upstream release
-- drop compat-libs patch in favor of separate systemd-compat-libs project
-- force locale to UTF-8 to make meson happy
-- disable broken test-execute
-- backport nsdelegate support from PR#6294
 
 * Mon Jul 31 2017 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 234-5
 - Backport more patches (#1476005, hopefully #1462378)
@@ -2281,9 +1939,6 @@ fi
 * Tue Jun 27 2017 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 233-6
 - Fix an out-of-bounds write in systemd-resolved (CVE-2017-9445)
 
-* Sat Jun 17 2017 Peter Blair <pmb@fb.com> - 233-2.fb2
-- Apply patch from CVE-2017-9445
-
 * Fri Jun 16 2017 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 233-5.gitec36d05
 - Update to snapshot version, build with meson
 
@@ -2295,25 +1950,9 @@ fi
 - Drop soft-static uid for systemd-journal-gateway
 - Use ID from /etc/os-release as ntpvendor
 
-* Thu Apr 13 2017 Davide Cavalca <dcavalca@fb.com> - 233-2.fb1
-- New upstream release
-- disable a couple of broken tests
-- default to legacy hierarchy for now
-
-* Wed Apr 12 2017 Davide Cavalca <dcavalca@fb.com> - 231-11.fb2
-- fix lz4 depends to pick the right package
-
-* Mon Apr  3 2017 Davide Cavalca <dcavalca@fb.com> - 231-11.fb1
-- use facebook macro to gate Facebook-specific settings
-- rebuild against new RPM backport
-- update patches
-
 * Thu Mar 16 2017 Michal Sekletar <msekleta@redhat.com> - 233-3
 - Backport bugfixes from upstream
 - Don't return error when machinectl couldn't figure out container IP addresses (#1419501)
-
-* Tue Mar 14 2017 Patrick White <pwhite@fb.com> - 231-2.fb4
-- add poettering patch to fix hitting an assert (PR#4447)
 
 * Thu Mar  2 2017 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 233-2
 - Fix installation conflict with polkit
@@ -2415,28 +2054,8 @@ fi
 - Fix issue with daemon-reload messing up graphics (#1367766)
 - A few other bugfixes
 
-* Wed Aug 10 2016 Davide Cavalca <dcavalca@fb.com> - 231-2.fb3
-- add mpawlowski root filesystem namespace patch for #12621017
-- add htejun patch for cgroup2 cpu controller (PR#3905)
-- update htejun logind patch from PR#3835
-
 * Wed Aug 03 2016 Adam Williamson <awilliam@redhat.com> - 231-3
 - Revert preset-all change, it broke stuff (#1363858)
-
-* Thu Jul 28 2016 Davide Cavalca <dcavalca@fb.com> - 231-2.fb2
-- add /dev/fio patch from bwann for GH#3718
-- import PR#3821 updates and rebase patches on github
-- add htejun logind patch for UserTasksMax (#12460186, PR#3835)
-
-* Wed Jul 27 2016 Davide Cavalca <dcavalca@fb.com> - 231-2.fb1
-- Facebook rebuild
-- Fix test failures in mock (#7950934, PR#3821)
-- drop fsck on root patch now that we have the new dracut (see PR#3822)
-- Rework LTO disable patch to be conditional (#11565880, PR#3823)
-- update compat-libs and rebase onto public branch
-  (https://github.com/davide125/systemd/tree/compat-libs)
-- add back python support now that we have python34-lxml
-- add back xkbcommon support as it's available in rolling os updates
 
 * Wed Jul 27 2016 Zbigniew Jędrzejewski-Szmek <zbyszek@bupkis> - 231-2
 - Call preset-all on initial installation (#1118740)
@@ -2444,9 +2063,6 @@ fi
 
 * Tue Jul 26 2016 Zbigniew Jędrzejewski-Szmek <zbyszek@bupkis> - 231-1
 - Update to latest version
-
-* Tue Jul 19 2016 Davide Cavalca <dcavalca@fb.com> - 230-2.fb2
-- fix fsck for root filesystem on firstboot after install (#11352467)
 
 * Wed Jun  8 2016 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 230-3
 - Update to latest git snapshot (fixes for systemctl set-default,
@@ -2457,11 +2073,6 @@ fi
   might not work, but I think that existing functionality should not
   be broken, so it seems worthwile to update to the snapshot.
 
-* Thu May 26 2016 Davide Cavalca <dcavalca@fb.com> - 230-2.fb1
-- Facebook rebuild
-- backport htejun PRs for cgroup2 (#3337, #3329, #3315, #3417, #3418)
-- add back compat-libs
-
 * Sat May 21 2016 Zbigniew Jędrzejewski-Szmek <zbyszek@bupkis> - 230-2
 - Remove systemd-compat-libs on upgrade
 
@@ -2470,15 +2081,6 @@ fi
 - Drop compat-libs
 - Require libxkbcommon explictly, since the automatic dependency will
   not be generated anymore
-
-* Thu May 12 2016 Tejun Heo <htejun@fb.com> - 229-1.fb6
-- backport https://github.com/systemd/systemd/pull/3246 to fix slice overrides
-
-* Mon May 09 2016 Davide Cavalca <dcavalca@fb.com> - 229-1.fb5
-- update Tejun Heo patches for cgroup2 io controller support
-
-* Fri Apr 29 2016 Davide Cavalca <dcavalca@fb.com> - 229-1.fb4
-- add Tejun Heo test patch for cgroup2 IO controllers support (#10638181)
 
 * Tue Apr 26 2016 Zbigniew Jędrzejewski-Szmek <zbyszek@bupkis> - 229-15
 - Remove duplicated entries in -container %%files (#1330395)
@@ -2497,9 +2099,6 @@ fi
 
 * Mon Apr 18 2016 Harald Hoyer <harald@redhat.com> - 229-10
 - move device dependant stuff to the udev subpackage
-
-* Thu Mar 24 2016 Davide Cavalca <dcavalca@fb.com> - 229-1.fb3
-- add Tejun Heo patches for cgroups v2 support (#10268183)
 
 * Tue Mar 22 2016 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 229-9
 - Add myhostname to /etc/nsswitch.conf (#1318303)
@@ -2521,9 +2120,6 @@ Resolves: rhbz#1299019
 - Split out system-udev subpackage
 - Add various bugfix patches, incl. a tentative fix for #1308771
 
-* Wed Mar 02 2016 Davide Cavalca <dcavalca@fb.com> - 229-1.fb2
-- revert RPM trigger macros for #10119506
-
 * Tue Mar  1 2016 Peter Robinson <pbrobinson@fedoraproject.org> 229-4
 - Power64 and s390(x) now have libseccomp support
 - aarch64 has gnu-efi
@@ -2536,10 +2132,6 @@ Resolves: rhbz#1299019
 Resolves: rhbz#1299019
 - this causes the dtb files to not get installed at all and the fdtdir
 - line in extlinux.conf to not get updated correctly
-
-* Tue Feb 16 2016 Davide Cavalca <dcavalca@fb.com> - 229-1.fb1
-- Facebook rebuilt
-- disable LTO to fix a build segfault with LTO
 
 * Thu Feb 11 2016 Michal Sekletar <msekleta@redhat.com> - 229-1
 - New upstream release
@@ -2572,11 +2164,6 @@ Resolves: rhbz#1299019
   properly installed), mixed with some new resolved features.
 - Rework file triggers so that they always run before daemons are restarted
 
-* Mon Nov 23 2015 Davide Cavalca <dcavalca@fb.com> - 228-3.fb1
-- Facebook rebuilt
-- disable test-namespace
-- revert rpm file triggers as they don't work on el7
-
 * Thu Nov 19 2015 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 228-3
 - Enable rpm file triggers for daemon-reload
 
@@ -2605,11 +2192,6 @@ Resolves: rhbz#1299019
 
 * Tue Nov 03 2015 Michal Schmidt <mschmidt@redhat.com> - 227-2
 - Rebuild for libmicrohttpd soname bump.
-
-* Fri Oct 09 2015 Davide Cavalca <dcavalca@fb.com> - 227-1.fb1
-- disable tests broken on centos6
-- fix build with centos7 curl
-- kernel-install: add fedora specific callouts to new-kernel-pkg
 
 * Wed Oct  7 2015 Kay Sievers <kay@redhat.com> - 227-1
 - New upstream release

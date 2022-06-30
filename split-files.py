@@ -1,7 +1,6 @@
 import re, sys, os, collections
 
 buildroot = sys.argv[1]
-release = sys.argv[2]
 known_files = sys.stdin.read().splitlines()
 known_files = {line.split()[-1]:line for line in known_files}
 
@@ -29,7 +28,7 @@ o_resolve = open('.file-list-resolve', 'w')
 o_tests = open('.file-list-tests', 'w')
 o_standalone_tmpfiles = open('.file-list-standalone-tmpfiles', 'w')
 o_standalone_sysusers = open('.file-list-standalone-sysusers', 'w')
-o_rest = open('.file-list-rest', 'w')
+o_main = open('.file-list-main', 'w')
 for file in files(buildroot):
     n = file.path[1:]
     if re.match(r'''/usr/(share|include)$|
@@ -59,7 +58,11 @@ for file in files(buildroot):
         o = o_rpm_macros
     elif '/usr/lib/systemd/tests' in n:
         o = o_tests
-    elif re.search(r'/lib.*\.pc|/man3/|/usr/include|(?<!/libsystemd-shared-...).so$', n):
+    elif re.search(r'/libsystemd-(shared|core)-.*\.so$', n):
+        o = o_main
+    elif re.search(r'/libcryptsetup-token-systemd-.*\.so$', n):
+        o = o_udev
+    elif re.search(r'/lib.*\.pc|/man3/|/usr/include|\.so$', n):
         o = o_devel
     elif re.search(r'''journal-(remote|gateway|upload)|
                        systemd-remote\.conf|
@@ -67,6 +70,7 @@ for file in files(buildroot):
                        /var/log/journal/remote
     ''', n, re.X):
         o = o_remote
+
     elif re.search(r'''mymachines|
                        machinectl|
                        systemd-nspawn|
@@ -78,6 +82,7 @@ for file in files(buildroot):
                        org.freedesktop.(import|machine)1
     ''', n, re.X):
         o = o_container
+
     elif re.search(r'''/usr/lib/systemd/network/80-|
                        networkd|
                        networkctl|
@@ -86,8 +91,9 @@ for file in files(buildroot):
                        tmpfiles\.d/systemd-network.conf|
                        systemd\.network|
                        systemd\.netdev
-    ''' + r'|systemd-network-generator' if release == "8" else r'', n, re.X):
+    ''', n, re.X):
         o = o_networkd
+
     elif '.so.' in n:
         o = o_libs
 
@@ -106,8 +112,8 @@ for file in files(buildroot):
                        modules-load|
                        timesync|
                        crypttab|
+                       cryptenroll|
                        cryptsetup|
-                       libcryptsetup-token-systemd|
                        kmod|
                        quota|
                        pstore|
@@ -157,7 +163,7 @@ for file in files(buildroot):
             assert False, 'Found .standalone not belonging to known packages'
 
     else:
-        o = o_rest
+        o = o_main
 
     if n in known_files:
         prefix = ' '.join(known_files[n].split()[:-1])
