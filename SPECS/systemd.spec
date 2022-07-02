@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        59%{?dist}
+Release:        60%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -810,6 +810,16 @@ Patch0757: 0757-sd-bus-do-not-read-unused-value.patch
 Patch0758: 0758-sd-bus-do-not-return-negative-errno-when-unknown-nam.patch
 Patch0759: 0759-sd-bus-switch-to-a-manual-overflow-check-in-sd_bus_t.patch
 Patch0760: 0760-resolved-let-s-preferably-route-reverse-lookups-for-.patch
+Patch0761: 0761-unit-don-t-emit-PropertiesChanged-signal-if-adding-a.patch
+Patch0762: 0762-tests-make-inverted-tests-actually-count.patch
+Patch0763: 0763-TEST-make-failure-tests-actually-fail-on-failure.patch
+Patch0764: 0764-ci-Mergify-configuration-update.patch
+Patch0765: 0765-core-propagate-triggered-unit-in-more-load-states.patch
+Patch0766: 0766-core-propagate-unit-start-limit-hit-state-to-trigger.patch
+Patch0767: 0767-core-Move-r-variable-declaration-to-start-of-unit_st.patch
+Patch0768: 0768-core-Delay-start-rate-limit-check-when-starting-a-un.patch
+Patch0769: 0769-core-Propagate-condition-failed-state-to-triggering-.patch
+Patch0770: 0770-unit-check-for-mount-rate-limiting-before-checking-a.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -1441,6 +1451,18 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Thu Jun 23 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-60
+- unit: don't emit PropertiesChanged signal if adding a dependency to a unit is a no-op (#1948480)
+- tests: make inverted tests actually count (#2087152)
+- TEST-*: make failure tests actually fail on failure (#2087152)
+- ci(Mergify): configuration update (#2087152)
+- core: propagate triggered unit in more load states (#2065322)
+- core: propagate unit start limit hit state to triggering path unit (#2065322)
+- core: Move 'r' variable declaration to start of unit_start() (#2065322)
+- core: Delay start rate limit check when starting a unit (#2065322)
+- core: Propagate condition failed state to triggering units. (#2065322)
+- unit: check for mount rate limiting before checking active state (#2095744)
+
 * Wed May 18 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-59
 - core: disallow using '-.service' as a service name (#2051520)
 - shared/dropin: support -.service.d/ top level drop-in for service units (#2051520)
