@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        60%{?dist}
+Release:        62%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -820,6 +820,27 @@ Patch0767: 0767-core-Move-r-variable-declaration-to-start-of-unit_st.patch
 Patch0768: 0768-core-Delay-start-rate-limit-check-when-starting-a-un.patch
 Patch0769: 0769-core-Propagate-condition-failed-state-to-triggering-.patch
 Patch0770: 0770-unit-check-for-mount-rate-limiting-before-checking-a.patch
+Patch0771: 0771-mkosi-Add-gnutls-package.patch
+Patch0772: 0772-unit-name-tighten-checks-for-building-valid-unit-nam.patch
+Patch0773: 0773-core-shorten-long-unit-names-that-are-based-on-paths.patch
+Patch0774: 0774-test-add-extended-test-for-triggering-mount-rate-lim.patch
+Patch0775: 0775-tests-add-test-case-for-long-unit-names.patch
+Patch0776: 0776-core-unset-HOME-that-the-kernel-gives-us.patch
+Patch0777: 0777-journal-remote-check-return-value-from-MHD_add_respo.patch
+Patch0778: 0778-journalctl-in-follow-mode-watch-stdout-for-POLLHUP-P.patch
+Patch0779: 0779-sd-bus-make-BUS_DEFAULT_TIMEOUT-configurable.patch
+Patch0780: 0780-fstab-generator-fix-debug-log.patch
+Patch0781: 0781-logind-session-dbus-allow-to-set-display-name-via-db.patch
+Patch0782: 0782-Allow-restart-for-oneshot-units.patch
+Patch0783: 0783-test-correct-TEST-41-StartLimitBurst-test.patch
+Patch0784: 0784-core-fix-assert-about-number-of-built-environment-va.patch
+Patch0785: 0785-core-add-one-more-assert.patch
+Patch0786: 0786-strv-introduce-strv_join_prefix.patch
+Patch0787: 0787-test-add-tests-for-strv_join_prefix.patch
+Patch0788: 0788-test-replace-swear-words-by-hoge.patch
+Patch0789: 0789-core-add-new-environment-variable-RUNTIME_DIRECTORY-.patch
+Patch0790: 0790-test-execute-add-tests-for-RUNTIME_DIRECTORY-or-frie.patch
+Patch0791: 0791-man-document-RUNTIME_DIRECTORY-or-friends.patch
 
 
 %ifarch %{ix86} x86_64 aarch64
@@ -883,7 +904,6 @@ Requires:       %{name}-pam = %{version}-%{release}
 Requires:       %{name}-libs = %{version}-%{release}
 Recommends:     diffutils
 Requires:       util-linux
-Requires:       timedatex
 Recommends:     libxkbcommon%{?_isa}
 Provides:       /bin/systemctl
 Provides:       /sbin/shutdown
@@ -1319,7 +1339,7 @@ fi
 
 function mod_nss() {
     if [ -f "$1" ] ; then
-        # sed-fu to add myhostanme to hosts line
+        # sed-fu to add myhostname to hosts line
         grep -E -q '^hosts:.* myhostname' "$1" ||
         sed -i.bak -e '
                 /^hosts:/ !b
@@ -1336,14 +1356,14 @@ function mod_nss() {
 }
 
 FILE="$(readlink /etc/nsswitch.conf || echo /etc/nsswitch.conf)"
-mod_nss "$FILE"
-
-if [ "$FILE" = "/etc/authselect/user-nsswitch.conf" ] ; then
-        authselect apply-changes &> /dev/null
+if [ "$FILE" = "/etc/authselect/nsswitch.conf" ] && authselect check &>/dev/null; then
+        mod_nss "/etc/authselect/user-nsswitch.conf"
+        authselect apply-changes &> /dev/null || :
 else
-        # also apply the same changes to nsswitch.conf to affect
+        mod_nss "$FILE"
+        # also apply the same changes to user-nsswitch.conf to affect
         # possible future authselect configuration
-	mod_nss "/etc/authselect/user-nsswitch.conf"
+        mod_nss "/etc/authselect/user-nsswitch.conf"
 fi
 
 # check if nobody or nfsnobody is defined
@@ -1451,6 +1471,32 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Mon Jul 18 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-62
+- spec: Remove dependency on timedatex (#2066946)
+
+* Thu Jul 14 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-61
+- mkosi: Add gnutls package (#2101227)
+- unit-name: tighten checks for building valid unit names (#1940973)
+- core: shorten long unit names that are based on paths and append path hash at the end (#1940973)
+- test: add extended test for triggering mount rate limit (#1940973)
+- tests: add test case for long unit names (#1940973)
+- core: unset HOME=/ that the kernel gives us (#2056527)
+- journal-remote: check return value from MHD_add_response_header (#2051981)
+- journalctl: in --follow mode watch stdout for POLLHUP/POLLERR and exit (#2003236)
+- sd-bus: make BUS_DEFAULT_TIMEOUT configurable (#2039461)
+- fstab-generator: fix debug log (#2101433)
+- logind-session-dbus: allow to set display name via dbus (#1857969)
+- Allow restart for oneshot units (#2042896)
+- test: correct TEST-41 StartLimitBurst test (#2042896)
+- core: fix assert() about number of built environment variables (#2049788)
+- core: add one more assert() (#2049788)
+- strv: introduce strv_join_prefix() (#2049788)
+- test: add tests for strv_join_prefix() (#2049788)
+- test: replace swear words by 'hoge' (#2049788)
+- core: add new environment variable $RUNTIME_DIRECTORY= or friends (#2049788)
+- test-execute: add tests for $RUNTIME_DIRECTORY= or friends (#2049788)
+- man: document RUNTIME_DIRECTORY= or friends (#2049788)
+
 * Thu Jun 23 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-60
 - unit: don't emit PropertiesChanged signal if adding a dependency to a unit is a no-op (#1948480)
 - tests: make inverted tests actually count (#2087152)
