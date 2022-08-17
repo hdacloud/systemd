@@ -4,9 +4,9 @@
 %global stable 1
 
 %if 0%{?facebook}
-%global hs_commit 509389de43ee53f865d78390efe64bcab4af8e10
+%global hs_commit e7a6912a4e6a437362d462d661c378822fa2e89d
 %else
-%global hs_commit 2ed69c958a525510502f3750cffe397339b605e6
+%global hs_commit c5440c321fb3a19bef85c2d905e86aafe94afcf6
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -42,7 +42,7 @@
 Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
-Version:        251.3
+Version:        251.4
 Release:        1.1%{?dist}
 %else
 # determine the build information from local checkout
@@ -1112,7 +1112,10 @@ fi
 
 %changelog
 
-* Tue Jul 21 2022 Anita Zhang <the.anitazha@gmail.com> - 251.3-1.1
+* Tue Aug 16 2022 Anita Zhang <the.anitazha@gmail.com> - 251.4-1.1
+- Bump release for 251.4
+
+* Thu Jul 21 2022 Anita Zhang <the.anitazha@gmail.com> - 251.3-1.1
 - Sync changes from Fedora for new release
 
 * Wed Jul 13 2022 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 251.3-1
