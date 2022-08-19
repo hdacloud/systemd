@@ -4,7 +4,7 @@
 %global stable 1
 
 %if 0%{?facebook}
-%global hs_commit e7a6912a4e6a437362d462d661c378822fa2e89d
+%global hs_commit dba72c9e632a7dd5033c231f643dc5813440cf3f
 %else
 %global hs_commit c5440c321fb3a19bef85c2d905e86aafe94afcf6
 %endif
@@ -43,7 +43,7 @@ Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
 Version:        251.4
-Release:        1.1%{?dist}
+Release:        1.2%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -1111,6 +1111,9 @@ fi
 %endif
 
 %changelog
+
+* Thu Aug 18 2022 Anita Zhang <the.anitazha@gmail.com> - 251.4-1.2
+- Revert 32-bit offsets journal commit from hs+fb build
 
 * Tue Aug 16 2022 Anita Zhang <the.anitazha@gmail.com> - 251.4-1.1
 - Bump release for 251.4
