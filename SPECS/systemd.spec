@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        62%{?dist}
+Release:        65%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -841,7 +841,35 @@ Patch0788: 0788-test-replace-swear-words-by-hoge.patch
 Patch0789: 0789-core-add-new-environment-variable-RUNTIME_DIRECTORY-.patch
 Patch0790: 0790-test-execute-add-tests-for-RUNTIME_DIRECTORY-or-frie.patch
 Patch0791: 0791-man-document-RUNTIME_DIRECTORY-or-friends.patch
-
+Patch0792: 0792-ci-bump-the-worker-Ubuntu-version-to-Jammy.patch
+Patch0793: 0793-test-make-test-execute-pass-on-Linux-5.15.patch
+Patch0794: 0794-ci-install-iputils.patch
+Patch0795: 0795-ci-Mergify-Add-ci-waived-logic.patch
+Patch0796: 0796-sd-event-don-t-invalidate-source-type-on-disconnect.patch
+Patch0797: 0797-tests-make-sure-we-delay-running-mount-start-jobs-wh.patch
+Patch0798: 0798-core-drop-references-to-StandardOutputFileToCreate.patch
+Patch0799: 0799-dbus-execute-fix-indentation.patch
+Patch0800: 0800-dbus-execute-generate-the-correct-transient-unit-set.patch
+Patch0801: 0801-bus-unit-util-properly-accept-StandardOutput-append-.patch
+Patch0802: 0802-core-be-more-careful-when-inheriting-stdout-fds-to-s.patch
+Patch0803: 0803-test-add-a-test-for-StandardError-file.patch
+Patch0804: 0804-tree-wide-allow-ASCII-fallback-for-in-logs.patch
+Patch0805: 0805-tree-wide-allow-ASCII-fallback-for-in-logs.patch
+Patch0806: 0806-core-allow-to-set-default-timeout-for-devices.patch
+Patch0807: 0807-man-document-DefaultDeviceTimeoutSec.patch
+Patch0808: 0808-Revert-core-Propagate-condition-failed-state-to-trig.patch
+Patch0809: 0809-core-Check-unit-start-rate-limiting-earlier.patch
+Patch0810: 0810-core-Add-trigger-limit-for-path-units.patch
+Patch0811: 0811-meson-add-syscall-names-update-target.patch
+Patch0812: 0812-syscall-names-add-process_madvise-which-is-planned-f.patch
+Patch0813: 0813-shared-add-known-syscall-list.patch
+Patch0814: 0814-generate-syscall-list-require-python3.patch
+Patch0815: 0815-shared-seccomp-reduce-scope-of-indexing-variables.patch
+Patch0816: 0816-shared-syscall-list-filter-out-some-obviously-platfo.patch
+Patch0817: 0817-seccomp-tighten-checking-of-seccomp-filter-creation.patch
+Patch0818: 0818-shared-seccomp-util-added-functionality-to-make-list.patch
+Patch0819: 0819-nspawn-return-ENOSYS-by-default-EPERM-for-known-call.patch
+Patch0820: 0820-test-procfs-util-skip-test-on-certain-errors.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1471,6 +1499,43 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Fri Aug 19 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-65
+- test-procfs-util: skip test on certain errors (#2087152)
+
+* Thu Aug 18 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-64
+- ci: bump the worker Ubuntu version to Jammy (#2087152)
+- test: make test-execute pass on Linux 5.15 (#2087152)
+- ci: install iputils (#2087152)
+- ci(Mergify): Add `ci-waived` logic (#2087152)
+- sd-event: don't invalidate source type on disconnect (#2115396)
+- tests: make sure we delay running mount start jobs when /p/s/mountinfo is rate limited (#2095744)
+- core: drop references to 'StandardOutputFileToCreate' (#2093479)
+- dbus-execute: fix indentation (#2093479)
+- dbus-execute: generate the correct transient unit setting (#2093479)
+- bus-unit-util: properly accept StandardOutput=append:… settings (#2093479)
+- core: be more careful when inheriting stdout fds to stderr (#2093479)
+- test: add a test for StandardError=file:… (#2093479)
+- tree-wide: allow ASCII fallback for → in logs (#2093479)
+- tree-wide: allow ASCII fallback for … in logs (#2093479)
+- core: allow to set default timeout for devices (#1967245)
+- man: document DefaultDeviceTimeoutSec= (#1967245)
+- Revert "core: Propagate condition failed state to triggering units." (#2114005)
+- core: Check unit start rate limiting earlier (#2114005)
+- core: Add trigger limit for path units (#2114005)
+- meson: add syscall-names-update target (#2040247)
+- syscall-names: add process_madvise which is planned for 5.10 (#2040247)
+- shared: add @known syscall list (#2040247)
+- generate-syscall-list: require python3 (#2040247)
+- shared/seccomp: reduce scope of indexing variables (#2040247)
+- shared/syscall-list: filter out some obviously platform-specific syscalls (#2040247)
+- seccomp: tighten checking of seccomp filter creation (#2040247)
+- shared/seccomp-util: added functionality to make list of filtred syscalls (#2040247)
+- nspawn: return ENOSYS by default, EPERM for "known" calls (#2040247)
+- revert: resolved: pin stream while calling callbacks for it (#2110549)
+
+* Wed Aug 03 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-63
+- resolved: pin stream while calling callbacks for it (#2110549)
+
 * Mon Jul 18 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-62
 - spec: Remove dependency on timedatex (#2066946)
 
