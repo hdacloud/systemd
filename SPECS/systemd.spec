@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        65%{?dist}
+Release:        67%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -870,6 +870,11 @@ Patch0817: 0817-seccomp-tighten-checking-of-seccomp-filter-creation.patch
 Patch0818: 0818-shared-seccomp-util-added-functionality-to-make-list.patch
 Patch0819: 0819-nspawn-return-ENOSYS-by-default-EPERM-for-known-call.patch
 Patch0820: 0820-test-procfs-util-skip-test-on-certain-errors.patch
+Patch0821: 0821-Try-stopping-MD-RAID-devices-in-shutdown-too.patch
+Patch0822: 0822-shutdown-get-only-active-md-arrays.patch
+Patch0823: 0823-scope-allow-unprivileged-delegation-on-scopes.patch
+Patch0824: 0824-resolved-pin-stream-while-calling-callbacks-for-it.patch
+Patch0825: 0825-ci-functions-Add-useradd-and-userdel.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1499,6 +1504,15 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Fri Aug 26 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-67
+- resolved: pin stream while calling callbacks for it (#2110549)
+- ci(functions): Add `useradd` and `userdel` (#2110549)
+
+* Thu Aug 25 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-66
+- Try stopping MD RAID devices in shutdown too (#1817706)
+- shutdown: get only active md arrays. (#1817706)
+- scope: allow unprivileged delegation on scopes (#2068575)
+
 * Fri Aug 19 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-65
 - test-procfs-util: skip test on certain errors (#2087152)
 
