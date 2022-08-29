@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        58%{?dist}.3
+Release:        58%{?dist}.4
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -808,6 +808,7 @@ Patch0755: 0755-core-Delay-start-rate-limit-check-when-starting-a-un.patch
 Patch0756: 0756-core-Propagate-condition-failed-state-to-triggering-.patch
 Patch0757: 0757-unit-check-for-mount-rate-limiting-before-checking-a.patch
 
+Patch9000: 9000-resolved-pin-stream-while-calling-callbacks-for-it.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1437,6 +1438,9 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Wed Aug 03 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58.4
+- resolved: pin stream while calling callbacks for it (#2110548)
+
 * Thu Jun 23 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58.3
 - unit: check for mount rate limiting before checking active state (#2097336)
 
