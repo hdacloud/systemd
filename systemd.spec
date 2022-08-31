@@ -43,7 +43,7 @@ Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
 Version:        251.4
-Release:        1.2%{?dist}
+Release:        1.3%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -1111,6 +1111,9 @@ fi
 %endif
 
 %changelog
+
+* Wed Aug 31 2022 Anita Zhang <the.anitazha@gmail.com> - 251.4-1.3
+- Fix split-files.py regex for networkd files on non-C8
 
 * Thu Aug 18 2022 Anita Zhang <the.anitazha@gmail.com> - 251.4-1.2
 - Revert 32-bit offsets journal commit from hs+fb build

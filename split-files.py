@@ -92,7 +92,10 @@ for file in files(buildroot):
                        tmpfiles\.d/systemd-network.conf|
                        systemd\.network|
                        systemd\.netdev
-    ''' + r'|systemd-network-generator' if release == "8" else r'', n, re.X):
+    ''', n, re.X):
+        o = o_networkd
+
+    elif re.search(r'systemd-network-generator', n, re.X) and release == "8":
         o = o_networkd
 
     elif '.so.' in n:
