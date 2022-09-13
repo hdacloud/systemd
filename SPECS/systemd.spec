@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        58%{?dist}.4
+Release:        58%{?dist}.7
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -807,6 +807,10 @@ Patch0754: 0754-core-Move-r-variable-declaration-to-start-of-unit_st.patch
 Patch0755: 0755-core-Delay-start-rate-limit-check-when-starting-a-un.patch
 Patch0756: 0756-core-Propagate-condition-failed-state-to-triggering-.patch
 Patch0757: 0757-unit-check-for-mount-rate-limiting-before-checking-a.patch
+Patch0758: 0758-sd-event-don-t-invalidate-source-type-on-disconnect.patch
+Patch0759: 0759-test-procfs-util-skip-test-on-certain-errors.patch
+Patch0760: 0760-Try-stopping-MD-RAID-devices-in-shutdown-too.patch
+Patch0761: 0761-shutdown-get-only-active-md-arrays.patch
 
 Patch9000: 9000-resolved-pin-stream-while-calling-callbacks-for-it.patch
 
@@ -1438,6 +1442,12 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Thu Aug 25 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58.7
+- sd-event: don't invalidate source type on disconnect (#2116892)
+- test-procfs-util: skip test on certain errors (#2087152)
+- Try stopping MD RAID devices in shutdown too (#2120608)
+- shutdown: get only active md arrays. (#2120608)
+
 * Wed Aug 03 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58.4
 - resolved: pin stream while calling callbacks for it (#2110548)
 
