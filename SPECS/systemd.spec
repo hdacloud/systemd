@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        67%{?dist}
+Release:        68%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -875,6 +875,12 @@ Patch0822: 0822-shutdown-get-only-active-md-arrays.patch
 Patch0823: 0823-scope-allow-unprivileged-delegation-on-scopes.patch
 Patch0824: 0824-resolved-pin-stream-while-calling-callbacks-for-it.patch
 Patch0825: 0825-ci-functions-Add-useradd-and-userdel.patch
+Patch0826: 0826-logind-optionally-watch-utmp-for-login-data.patch
+Patch0827: 0827-logind-add-hashtable-for-finding-session-by-leader-P.patch
+Patch0828: 0828-core-load-fragment-move-config_parse_sec_fix_0-to-sr.patch
+Patch0829: 0829-sd-event-add-relative-timer-calls.patch
+Patch0830: 0830-logind-add-option-to-stop-idle-sessions-after-specif.patch
+Patch0831: 0831-logind-schedule-idle-check-full-interval-from-now-if.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1504,6 +1510,14 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Tue Sep 27 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-68
+- logind: optionally watch utmp for login data (#2122288)
+- logind: add hashtable for finding session by leader PID (#2122288)
+- core/load-fragment: move config_parse_sec_fix_0 to src/shared (#2122288)
+- sd-event: add relative timer calls (#2122288)
+- logind: add option to stop idle sessions after specified timeout (#2122288)
+- logind: schedule idle check full interval from now if we couldn't figure out atime timestamp (#2122288)
+
 * Fri Aug 26 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-67
 - resolved: pin stream while calling callbacks for it (#2110549)
 - ci(functions): Add `useradd` and `userdel` (#2110549)
