@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        58%{?dist}.7
+Release:        58%{?dist}.8
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -811,8 +811,16 @@ Patch0758: 0758-sd-event-don-t-invalidate-source-type-on-disconnect.patch
 Patch0759: 0759-test-procfs-util-skip-test-on-certain-errors.patch
 Patch0760: 0760-Try-stopping-MD-RAID-devices-in-shutdown-too.patch
 Patch0761: 0761-shutdown-get-only-active-md-arrays.patch
+Patch0762: 0762-unit-name-tighten-checks-for-building-valid-unit-nam.patch
+Patch0763: 0763-core-shorten-long-unit-names-that-are-based-on-paths.patch
+Patch0764: 0764-test-add-extended-test-for-triggering-mount-rate-lim.patch
+Patch0765: 0765-tests-add-test-case-for-long-unit-names.patch
+Patch0766: 0766-Revert-core-Propagate-condition-failed-state-to-trig.patch
+Patch0767: 0767-core-Check-unit-start-rate-limiting-earlier.patch
+Patch0768: 0768-core-Add-trigger-limit-for-path-units.patch
+Patch0769: 0769-resolved-pin-stream-while-calling-callbacks-for-it.patch
+Patch0770: 0770-core-move-reset_arguments-to-the-end-of-main-s-finis.patch
 
-Patch9000: 9000-resolved-pin-stream-while-calling-callbacks-for-it.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1442,6 +1450,17 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Wed Sep 21 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58.8
+- unit-name: tighten checks for building valid unit names (#2094712)
+- core: shorten long unit names that are based on paths and append path hash at the end (#2094712)
+- test: add extended test for triggering mount rate limit (#2094712)
+- tests: add test case for long unit names (#2094712)
+- Revert "core: Propagate condition failed state to triggering units." (#2123801)
+- core: Check unit start rate limiting earlier (#2123801)
+- core: Add trigger limit for path units (#2123801)
+- resolved: pin stream while calling callbacks for it (#2110548)
+- core: move reset_arguments() to the end of main's finish (#2127171)
+
 * Thu Aug 25 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58.7
 - sd-event: don't invalidate source type on disconnect (#2116892)
 - test-procfs-util: skip test on certain errors (#2087152)

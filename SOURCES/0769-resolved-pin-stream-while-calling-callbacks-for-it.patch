@@ -1,4 +1,4 @@
-From a4f08c798cabd5c43f2578a9e2b048fa1ad4a52c Mon Sep 17 00:00:00 2001
+From b92fae31236301ba1fcca604c68bb4e908318c49 Mon Sep 17 00:00:00 2001
 From: Lennart Poettering <lennart@poettering.net>
 Date: Tue, 4 Dec 2018 22:13:39 +0100
 Subject: [PATCH] resolved: pin stream while calling callbacks for it
@@ -16,7 +16,7 @@ Resolves: #2110548
  1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/src/resolve/resolved-dns-stream.c b/src/resolve/resolved-dns-stream.c
-index 066daef96e..2d0162483a 100644
+index 555e200a23..ca0313d1d7 100644
 --- a/src/resolve/resolved-dns-stream.c
 +++ b/src/resolve/resolved-dns-stream.c
 @@ -42,6 +42,8 @@ static int dns_stream_update_io(DnsStream *s) {
@@ -28,7 +28,7 @@ index 066daef96e..2d0162483a 100644
          assert(s);
  
  #if ENABLE_DNS_OVER_TLS
-@@ -315,7 +317,7 @@ static int on_stream_timeout(sd_event_source *es, usec_t usec, void *userdata) {
+@@ -316,7 +318,7 @@ static int on_stream_timeout(sd_event_source *es, usec_t usec, void *userdata) {
  }
  
  static int on_stream_io(sd_event_source *es, int fd, uint32_t revents, void *userdata) {
@@ -37,6 +37,3 @@ index 066daef96e..2d0162483a 100644
          int r;
  
          assert(s);
--- 
-2.37.1
-
