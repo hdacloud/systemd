@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        58%{?dist}.8
+Release:        68%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -793,34 +793,94 @@ Patch0740: 0740-sysctl-fix-segfault.patch
 Patch0741: 0741-ci-drop-CentOS-8-CI.patch
 Patch0742: 0742-test-adapt-to-the-new-capsh-format.patch
 Patch0743: 0743-test-ignore-IAB-capabilities-in-test-execute.patch
-Patch0744: 0744-acpi-fpdt-mark-structures-as-packed.patch
-Patch0745: 0745-core-slice-make-slice_freezer_action-return-0-if-fre.patch
-Patch0746: 0746-core-unit-fix-use-after-free.patch
-Patch0747: 0747-sd-bus-fix-reference-counter-to-be-incremented.patch
-Patch0748: 0748-sd-bus-do-not-read-unused-value.patch
-Patch0749: 0749-sd-bus-do-not-return-negative-errno-when-unknown-nam.patch
-Patch0750: 0750-sd-bus-switch-to-a-manual-overflow-check-in-sd_bus_t.patch
-Patch0751: 0751-unit-don-t-emit-PropertiesChanged-signal-if-adding-a.patch
-Patch0752: 0752-core-propagate-triggered-unit-in-more-load-states.patch
-Patch0753: 0753-core-propagate-unit-start-limit-hit-state-to-trigger.patch
-Patch0754: 0754-core-Move-r-variable-declaration-to-start-of-unit_st.patch
-Patch0755: 0755-core-Delay-start-rate-limit-check-when-starting-a-un.patch
-Patch0756: 0756-core-Propagate-condition-failed-state-to-triggering-.patch
-Patch0757: 0757-unit-check-for-mount-rate-limiting-before-checking-a.patch
-Patch0758: 0758-sd-event-don-t-invalidate-source-type-on-disconnect.patch
-Patch0759: 0759-test-procfs-util-skip-test-on-certain-errors.patch
-Patch0760: 0760-Try-stopping-MD-RAID-devices-in-shutdown-too.patch
-Patch0761: 0761-shutdown-get-only-active-md-arrays.patch
-Patch0762: 0762-unit-name-tighten-checks-for-building-valid-unit-nam.patch
-Patch0763: 0763-core-shorten-long-unit-names-that-are-based-on-paths.patch
-Patch0764: 0764-test-add-extended-test-for-triggering-mount-rate-lim.patch
-Patch0765: 0765-tests-add-test-case-for-long-unit-names.patch
-Patch0766: 0766-Revert-core-Propagate-condition-failed-state-to-trig.patch
-Patch0767: 0767-core-Check-unit-start-rate-limiting-earlier.patch
-Patch0768: 0768-core-Add-trigger-limit-for-path-units.patch
-Patch0769: 0769-resolved-pin-stream-while-calling-callbacks-for-it.patch
-Patch0770: 0770-core-move-reset_arguments-to-the-end-of-main-s-finis.patch
-
+Patch0744: 0744-core-disallow-using-.service-as-a-service-name.patch
+Patch0745: 0745-shared-dropin-support-.service.d-top-level-drop-in-f.patch
+Patch0746: 0746-core-change-top-level-drop-in-from-.service.d-to-ser.patch
+Patch0747: 0747-shared-dropin-fix-assert-for-invalid-drop-in.patch
+Patch0748: 0748-udev-fix-slot-based-network-names-on-s390.patch
+Patch0749: 0749-udev-add-missing-initialization-to-fix-freeing-inval.patch
+Patch0750: 0750-udev-it-is-not-necessary-that-the-path-is-readable.patch
+Patch0751: 0751-udev-allow-onboard-index-up-to-65535.patch
+Patch0752: 0752-Revert-basic-use-comma-as-separator-in-cpuset-cgroup.patch
+Patch0753: 0753-acpi-fpdt-mark-structures-as-packed.patch
+Patch0754: 0754-core-slice-make-slice_freezer_action-return-0-if-fre.patch
+Patch0755: 0755-core-unit-fix-use-after-free.patch
+Patch0756: 0756-sd-bus-fix-reference-counter-to-be-incremented.patch
+Patch0757: 0757-sd-bus-do-not-read-unused-value.patch
+Patch0758: 0758-sd-bus-do-not-return-negative-errno-when-unknown-nam.patch
+Patch0759: 0759-sd-bus-switch-to-a-manual-overflow-check-in-sd_bus_t.patch
+Patch0760: 0760-resolved-let-s-preferably-route-reverse-lookups-for-.patch
+Patch0761: 0761-unit-don-t-emit-PropertiesChanged-signal-if-adding-a.patch
+Patch0762: 0762-tests-make-inverted-tests-actually-count.patch
+Patch0763: 0763-TEST-make-failure-tests-actually-fail-on-failure.patch
+Patch0764: 0764-ci-Mergify-configuration-update.patch
+Patch0765: 0765-core-propagate-triggered-unit-in-more-load-states.patch
+Patch0766: 0766-core-propagate-unit-start-limit-hit-state-to-trigger.patch
+Patch0767: 0767-core-Move-r-variable-declaration-to-start-of-unit_st.patch
+Patch0768: 0768-core-Delay-start-rate-limit-check-when-starting-a-un.patch
+Patch0769: 0769-core-Propagate-condition-failed-state-to-triggering-.patch
+Patch0770: 0770-unit-check-for-mount-rate-limiting-before-checking-a.patch
+Patch0771: 0771-mkosi-Add-gnutls-package.patch
+Patch0772: 0772-unit-name-tighten-checks-for-building-valid-unit-nam.patch
+Patch0773: 0773-core-shorten-long-unit-names-that-are-based-on-paths.patch
+Patch0774: 0774-test-add-extended-test-for-triggering-mount-rate-lim.patch
+Patch0775: 0775-tests-add-test-case-for-long-unit-names.patch
+Patch0776: 0776-core-unset-HOME-that-the-kernel-gives-us.patch
+Patch0777: 0777-journal-remote-check-return-value-from-MHD_add_respo.patch
+Patch0778: 0778-journalctl-in-follow-mode-watch-stdout-for-POLLHUP-P.patch
+Patch0779: 0779-sd-bus-make-BUS_DEFAULT_TIMEOUT-configurable.patch
+Patch0780: 0780-fstab-generator-fix-debug-log.patch
+Patch0781: 0781-logind-session-dbus-allow-to-set-display-name-via-db.patch
+Patch0782: 0782-Allow-restart-for-oneshot-units.patch
+Patch0783: 0783-test-correct-TEST-41-StartLimitBurst-test.patch
+Patch0784: 0784-core-fix-assert-about-number-of-built-environment-va.patch
+Patch0785: 0785-core-add-one-more-assert.patch
+Patch0786: 0786-strv-introduce-strv_join_prefix.patch
+Patch0787: 0787-test-add-tests-for-strv_join_prefix.patch
+Patch0788: 0788-test-replace-swear-words-by-hoge.patch
+Patch0789: 0789-core-add-new-environment-variable-RUNTIME_DIRECTORY-.patch
+Patch0790: 0790-test-execute-add-tests-for-RUNTIME_DIRECTORY-or-frie.patch
+Patch0791: 0791-man-document-RUNTIME_DIRECTORY-or-friends.patch
+Patch0792: 0792-ci-bump-the-worker-Ubuntu-version-to-Jammy.patch
+Patch0793: 0793-test-make-test-execute-pass-on-Linux-5.15.patch
+Patch0794: 0794-ci-install-iputils.patch
+Patch0795: 0795-ci-Mergify-Add-ci-waived-logic.patch
+Patch0796: 0796-sd-event-don-t-invalidate-source-type-on-disconnect.patch
+Patch0797: 0797-tests-make-sure-we-delay-running-mount-start-jobs-wh.patch
+Patch0798: 0798-core-drop-references-to-StandardOutputFileToCreate.patch
+Patch0799: 0799-dbus-execute-fix-indentation.patch
+Patch0800: 0800-dbus-execute-generate-the-correct-transient-unit-set.patch
+Patch0801: 0801-bus-unit-util-properly-accept-StandardOutput-append-.patch
+Patch0802: 0802-core-be-more-careful-when-inheriting-stdout-fds-to-s.patch
+Patch0803: 0803-test-add-a-test-for-StandardError-file.patch
+Patch0804: 0804-tree-wide-allow-ASCII-fallback-for-in-logs.patch
+Patch0805: 0805-tree-wide-allow-ASCII-fallback-for-in-logs.patch
+Patch0806: 0806-core-allow-to-set-default-timeout-for-devices.patch
+Patch0807: 0807-man-document-DefaultDeviceTimeoutSec.patch
+Patch0808: 0808-Revert-core-Propagate-condition-failed-state-to-trig.patch
+Patch0809: 0809-core-Check-unit-start-rate-limiting-earlier.patch
+Patch0810: 0810-core-Add-trigger-limit-for-path-units.patch
+Patch0811: 0811-meson-add-syscall-names-update-target.patch
+Patch0812: 0812-syscall-names-add-process_madvise-which-is-planned-f.patch
+Patch0813: 0813-shared-add-known-syscall-list.patch
+Patch0814: 0814-generate-syscall-list-require-python3.patch
+Patch0815: 0815-shared-seccomp-reduce-scope-of-indexing-variables.patch
+Patch0816: 0816-shared-syscall-list-filter-out-some-obviously-platfo.patch
+Patch0817: 0817-seccomp-tighten-checking-of-seccomp-filter-creation.patch
+Patch0818: 0818-shared-seccomp-util-added-functionality-to-make-list.patch
+Patch0819: 0819-nspawn-return-ENOSYS-by-default-EPERM-for-known-call.patch
+Patch0820: 0820-test-procfs-util-skip-test-on-certain-errors.patch
+Patch0821: 0821-Try-stopping-MD-RAID-devices-in-shutdown-too.patch
+Patch0822: 0822-shutdown-get-only-active-md-arrays.patch
+Patch0823: 0823-scope-allow-unprivileged-delegation-on-scopes.patch
+Patch0824: 0824-resolved-pin-stream-while-calling-callbacks-for-it.patch
+Patch0825: 0825-ci-functions-Add-useradd-and-userdel.patch
+Patch0826: 0826-logind-optionally-watch-utmp-for-login-data.patch
+Patch0827: 0827-logind-add-hashtable-for-finding-session-by-leader-P.patch
+Patch0828: 0828-core-load-fragment-move-config_parse_sec_fix_0-to-sr.patch
+Patch0829: 0829-sd-event-add-relative-timer-calls.patch
+Patch0830: 0830-logind-add-option-to-stop-idle-sessions-after-specif.patch
+Patch0831: 0831-logind-schedule-idle-check-full-interval-from-now-if.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1318,7 +1378,7 @@ fi
 
 function mod_nss() {
     if [ -f "$1" ] ; then
-        # sed-fu to add myhostanme to hosts line
+        # sed-fu to add myhostname to hosts line
         grep -E -q '^hosts:.* myhostname' "$1" ||
         sed -i.bak -e '
                 /^hosts:/ !b
@@ -1335,14 +1395,14 @@ function mod_nss() {
 }
 
 FILE="$(readlink /etc/nsswitch.conf || echo /etc/nsswitch.conf)"
-mod_nss "$FILE"
-
-if [ "$FILE" = "/etc/authselect/user-nsswitch.conf" ] ; then
-        authselect apply-changes &> /dev/null
+if [ "$FILE" = "/etc/authselect/nsswitch.conf" ] && authselect check &>/dev/null; then
+        mod_nss "/etc/authselect/user-nsswitch.conf"
+        authselect apply-changes &> /dev/null || :
 else
-        # also apply the same changes to nsswitch.conf to affect
+        mod_nss "$FILE"
+        # also apply the same changes to user-nsswitch.conf to affect
         # possible future authselect configuration
-	mod_nss "/etc/authselect/user-nsswitch.conf"
+        mod_nss "/etc/authselect/user-nsswitch.conf"
 fi
 
 # check if nobody or nfsnobody is defined
@@ -1450,45 +1510,115 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
-* Wed Sep 21 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58.8
-- unit-name: tighten checks for building valid unit names (#2094712)
-- core: shorten long unit names that are based on paths and append path hash at the end (#2094712)
-- test: add extended test for triggering mount rate limit (#2094712)
-- tests: add test case for long unit names (#2094712)
-- Revert "core: Propagate condition failed state to triggering units." (#2123801)
-- core: Check unit start rate limiting earlier (#2123801)
-- core: Add trigger limit for path units (#2123801)
-- resolved: pin stream while calling callbacks for it (#2110548)
-- core: move reset_arguments() to the end of main's finish (#2127171)
+* Tue Sep 27 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-68
+- logind: optionally watch utmp for login data (#2122288)
+- logind: add hashtable for finding session by leader PID (#2122288)
+- core/load-fragment: move config_parse_sec_fix_0 to src/shared (#2122288)
+- sd-event: add relative timer calls (#2122288)
+- logind: add option to stop idle sessions after specified timeout (#2122288)
+- logind: schedule idle check full interval from now if we couldn't figure out atime timestamp (#2122288)
 
-* Thu Aug 25 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58.7
-- sd-event: don't invalidate source type on disconnect (#2116892)
+* Fri Aug 26 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-67
+- resolved: pin stream while calling callbacks for it (#2110549)
+- ci(functions): Add `useradd` and `userdel` (#2110549)
+
+* Thu Aug 25 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-66
+- Try stopping MD RAID devices in shutdown too (#1817706)
+- shutdown: get only active md arrays. (#1817706)
+- scope: allow unprivileged delegation on scopes (#2068575)
+
+* Fri Aug 19 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-65
 - test-procfs-util: skip test on certain errors (#2087152)
-- Try stopping MD RAID devices in shutdown too (#2120608)
-- shutdown: get only active md arrays. (#2120608)
 
-* Wed Aug 03 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58.4
-- resolved: pin stream while calling callbacks for it (#2110548)
+* Thu Aug 18 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-64
+- ci: bump the worker Ubuntu version to Jammy (#2087152)
+- test: make test-execute pass on Linux 5.15 (#2087152)
+- ci: install iputils (#2087152)
+- ci(Mergify): Add `ci-waived` logic (#2087152)
+- sd-event: don't invalidate source type on disconnect (#2115396)
+- tests: make sure we delay running mount start jobs when /p/s/mountinfo is rate limited (#2095744)
+- core: drop references to 'StandardOutputFileToCreate' (#2093479)
+- dbus-execute: fix indentation (#2093479)
+- dbus-execute: generate the correct transient unit setting (#2093479)
+- bus-unit-util: properly accept StandardOutput=append:… settings (#2093479)
+- core: be more careful when inheriting stdout fds to stderr (#2093479)
+- test: add a test for StandardError=file:… (#2093479)
+- tree-wide: allow ASCII fallback for → in logs (#2093479)
+- tree-wide: allow ASCII fallback for … in logs (#2093479)
+- core: allow to set default timeout for devices (#1967245)
+- man: document DefaultDeviceTimeoutSec= (#1967245)
+- Revert "core: Propagate condition failed state to triggering units." (#2114005)
+- core: Check unit start rate limiting earlier (#2114005)
+- core: Add trigger limit for path units (#2114005)
+- meson: add syscall-names-update target (#2040247)
+- syscall-names: add process_madvise which is planned for 5.10 (#2040247)
+- shared: add @known syscall list (#2040247)
+- generate-syscall-list: require python3 (#2040247)
+- shared/seccomp: reduce scope of indexing variables (#2040247)
+- shared/syscall-list: filter out some obviously platform-specific syscalls (#2040247)
+- seccomp: tighten checking of seccomp filter creation (#2040247)
+- shared/seccomp-util: added functionality to make list of filtred syscalls (#2040247)
+- nspawn: return ENOSYS by default, EPERM for "known" calls (#2040247)
+- revert: resolved: pin stream while calling callbacks for it (#2110549)
 
-* Thu Jun 23 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58.3
-- unit: check for mount rate limiting before checking active state (#2097336)
+* Wed Aug 03 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-63
+- resolved: pin stream while calling callbacks for it (#2110549)
 
-* Thu Jun 09 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58.2
-- unit: don't emit PropertiesChanged signal if adding a dependency to a unit is a no-op (#2091590)
-- core: propagate triggered unit in more load states (#2086553)
-- core: propagate unit start limit hit state to triggering path unit (#2086553)
-- core: Move 'r' variable declaration to start of unit_start() (#2086553)
-- core: Delay start rate limit check when starting a unit (#2086553)
-- core: Propagate condition failed state to triggering units. (#2086553)
+* Mon Jul 18 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-62
+- spec: Remove dependency on timedatex (#2066946)
 
-* Wed May 11 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58.1
-- acpi-fpdt: mark structures as packed (#2084052)
-- core/slice: make slice_freezer_action() return 0 if freezing state is unchanged (#2084052)
-- core/unit: fix use-after-free (#2084052)
-- sd-bus: fix reference counter to be incremented (#2084052)
-- sd-bus: do not read unused value (#2084052)
-- sd-bus: do not return negative errno when unknown name is specified (#2084052)
-- sd-bus: switch to a manual overflow check in sd_bus_track_add_name() (#2084052)
+* Thu Jul 14 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-61
+- mkosi: Add gnutls package (#2101227)
+- unit-name: tighten checks for building valid unit names (#1940973)
+- core: shorten long unit names that are based on paths and append path hash at the end (#1940973)
+- test: add extended test for triggering mount rate limit (#1940973)
+- tests: add test case for long unit names (#1940973)
+- core: unset HOME=/ that the kernel gives us (#2056527)
+- journal-remote: check return value from MHD_add_response_header (#2051981)
+- journalctl: in --follow mode watch stdout for POLLHUP/POLLERR and exit (#2003236)
+- sd-bus: make BUS_DEFAULT_TIMEOUT configurable (#2039461)
+- fstab-generator: fix debug log (#2101433)
+- logind-session-dbus: allow to set display name via dbus (#1857969)
+- Allow restart for oneshot units (#2042896)
+- test: correct TEST-41 StartLimitBurst test (#2042896)
+- core: fix assert() about number of built environment variables (#2049788)
+- core: add one more assert() (#2049788)
+- strv: introduce strv_join_prefix() (#2049788)
+- test: add tests for strv_join_prefix() (#2049788)
+- test: replace swear words by 'hoge' (#2049788)
+- core: add new environment variable $RUNTIME_DIRECTORY= or friends (#2049788)
+- test-execute: add tests for $RUNTIME_DIRECTORY= or friends (#2049788)
+- man: document RUNTIME_DIRECTORY= or friends (#2049788)
+
+* Thu Jun 23 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-60
+- unit: don't emit PropertiesChanged signal if adding a dependency to a unit is a no-op (#1948480)
+- tests: make inverted tests actually count (#2087152)
+- TEST-*: make failure tests actually fail on failure (#2087152)
+- ci(Mergify): configuration update (#2087152)
+- core: propagate triggered unit in more load states (#2065322)
+- core: propagate unit start limit hit state to triggering path unit (#2065322)
+- core: Move 'r' variable declaration to start of unit_start() (#2065322)
+- core: Delay start rate limit check when starting a unit (#2065322)
+- core: Propagate condition failed state to triggering units. (#2065322)
+- unit: check for mount rate limiting before checking active state (#2095744)
+
+* Wed May 18 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-59
+- core: disallow using '-.service' as a service name (#2051520)
+- shared/dropin: support -.service.d/ top level drop-in for service units (#2051520)
+- core: change top-level drop-in from -.service.d to service.d (#2051520)
+- shared/dropin: fix assert for invalid drop-in (#2051520)
+- udev: fix slot based network names on s390 (#1939914)
+- udev: it is not necessary that the path is readable (#1939914)
+- udev: allow onboard index up to 65535 (#1939914)
+- Revert "basic: use comma as separator in cpuset cgroup cpu ranges" (#1858220)
+- acpi-fpdt: mark structures as packed (#2047373)
+- core/slice: make slice_freezer_action() return 0 if freezing state is unchanged (#2047373)
+- core/unit: fix use-after-free (#2047373)
+- sd-bus: fix reference counter to be incremented (#2047373)
+- sd-bus: do not read unused value (#2047373)
+- sd-bus: do not return negative errno when unknown name is specified (#2047373)
+- sd-bus: switch to a manual overflow check in sd_bus_track_add_name() (#2047373)
+- spec: Add dependency on timedatex (#2066946)
 
 * Tue Feb 08 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-58
 - ci: drop CentOS 8 CI (#2017033)
