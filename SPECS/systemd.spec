@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        68%{?dist}
+Release:        69%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -881,6 +881,13 @@ Patch0828: 0828-core-load-fragment-move-config_parse_sec_fix_0-to-sr.patch
 Patch0829: 0829-sd-event-add-relative-timer-calls.patch
 Patch0830: 0830-logind-add-option-to-stop-idle-sessions-after-specif.patch
 Patch0831: 0831-logind-schedule-idle-check-full-interval-from-now-if.patch
+Patch0832: 0832-ci-lint-add-shell-linter-Differential-ShellCheck.patch
+Patch0833: 0833-meson-do-not-compare-objects-of-different-types.patch
+Patch0834: 0834-journal-remote-use-MHD_HTTP_CONTENT_TOO_LARGE-as-MHD.patch
+Patch0835: 0835-Fix-build-with-httpd-0.9.71.patch
+Patch0836: 0836-ci-replace-LGTM-with-CodeQL.patch
+Patch0837: 0837-ci-mergify-Update-policy-Drop-LGTM-checks.patch
+Patch0838: 0838-time-util-fix-buffer-over-run.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1510,13 +1517,20 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
-* Tue Sep 27 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-68
+* Tue Nov 08 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-69
 - logind: optionally watch utmp for login data (#2122288)
 - logind: add hashtable for finding session by leader PID (#2122288)
 - core/load-fragment: move config_parse_sec_fix_0 to src/shared (#2122288)
 - sd-event: add relative timer calls (#2122288)
 - logind: add option to stop idle sessions after specified timeout (#2122288)
 - logind: schedule idle check full interval from now if we couldn't figure out atime timestamp (#2122288)
+- ci(lint): add shell linter - Differential ShellCheck (#2122499)
+- meson: do not compare objects of different types (#2122499)
+- journal-remote: use MHD_HTTP_CONTENT_TOO_LARGE as MHD_HTTP_PAYLOAD_TOO_LARGE is deprecated since 0.9.74 (#2122499)
+- Fix build with µhttpd 0.9.71 (#2122499)
+- ci: replace LGTM with CodeQL (#2122499)
+- ci(mergify): Update policy - Drop LGTM checks (#2122499)
+- time-util: fix buffer-over-run (#2139391)
 
 * Fri Aug 26 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-67
 - resolved: pin stream while calling callbacks for it (#2110549)
