@@ -4,9 +4,9 @@
 %global stable 1
 
 %if 0%{?facebook}
-%global hs_commit 6f34e02bc885d5bf248eac0914e4605380ef82c9
+%global hs_commit 5a240fdebea1f6b24cb9b15cd1e5c19c851ce1fa
 %else
-%global hs_commit ab2623c42b43d997d5ccd1d3f1f7a224b09245d8
+%global hs_commit ebdc7d8d718bc0aa48f18a2517ed209271a319b1
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -43,7 +43,7 @@ Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
 Version:        252.4
-Release:        598.6%{?dist}
+Release:        598.7%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -85,6 +85,7 @@ Source24:       sysusers.generate-pre.sh
 Source100:      Makefile.selinux
 Source101:      systemd_hs.te
 Source102:      systemd_hs.if
+Source103:      systemd_hs.fc
 
 %if 0
 GIT_DIR=../../src/systemd/.git git format-patch-ab --no-signature -M -N v235..v235-stable
@@ -527,7 +528,7 @@ runs properly under an environment with SELinux enabled.
 
 %if %{with selinux}
 mkdir selinux
-cp %SOURCE100 %SOURCE101 %SOURCE102 selinux
+cp %SOURCE100 %SOURCE101 %SOURCE102 %SOURCE103 selinux
 %endif
 
 %build
@@ -1154,6 +1155,10 @@ fi
 %endif
 
 %changelog
+
+* Wed Jan 04 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 252.4-598.7
+- Backport udev rules fix
+- Fix selinux module
 
 * Wed Jan 04 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 252.4-598.6
 - Bump release for 252.4
