@@ -18,6 +18,7 @@ def files(root):
 
 o_libs = open('.file-list-libs', 'w')
 o_udev = open('.file-list-udev', 'w')
+o_boot = open('.file-list-boot', 'w')
 o_pam = open('.file-list-pam', 'w')
 o_rpm_macros = open('.file-list-rpm-macros', 'w')
 o_devel = open('.file-list-devel', 'w')
@@ -133,8 +134,10 @@ for file in files(buildroot):
                        integritysetup|
                        integritytab|
                        remount-fs|
+                       /initrd|
+                       systemd-pcrphase|
+                       systemd-measure|
                        /boot$|
-                       /boot/efi|
                        /kernel/|
                        /kernel$|
                        /modprobe.d|
@@ -147,6 +150,9 @@ for file in files(buildroot):
                        # they can be used to interact with remote daemons. Also, the user could be
                        # confused if those user-facing binaries are not available.
         o = o_udev
+
+    elif re.search(r'''/boot/efi''', n, re.X):
+        o = o_boot
 
     elif re.search(r'''resolved|resolve1|
                        systemd-resolve|
