@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        68%{?dist}
+Release:        68%{?dist}.1
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -881,6 +881,8 @@ Patch0828: 0828-core-load-fragment-move-config_parse_sec_fix_0-to-sr.patch
 Patch0829: 0829-sd-event-add-relative-timer-calls.patch
 Patch0830: 0830-logind-add-option-to-stop-idle-sessions-after-specif.patch
 Patch0831: 0831-logind-schedule-idle-check-full-interval-from-now-if.patch
+Patch0832: 0832-time-util-fix-buffer-over-run.patch
+Patch0833: 0833-core-move-reset_arguments-to-the-end-of-main-s-finis.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1510,6 +1512,10 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Mon Nov 07 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-68.1
+- time-util: fix buffer-over-run (#2139390)
+- core: move reset_arguments() to the end of main's finish (#2127170)
+
 * Tue Sep 27 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-68
 - logind: optionally watch utmp for login data (#2122288)
 - logind: add hashtable for finding session by leader PID (#2122288)
