@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        69%{?dist}
+Release:        70%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -888,6 +888,21 @@ Patch0835: 0835-Fix-build-with-httpd-0.9.71.patch
 Patch0836: 0836-ci-replace-LGTM-with-CodeQL.patch
 Patch0837: 0837-ci-mergify-Update-policy-Drop-LGTM-checks.patch
 Patch0838: 0838-time-util-fix-buffer-over-run.patch
+Patch0839: 0839-basic-recognize-pdfs-filesystem-as-a-network-filesys.patch
+Patch0840: 0840-core-move-reset_arguments-to-the-end-of-main-s-finis.patch
+Patch0841: 0841-manager-move-inc.-of-n_reloading-into-a-function.patch
+Patch0842: 0842-core-Add-new-DBUS-properties-UnitsReloadStartTimesta.patch
+Patch0843: 0843-core-Indicate-the-time-when-the-manager-started-load.patch
+Patch0844: 0844-core-do-not-touch-run-systemd-systemd-units-load-fro.patch
+Patch0845: 0845-sysctl-downgrade-message-when-we-have-no-permission.patch
+Patch0846: 0846-core-respect-SELinuxContext-for-socket-creation.patch
+Patch0847: 0847-manager-use-target-process-context-to-set-socket-con.patch
+Patch0848: 0848-virt-detect-Amazon-EC2-Nitro-instance.patch
+Patch0849: 0849-machine-id-setup-generate-machine-id-from-DMI-produc.patch
+Patch0850: 0850-virt-use-string-table-to-detect-VM-or-container.patch
+Patch0851: 0851-fileio-introduce-read_full_virtual_file-for-reading-.patch
+Patch0852: 0852-Use-BIOS-characteristics-to-distinguish-EC2-bare-met.patch
+Patch0853: 0853-device-drop-refuse_after.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1517,6 +1532,23 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Mon Jan 16 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-70
+- basic: recognize pdfs filesystem as a network filesystem (#2094661)
+- core: move reset_arguments() to the end of main's finish (#2127131)
+- manager: move inc. of n_reloading into a function (#2136869)
+- core: Add new DBUS properties UnitsReloadStartTimestamp and UnitsLoadTimestampMontonic (#2136869)
+- core: Indicate the time when the manager started loading units the last time (#2136869)
+- core: do not touch /run/systemd/systemd-units-load from user session instances (#2136869)
+- sysctl: downgrade message when we have no permission (#2158160)
+- core: respect SELinuxContext= for socket creation (#2136738)
+- manager: use target process context to set socket context (#2136738)
+- virt: detect Amazon EC2 Nitro instance (#2117948)
+- machine-id-setup: generate machine-id from DMI product ID on Amazon EC2 (#2117948)
+- virt: use string table to detect VM or container (#2117948)
+- fileio: introduce read_full_virtual_file() for reading virtual files in sysfs, procfs (#2117948)
+- Use BIOS characteristics to distinguish EC2 bare-metal from VMs (#2117948)
+- device: drop refuse_after (#2043524)
+
 * Tue Nov 08 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-69
 - logind: optionally watch utmp for login data (#2122288)
 - logind: add hashtable for finding session by leader PID (#2122288)
