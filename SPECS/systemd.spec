@@ -21,7 +21,7 @@
 Name:           systemd
 Url:            https://www.freedesktop.org/wiki/Software/systemd
 Version:        250
-Release:        12%{?dist}
+Release:        12%{?dist}.1
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -429,6 +429,7 @@ Patch0348: 0348-test-terminate-session-and-user-on-cleanup.patch
 Patch0349: 0349-test-do-not-restart-getty-tty2-automatically.patch
 Patch0350: 0350-tests-add-test-for-StopIdleSessionSec-option.patch
 Patch0351: 0351-logind-schedule-idle-check-full-interval-from-now-if.patch
+Patch0352: 0352-time-util-fix-buffer-over-run.patch
 
 # Downstream-only patches (9000–9999)
 
@@ -1210,6 +1211,9 @@ getent passwd systemd-oom &>/dev/null || useradd -r -l -g systemd-oom -d / -s /s
 %files standalone-sysusers -f .file-list-standalone-sysusers
 
 %changelog
+* Mon Nov 07 2022 systemd maintenance team <systemd-maint@redhat.com> - 250-12.1
+- time-util: fix buffer-over-run (#2139388)
+
 * Fri Sep 23 2022 systemd maintenance team <systemd-maint@redhat.com> - 250-12
 - core/load-fragment: move config_parse_sec_fix_0 to src/shared (#2100464)
 - logind: add option to stop idle sessions after specified timeout (#2100464)
