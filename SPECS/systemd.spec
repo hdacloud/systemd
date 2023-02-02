@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        70%{?dist}
+Release:        71%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -903,6 +903,15 @@ Patch0850: 0850-virt-use-string-table-to-detect-VM-or-container.patch
 Patch0851: 0851-fileio-introduce-read_full_virtual_file-for-reading-.patch
 Patch0852: 0852-Use-BIOS-characteristics-to-distinguish-EC2-bare-met.patch
 Patch0853: 0853-device-drop-refuse_after.patch
+Patch0854: 0854-manager-limit-access-to-private-dbus-socket.patch
+Patch0855: 0855-journalctl-do-not-treat-EINTR-as-an-error-when-waiti.patch
+Patch0856: 0856-core-bring-manager_startup-and-manager_reload-more-i.patch
+Patch0857: 0857-pam-add-a-call-to-pam_namespace.patch
+Patch0858: 0858-virt-Support-detection-for-ARM64-Hyper-V-guests.patch
+Patch0859: 0859-virt-Fix-the-detection-for-Hyper-V-VMs.patch
+Patch0860: 0860-basic-add-STRERROR-wrapper-for-strerror_r.patch
+Patch0861: 0861-coredump-put-context-array-into-a-struct.patch
+Patch0862: 0862-coredump-do-not-allow-user-to-access-coredumps-with-.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1532,6 +1541,17 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Tue Jan 31 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-71
+- manager: limit access to private dbus socket (#2119405)
+- journalctl: do not treat EINTR as an error when waiting for events (#2161683)
+- core: bring manager_startup() and manager_reload() more inline (#2059633)
+- pam: add a call to pam_namespace (#1861836)
+- virt: Support detection for ARM64 Hyper-V guests (#2158307)
+- virt: Fix the detection for Hyper-V VMs (#2158307)
+- basic: add STRERROR() wrapper for strerror_r() (#2155520)
+- coredump: put context array into a struct (#2155520)
+- coredump: do not allow user to access coredumps with changed uid/gid/capabilities (#2155520)
+
 * Mon Jan 16 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-70
 - basic: recognize pdfs filesystem as a network filesystem (#2094661)
 - core: move reset_arguments() to the end of main's finish (#2127131)
