@@ -43,7 +43,7 @@ Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
 Version:        252.4
-Release:        598.8%{?dist}
+Release:        598.9%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -1155,6 +1155,9 @@ fi
 %endif
 
 %changelog
+
+* Fri Feb 17 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 252.4-598.9
+- Fix selinux unsupported directive on centos stream 8
 
 * Fri Feb 17 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 252.4-598.8
 - Fix changelog
