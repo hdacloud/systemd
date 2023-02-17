@@ -46,7 +46,7 @@ allow syslogd_t user_tmp_t:dir search;
 allow systemd_machined_t init_var_run_t:sock_file manage_sock_file_perms;
 
 #============= systemd_networkd_t ==============
-allow systemd_networkd_t system_dbusd_var_run_t:sock_file watch;
+allow systemd_networkd_t system_dbusd_var_run_t:sock_file *;
 
 selinux_use_status_page(init_t)
 selinux_use_status_page(systemd_hostnamed_t)
