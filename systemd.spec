@@ -43,7 +43,7 @@ Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
 Version:        252.4
-Release:        598.7%{?dist}
+Release:        598.8%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -1156,7 +1156,10 @@ fi
 
 %changelog
 
-* Wed Jan 04 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 252.4-598.7
+* Fri Feb 17 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 252.4-598.8
+- Fix changelog
+
+* Fri Feb 17 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 252.4-598.7
 - Backport udev rules fix
 - Fix selinux module
 
