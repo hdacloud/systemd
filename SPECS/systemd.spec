@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        71%{?dist}
+Release:        72%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -912,6 +912,16 @@ Patch0859: 0859-virt-Fix-the-detection-for-Hyper-V-VMs.patch
 Patch0860: 0860-basic-add-STRERROR-wrapper-for-strerror_r.patch
 Patch0861: 0861-coredump-put-context-array-into-a-struct.patch
 Patch0862: 0862-coredump-do-not-allow-user-to-access-coredumps-with-.patch
+Patch0863: 0863-logind-remember-our-idle-state-and-use-it-to-detect-.patch
+Patch0864: 0864-test-import-logind-test-from-debian-ubuntu-test-suit.patch
+Patch0865: 0865-test-introduce-inst_recursive-helper-function.patch
+Patch0866: 0866-tests-verify-that-Lock-D-Bus-signal-is-sent-when-Idl.patch
+Patch0867: 0867-systemctl-simplify-halt_main.patch
+Patch0868: 0868-systemctl-shutdown-don-t-fallback-on-auth-fail.patch
+Patch0869: 0869-systemctl-reintroduce-the-original-halt_main.patch
+Patch0870: 0870-systemctl-preserve-old-behavior-unless-requested.patch
+Patch0871: 0871-pam_systemd-suppress-LOG_DEBUG-log-messages-if-debug.patch
+Patch0872: 0872-udev-net_id-introduce-naming-scheme-for-RHEL-8.8.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1541,6 +1551,18 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Fri Feb 17 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-72
+- test: import logind test from debian/ubuntu test suite (#1866955)
+- test: introduce inst_recursive() helper function (#1866955)
+- tests: verify that Lock D-Bus signal is sent when IdleAction=lock (#1866955)
+- systemctl: simplify halt_main() (#2053273)
+- systemctl: shutdown don't fallback on auth fail (#2053273)
+- systemctl: reintroduce the original halt_main() (#2053273)
+- systemctl: preserve old behavior unless requested (#2053273)
+- pam_systemd: suppress LOG_DEBUG log messages if debugging is off (#2170084)
+- udev/net_id: introduce naming scheme for RHEL-8.8 (#2170499)
+- pam: add a call to pam_namespace (#1861836)
+
 * Tue Jan 31 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-71
 - manager: limit access to private dbus socket (#2119405)
 - journalctl: do not treat EINTR as an error when waiting for events (#2161683)
