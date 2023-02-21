@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        68%{?dist}.2
+Release:        68%{?dist}.4
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -884,6 +884,10 @@ Patch0831: 0831-logind-schedule-idle-check-full-interval-from-now-if.patch
 Patch0832: 0832-time-util-fix-buffer-over-run.patch
 Patch0833: 0833-core-move-reset_arguments-to-the-end-of-main-s-finis.patch
 Patch0834: 0834-basic-recognize-pdfs-filesystem-as-a-network-filesys.patch
+Patch0835: 0835-core-bring-manager_startup-and-manager_reload-more-i.patch
+Patch0836: 0836-basic-add-STRERROR-wrapper-for-strerror_r.patch
+Patch0837: 0837-coredump-put-context-array-into-a-struct.patch
+Patch0838: 0838-coredump-do-not-allow-user-to-access-coredumps-with-.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1513,6 +1517,14 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Mon Jan 30 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-68.4
+- basic: add STRERROR() wrapper for strerror_r() (#2155519)
+- coredump: put context array into a struct (#2155519)
+- coredump: do not allow user to access coredumps with changed uid/gid/capabilities (#2155519)
+
+* Fri Jan 27 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-68.3
+- core: bring manager_startup() and manager_reload() more inline (#2164049)
+
 * Mon Nov 21 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-68.2
 - basic: recognize pdfs filesystem as a network filesystem (#2143100)
 
