@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        72%{?dist}
+Release:        73%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -922,6 +922,35 @@ Patch0869: 0869-systemctl-reintroduce-the-original-halt_main.patch
 Patch0870: 0870-systemctl-preserve-old-behavior-unless-requested.patch
 Patch0871: 0871-pam_systemd-suppress-LOG_DEBUG-log-messages-if-debug.patch
 Patch0872: 0872-udev-net_id-introduce-naming-scheme-for-RHEL-8.8.patch
+Patch0873: 0873-journald-add-API-to-move-logging-from-var-to-run-aga.patch
+Patch0874: 0874-journalctl-add-new-relinquish-and-smart-relinquish-o.patch
+Patch0875: 0875-units-automatically-revert-to-run-logging-on-shutdow.patch
+Patch0876: 0876-pstore-Tool-to-archive-contents-of-pstore.patch
+Patch0877: 0877-meson-drop-redundant-line.patch
+Patch0878: 0878-pstore-drop-unnecessary-initializations.patch
+Patch0879: 0879-pstopre-fix-return-value-of-list_files.patch
+Patch0880: 0880-pstore-remove-temporary-file-on-failure.patch
+Patch0881: 0881-pstore-do-not-add-FILE-journal-entry-if-content_size.patch
+Patch0882: 0882-pstore-run-only-when-sys-fs-pstore-is-not-empty.patch
+Patch0883: 0883-pstore-fix-use-after-free.patch
+Patch0884: 0884-pstore-refuse-to-run-if-arguments-are-specified.patch
+Patch0885: 0885-pstore-allow-specifying-src-and-dst-dirs-are-argumen.patch
+Patch0886: 0886-pstore-rework-memory-handling-for-dmesg.patch
+Patch0887: 0887-pstore-fixes-for-dmesg.txt-reconstruction.patch
+Patch0888: 0888-pstore-Don-t-start-systemd-pstore.service-in-contain.patch
+Patch0889: 0889-units-pull-in-systemd-pstore.service-from-sysinit.ta.patch
+Patch0890: 0890-units-drop-dependency-on-systemd-remount-fs.service-.patch
+Patch0891: 0891-units-make-sure-systemd-pstore-stops-at-shutdown.patch
+Patch0892: 0892-pstore-Run-after-modules-are-loaded.patch
+Patch0893: 0893-pstore-do-not-try-to-load-all-known-pstore-modules.patch
+Patch0894: 0894-logind-session-make-stopping-of-idle-session-visible.patch
+Patch0895: 0895-journald-Increase-stdout-buffer-size-sooner-when-alm.patch
+Patch0896: 0896-journald-rework-end-of-line-marker-handling-to-use-a.patch
+Patch0897: 0897-journald-use-the-fact-that-client_context_release-re.patch
+Patch0898: 0898-journald-rework-pid-change-handling.patch
+Patch0899: 0899-test-Add-a-test-case-for-15654.patch
+Patch0900: 0900-test-Stricter-test-case-for-15654-Add-more-checks.patch
+Patch0901: 0901-man-document-the-new-_LINE_BREAK-type.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1339,7 +1368,8 @@ python3 %{SOURCE2} %buildroot <<EOF
 EOF
 
 %check
-%meson_test
+# Add --num-processes 1 as workaround for issues on ppc64le - AttributeError: 'NoneType' object has no attribute '_add_reader' - https://github.com/python/cpython/issues/82200
+%meson_test --num-processes 1
 
 #############################################################################################
 
@@ -1551,6 +1581,37 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Mon Feb 27 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-73
+- journald: add API to move logging from /var to /run again (#1873540)
+- journalctl: add new --relinquish and --smart-relinquish options (#1873540)
+- units: automatically revert to /run logging on shutdown if necessary (#1873540)
+- pstore: Tool to archive contents of pstore (#2158832)
+- meson: drop redundant line (#2158832)
+- pstore: drop unnecessary initializations (#2158832)
+- pstopre: fix return value of list_files() (#2158832)
+- pstore: remove temporary file on failure (#2158832)
+- pstore: do not add FILE= journal entry if content_size == 0 (#2158832)
+- pstore: run only when /sys/fs/pstore is not empty (#2158832)
+- pstore: fix use after free (#2158832)
+- pstore: refuse to run if arguments are specified (#2158832)
+- pstore: allow specifying src and dst dirs are arguments (#2158832)
+- pstore: rework memory handling for dmesg (#2158832)
+- pstore: fixes for dmesg.txt reconstruction (#2158832)
+- pstore: Don't start systemd-pstore.service in containers (#2158832)
+- units: pull in systemd-pstore.service from sysinit.target (#2158832)
+- units: drop dependency on systemd-remount-fs.service from systemd-pstore.service (#2158832)
+- units: make sure systemd-pstore stops at shutdown (#2158832)
+- pstore: Run after modules are loaded (#2158832)
+- pstore: do not try to load all known pstore modules (#2158832)
+- logind-session: make stopping of idle session visible to admins (#2156780)
+- journald: Increase stdout buffer size sooner, when almost full (#2029426)
+- journald: rework end of line marker handling to use a field table (#2029426)
+- journald: use the fact that client_context_release() returns NULL (#2029426)
+- journald: rework pid change handling (#2029426)
+- test: Add a test case for #15654 (#2029426)
+- test: Stricter test case for #15654 (Add more checks) (#2029426)
+- man: document the new _LINE_BREAK= type (#2029426)
+
 * Fri Feb 17 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-72
 - test: import logind test from debian/ubuntu test suite (#1866955)
 - test: introduce inst_recursive() helper function (#1866955)
