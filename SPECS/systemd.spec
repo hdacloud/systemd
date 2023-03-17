@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        73%{?dist}
+Release:        74%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -951,6 +951,9 @@ Patch0898: 0898-journald-rework-pid-change-handling.patch
 Patch0899: 0899-test-Add-a-test-case-for-15654.patch
 Patch0900: 0900-test-Stricter-test-case-for-15654-Add-more-checks.patch
 Patch0901: 0901-man-document-the-new-_LINE_BREAK-type.patch
+Patch0902: 0902-journald-server-always-create-state-file-in-signal-h.patch
+Patch0903: 0903-journald-server-move-relinquish-code-into-function.patch
+Patch0904: 0904-journald-server-always-touch-state-file-in-signal-ha.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1581,6 +1584,11 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Tue Mar 14 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-74
+- journald-server: always create state file in signal handler (#2174645)
+- journald-server: move relinquish code into function (#2174645)
+- journald-server: always touch state file in signal handler (#2174645)
+
 * Mon Feb 27 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-73
 - journald: add API to move logging from /var to /run again (#1873540)
 - journalctl: add new --relinquish and --smart-relinquish options (#1873540)
