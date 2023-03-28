@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        67%{?dist}
+Release:        72%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -875,6 +875,53 @@ Patch0822: 0822-shutdown-get-only-active-md-arrays.patch
 Patch0823: 0823-scope-allow-unprivileged-delegation-on-scopes.patch
 Patch0824: 0824-resolved-pin-stream-while-calling-callbacks-for-it.patch
 Patch0825: 0825-ci-functions-Add-useradd-and-userdel.patch
+Patch0826: 0826-logind-optionally-watch-utmp-for-login-data.patch
+Patch0827: 0827-logind-add-hashtable-for-finding-session-by-leader-P.patch
+Patch0828: 0828-core-load-fragment-move-config_parse_sec_fix_0-to-sr.patch
+Patch0829: 0829-sd-event-add-relative-timer-calls.patch
+Patch0830: 0830-logind-add-option-to-stop-idle-sessions-after-specif.patch
+Patch0831: 0831-logind-schedule-idle-check-full-interval-from-now-if.patch
+Patch0832: 0832-ci-lint-add-shell-linter-Differential-ShellCheck.patch
+Patch0833: 0833-meson-do-not-compare-objects-of-different-types.patch
+Patch0834: 0834-journal-remote-use-MHD_HTTP_CONTENT_TOO_LARGE-as-MHD.patch
+Patch0835: 0835-Fix-build-with-httpd-0.9.71.patch
+Patch0836: 0836-ci-replace-LGTM-with-CodeQL.patch
+Patch0837: 0837-ci-mergify-Update-policy-Drop-LGTM-checks.patch
+Patch0838: 0838-time-util-fix-buffer-over-run.patch
+Patch0839: 0839-basic-recognize-pdfs-filesystem-as-a-network-filesys.patch
+Patch0840: 0840-core-move-reset_arguments-to-the-end-of-main-s-finis.patch
+Patch0841: 0841-manager-move-inc.-of-n_reloading-into-a-function.patch
+Patch0842: 0842-core-Add-new-DBUS-properties-UnitsReloadStartTimesta.patch
+Patch0843: 0843-core-Indicate-the-time-when-the-manager-started-load.patch
+Patch0844: 0844-core-do-not-touch-run-systemd-systemd-units-load-fro.patch
+Patch0845: 0845-sysctl-downgrade-message-when-we-have-no-permission.patch
+Patch0846: 0846-core-respect-SELinuxContext-for-socket-creation.patch
+Patch0847: 0847-manager-use-target-process-context-to-set-socket-con.patch
+Patch0848: 0848-virt-detect-Amazon-EC2-Nitro-instance.patch
+Patch0849: 0849-machine-id-setup-generate-machine-id-from-DMI-produc.patch
+Patch0850: 0850-virt-use-string-table-to-detect-VM-or-container.patch
+Patch0851: 0851-fileio-introduce-read_full_virtual_file-for-reading-.patch
+Patch0852: 0852-Use-BIOS-characteristics-to-distinguish-EC2-bare-met.patch
+Patch0853: 0853-device-drop-refuse_after.patch
+Patch0854: 0854-manager-limit-access-to-private-dbus-socket.patch
+Patch0855: 0855-journalctl-do-not-treat-EINTR-as-an-error-when-waiti.patch
+Patch0856: 0856-core-bring-manager_startup-and-manager_reload-more-i.patch
+Patch0857: 0857-pam-add-a-call-to-pam_namespace.patch
+Patch0858: 0858-virt-Support-detection-for-ARM64-Hyper-V-guests.patch
+Patch0859: 0859-virt-Fix-the-detection-for-Hyper-V-VMs.patch
+Patch0860: 0860-basic-add-STRERROR-wrapper-for-strerror_r.patch
+Patch0861: 0861-coredump-put-context-array-into-a-struct.patch
+Patch0862: 0862-coredump-do-not-allow-user-to-access-coredumps-with-.patch
+Patch0863: 0863-logind-remember-our-idle-state-and-use-it-to-detect-.patch
+Patch0864: 0864-test-import-logind-test-from-debian-ubuntu-test-suit.patch
+Patch0865: 0865-test-introduce-inst_recursive-helper-function.patch
+Patch0866: 0866-tests-verify-that-Lock-D-Bus-signal-is-sent-when-Idl.patch
+Patch0867: 0867-systemctl-simplify-halt_main.patch
+Patch0868: 0868-systemctl-shutdown-don-t-fallback-on-auth-fail.patch
+Patch0869: 0869-systemctl-reintroduce-the-original-halt_main.patch
+Patch0870: 0870-systemctl-preserve-old-behavior-unless-requested.patch
+Patch0871: 0871-pam_systemd-suppress-LOG_DEBUG-log-messages-if-debug.patch
+Patch0872: 0872-udev-net_id-introduce-naming-scheme-for-RHEL-8.8.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1504,6 +1551,61 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
+* Fri Feb 17 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-72
+- test: import logind test from debian/ubuntu test suite (#1866955)
+- test: introduce inst_recursive() helper function (#1866955)
+- tests: verify that Lock D-Bus signal is sent when IdleAction=lock (#1866955)
+- systemctl: simplify halt_main() (#2053273)
+- systemctl: shutdown don't fallback on auth fail (#2053273)
+- systemctl: reintroduce the original halt_main() (#2053273)
+- systemctl: preserve old behavior unless requested (#2053273)
+- pam_systemd: suppress LOG_DEBUG log messages if debugging is off (#2170084)
+- udev/net_id: introduce naming scheme for RHEL-8.8 (#2170499)
+- pam: add a call to pam_namespace (#1861836)
+
+* Tue Jan 31 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-71
+- manager: limit access to private dbus socket (#2119405)
+- journalctl: do not treat EINTR as an error when waiting for events (#2161683)
+- core: bring manager_startup() and manager_reload() more inline (#2059633)
+- pam: add a call to pam_namespace (#1861836)
+- virt: Support detection for ARM64 Hyper-V guests (#2158307)
+- virt: Fix the detection for Hyper-V VMs (#2158307)
+- basic: add STRERROR() wrapper for strerror_r() (#2155520)
+- coredump: put context array into a struct (#2155520)
+- coredump: do not allow user to access coredumps with changed uid/gid/capabilities (#2155520)
+
+* Mon Jan 16 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-70
+- basic: recognize pdfs filesystem as a network filesystem (#2094661)
+- core: move reset_arguments() to the end of main's finish (#2127131)
+- manager: move inc. of n_reloading into a function (#2136869)
+- core: Add new DBUS properties UnitsReloadStartTimestamp and UnitsLoadTimestampMontonic (#2136869)
+- core: Indicate the time when the manager started loading units the last time (#2136869)
+- core: do not touch /run/systemd/systemd-units-load from user session instances (#2136869)
+- sysctl: downgrade message when we have no permission (#2158160)
+- core: respect SELinuxContext= for socket creation (#2136738)
+- manager: use target process context to set socket context (#2136738)
+- virt: detect Amazon EC2 Nitro instance (#2117948)
+- machine-id-setup: generate machine-id from DMI product ID on Amazon EC2 (#2117948)
+- virt: use string table to detect VM or container (#2117948)
+- fileio: introduce read_full_virtual_file() for reading virtual files in sysfs, procfs (#2117948)
+- Use BIOS characteristics to distinguish EC2 bare-metal from VMs (#2117948)
+- device: drop refuse_after (#2043524)
+
+* Tue Nov 08 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-69
+- logind: optionally watch utmp for login data (#2122288)
+- logind: add hashtable for finding session by leader PID (#2122288)
+- core/load-fragment: move config_parse_sec_fix_0 to src/shared (#2122288)
+- sd-event: add relative timer calls (#2122288)
+- logind: add option to stop idle sessions after specified timeout (#2122288)
+- logind: schedule idle check full interval from now if we couldn't figure out atime timestamp (#2122288)
+- ci(lint): add shell linter - Differential ShellCheck (#2122499)
+- meson: do not compare objects of different types (#2122499)
+- journal-remote: use MHD_HTTP_CONTENT_TOO_LARGE as MHD_HTTP_PAYLOAD_TOO_LARGE is deprecated since 0.9.74 (#2122499)
+- Fix build with µhttpd 0.9.71 (#2122499)
+- ci: replace LGTM with CodeQL (#2122499)
+- ci(mergify): Update policy - Drop LGTM checks (#2122499)
+- time-util: fix buffer-over-run (#2139391)
+
 * Fri Aug 26 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-67
 - resolved: pin stream while calling callbacks for it (#2110549)
 - ci(functions): Add `useradd` and `userdel` (#2110549)
