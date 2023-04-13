@@ -4,7 +4,7 @@
 %global stable 1
 
 %if 0%{?facebook}
-%global hs_commit 5a240fdebea1f6b24cb9b15cd1e5c19c851ce1fa
+%global hs_commit b503711a2569ce76e6a735a5ea15669fc5e0a724
 %else
 %global hs_commit ebdc7d8d718bc0aa48f18a2517ed209271a319b1
 %endif
@@ -43,7 +43,7 @@ Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
 Version:        252.4
-Release:        598.9%{?dist}
+Release:        598.10%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -1155,6 +1155,9 @@ fi
 %endif
 
 %changelog
+
+* Fri Apr 13 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 252.4-598.10
+- Revert cpu controller delegation to user@.service commit for FB builds
 
 * Fri Feb 17 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 252.4-598.9
 - Fix selinux unsupported directive on centos stream 8
