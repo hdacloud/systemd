@@ -4,9 +4,9 @@
 %global stable 1
 
 %if 0%{?facebook}
-%global hs_commit b503711a2569ce76e6a735a5ea15669fc5e0a724
+%global hs_commit 90b17b51e8c4089f0b0d93aa437c2b4b1e3a8b67
 %else
-%global hs_commit ebdc7d8d718bc0aa48f18a2517ed209271a319b1
+%global hs_commit b2bf14d5dc581c4f111fe3edcea836bd317cad51
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -43,7 +43,7 @@ Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
 Version:        252.4
-Release:        598.10%{?dist}
+Release:        598.11%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -1156,7 +1156,12 @@ fi
 
 %changelog
 
-* Fri Apr 13 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 252.4-598.10
+* Mon May 15 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 252.4-598.11
+- Backport fixes for journald crashes and bad behavior when dealing with
+  corrupted journals.
+- Fix changelog date
+
+* Thu Apr 13 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 252.4-598.10
 - Revert cpu controller delegation to user@.service commit for FB builds
 
 * Fri Feb 17 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 252.4-598.9
