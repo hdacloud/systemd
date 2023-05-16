@@ -1,4 +1,4 @@
-From e256e03710abfd96e74d0b278c2b7186e3c8888b Mon Sep 17 00:00:00 2001
+From f53c6620c55488e2a3bd92957b21b6b95a7a3d35 Mon Sep 17 00:00:00 2001
 From: David Tardon <dtardon@redhat.com>
 Date: Thu, 12 Jan 2023 15:47:09 +0100
 Subject: [PATCH] coredump: put context array into a struct
@@ -7,7 +7,7 @@ Subject: [PATCH] coredump: put context array into a struct
 but does just the minimal change to introduce the Context struct that is
 needed by the following commit.]
 
-Related: #2155519
+Related: #2155520
 ---
  src/coredump/coredump.c | 208 +++++++++++++++++++++-------------------
  1 file changed, 108 insertions(+), 100 deletions(-)

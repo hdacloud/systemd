@@ -13,7 +13,7 @@
 Name:           systemd
 Url:            http://www.freedesktop.org/wiki/Software/systemd
 Version:        239
-Release:        68%{?dist}.4
+Release:        74%{?dist}
 # For a breakdown of the licensing, see README
 License:        LGPLv2+ and MIT and GPLv2+
 Summary:        System and Service Manager
@@ -881,13 +881,79 @@ Patch0828: 0828-core-load-fragment-move-config_parse_sec_fix_0-to-sr.patch
 Patch0829: 0829-sd-event-add-relative-timer-calls.patch
 Patch0830: 0830-logind-add-option-to-stop-idle-sessions-after-specif.patch
 Patch0831: 0831-logind-schedule-idle-check-full-interval-from-now-if.patch
-Patch0832: 0832-time-util-fix-buffer-over-run.patch
-Patch0833: 0833-core-move-reset_arguments-to-the-end-of-main-s-finis.patch
-Patch0834: 0834-basic-recognize-pdfs-filesystem-as-a-network-filesys.patch
-Patch0835: 0835-core-bring-manager_startup-and-manager_reload-more-i.patch
-Patch0836: 0836-basic-add-STRERROR-wrapper-for-strerror_r.patch
-Patch0837: 0837-coredump-put-context-array-into-a-struct.patch
-Patch0838: 0838-coredump-do-not-allow-user-to-access-coredumps-with-.patch
+Patch0832: 0832-ci-lint-add-shell-linter-Differential-ShellCheck.patch
+Patch0833: 0833-meson-do-not-compare-objects-of-different-types.patch
+Patch0834: 0834-journal-remote-use-MHD_HTTP_CONTENT_TOO_LARGE-as-MHD.patch
+Patch0835: 0835-Fix-build-with-httpd-0.9.71.patch
+Patch0836: 0836-ci-replace-LGTM-with-CodeQL.patch
+Patch0837: 0837-ci-mergify-Update-policy-Drop-LGTM-checks.patch
+Patch0838: 0838-time-util-fix-buffer-over-run.patch
+Patch0839: 0839-basic-recognize-pdfs-filesystem-as-a-network-filesys.patch
+Patch0840: 0840-core-move-reset_arguments-to-the-end-of-main-s-finis.patch
+Patch0841: 0841-manager-move-inc.-of-n_reloading-into-a-function.patch
+Patch0842: 0842-core-Add-new-DBUS-properties-UnitsReloadStartTimesta.patch
+Patch0843: 0843-core-Indicate-the-time-when-the-manager-started-load.patch
+Patch0844: 0844-core-do-not-touch-run-systemd-systemd-units-load-fro.patch
+Patch0845: 0845-sysctl-downgrade-message-when-we-have-no-permission.patch
+Patch0846: 0846-core-respect-SELinuxContext-for-socket-creation.patch
+Patch0847: 0847-manager-use-target-process-context-to-set-socket-con.patch
+Patch0848: 0848-virt-detect-Amazon-EC2-Nitro-instance.patch
+Patch0849: 0849-machine-id-setup-generate-machine-id-from-DMI-produc.patch
+Patch0850: 0850-virt-use-string-table-to-detect-VM-or-container.patch
+Patch0851: 0851-fileio-introduce-read_full_virtual_file-for-reading-.patch
+Patch0852: 0852-Use-BIOS-characteristics-to-distinguish-EC2-bare-met.patch
+Patch0853: 0853-device-drop-refuse_after.patch
+Patch0854: 0854-manager-limit-access-to-private-dbus-socket.patch
+Patch0855: 0855-journalctl-do-not-treat-EINTR-as-an-error-when-waiti.patch
+Patch0856: 0856-core-bring-manager_startup-and-manager_reload-more-i.patch
+Patch0857: 0857-pam-add-a-call-to-pam_namespace.patch
+Patch0858: 0858-virt-Support-detection-for-ARM64-Hyper-V-guests.patch
+Patch0859: 0859-virt-Fix-the-detection-for-Hyper-V-VMs.patch
+Patch0860: 0860-basic-add-STRERROR-wrapper-for-strerror_r.patch
+Patch0861: 0861-coredump-put-context-array-into-a-struct.patch
+Patch0862: 0862-coredump-do-not-allow-user-to-access-coredumps-with-.patch
+Patch0863: 0863-logind-remember-our-idle-state-and-use-it-to-detect-.patch
+Patch0864: 0864-test-import-logind-test-from-debian-ubuntu-test-suit.patch
+Patch0865: 0865-test-introduce-inst_recursive-helper-function.patch
+Patch0866: 0866-tests-verify-that-Lock-D-Bus-signal-is-sent-when-Idl.patch
+Patch0867: 0867-systemctl-simplify-halt_main.patch
+Patch0868: 0868-systemctl-shutdown-don-t-fallback-on-auth-fail.patch
+Patch0869: 0869-systemctl-reintroduce-the-original-halt_main.patch
+Patch0870: 0870-systemctl-preserve-old-behavior-unless-requested.patch
+Patch0871: 0871-pam_systemd-suppress-LOG_DEBUG-log-messages-if-debug.patch
+Patch0872: 0872-udev-net_id-introduce-naming-scheme-for-RHEL-8.8.patch
+Patch0873: 0873-journald-add-API-to-move-logging-from-var-to-run-aga.patch
+Patch0874: 0874-journalctl-add-new-relinquish-and-smart-relinquish-o.patch
+Patch0875: 0875-units-automatically-revert-to-run-logging-on-shutdow.patch
+Patch0876: 0876-pstore-Tool-to-archive-contents-of-pstore.patch
+Patch0877: 0877-meson-drop-redundant-line.patch
+Patch0878: 0878-pstore-drop-unnecessary-initializations.patch
+Patch0879: 0879-pstopre-fix-return-value-of-list_files.patch
+Patch0880: 0880-pstore-remove-temporary-file-on-failure.patch
+Patch0881: 0881-pstore-do-not-add-FILE-journal-entry-if-content_size.patch
+Patch0882: 0882-pstore-run-only-when-sys-fs-pstore-is-not-empty.patch
+Patch0883: 0883-pstore-fix-use-after-free.patch
+Patch0884: 0884-pstore-refuse-to-run-if-arguments-are-specified.patch
+Patch0885: 0885-pstore-allow-specifying-src-and-dst-dirs-are-argumen.patch
+Patch0886: 0886-pstore-rework-memory-handling-for-dmesg.patch
+Patch0887: 0887-pstore-fixes-for-dmesg.txt-reconstruction.patch
+Patch0888: 0888-pstore-Don-t-start-systemd-pstore.service-in-contain.patch
+Patch0889: 0889-units-pull-in-systemd-pstore.service-from-sysinit.ta.patch
+Patch0890: 0890-units-drop-dependency-on-systemd-remount-fs.service-.patch
+Patch0891: 0891-units-make-sure-systemd-pstore-stops-at-shutdown.patch
+Patch0892: 0892-pstore-Run-after-modules-are-loaded.patch
+Patch0893: 0893-pstore-do-not-try-to-load-all-known-pstore-modules.patch
+Patch0894: 0894-logind-session-make-stopping-of-idle-session-visible.patch
+Patch0895: 0895-journald-Increase-stdout-buffer-size-sooner-when-alm.patch
+Patch0896: 0896-journald-rework-end-of-line-marker-handling-to-use-a.patch
+Patch0897: 0897-journald-use-the-fact-that-client_context_release-re.patch
+Patch0898: 0898-journald-rework-pid-change-handling.patch
+Patch0899: 0899-test-Add-a-test-case-for-15654.patch
+Patch0900: 0900-test-Stricter-test-case-for-15654-Add-more-checks.patch
+Patch0901: 0901-man-document-the-new-_LINE_BREAK-type.patch
+Patch0902: 0902-journald-server-always-create-state-file-in-signal-h.patch
+Patch0903: 0903-journald-server-move-relinquish-code-into-function.patch
+Patch0904: 0904-journald-server-always-touch-state-file-in-signal-ha.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1305,7 +1371,8 @@ python3 %{SOURCE2} %buildroot <<EOF
 EOF
 
 %check
-%meson_test
+# Add --num-processes 1 as workaround for issues on ppc64le - AttributeError: 'NoneType' object has no attribute '_add_reader' - https://github.com/python/cpython/issues/82200
+%meson_test --num-processes 1
 
 #############################################################################################
 
@@ -1517,28 +1584,96 @@ fi
 %files tests -f .file-list-tests
 
 %changelog
-* Mon Jan 30 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-68.4
-- basic: add STRERROR() wrapper for strerror_r() (#2155519)
-- coredump: put context array into a struct (#2155519)
-- coredump: do not allow user to access coredumps with changed uid/gid/capabilities (#2155519)
+* Tue Mar 14 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-74
+- journald-server: always create state file in signal handler (#2174645)
+- journald-server: move relinquish code into function (#2174645)
+- journald-server: always touch state file in signal handler (#2174645)
 
-* Fri Jan 27 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-68.3
-- core: bring manager_startup() and manager_reload() more inline (#2164049)
+* Mon Feb 27 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-73
+- journald: add API to move logging from /var to /run again (#1873540)
+- journalctl: add new --relinquish and --smart-relinquish options (#1873540)
+- units: automatically revert to /run logging on shutdown if necessary (#1873540)
+- pstore: Tool to archive contents of pstore (#2158832)
+- meson: drop redundant line (#2158832)
+- pstore: drop unnecessary initializations (#2158832)
+- pstopre: fix return value of list_files() (#2158832)
+- pstore: remove temporary file on failure (#2158832)
+- pstore: do not add FILE= journal entry if content_size == 0 (#2158832)
+- pstore: run only when /sys/fs/pstore is not empty (#2158832)
+- pstore: fix use after free (#2158832)
+- pstore: refuse to run if arguments are specified (#2158832)
+- pstore: allow specifying src and dst dirs are arguments (#2158832)
+- pstore: rework memory handling for dmesg (#2158832)
+- pstore: fixes for dmesg.txt reconstruction (#2158832)
+- pstore: Don't start systemd-pstore.service in containers (#2158832)
+- units: pull in systemd-pstore.service from sysinit.target (#2158832)
+- units: drop dependency on systemd-remount-fs.service from systemd-pstore.service (#2158832)
+- units: make sure systemd-pstore stops at shutdown (#2158832)
+- pstore: Run after modules are loaded (#2158832)
+- pstore: do not try to load all known pstore modules (#2158832)
+- logind-session: make stopping of idle session visible to admins (#2156780)
+- journald: Increase stdout buffer size sooner, when almost full (#2029426)
+- journald: rework end of line marker handling to use a field table (#2029426)
+- journald: use the fact that client_context_release() returns NULL (#2029426)
+- journald: rework pid change handling (#2029426)
+- test: Add a test case for #15654 (#2029426)
+- test: Stricter test case for #15654 (Add more checks) (#2029426)
+- man: document the new _LINE_BREAK= type (#2029426)
 
-* Mon Nov 21 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-68.2
-- basic: recognize pdfs filesystem as a network filesystem (#2143100)
+* Fri Feb 17 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-72
+- test: import logind test from debian/ubuntu test suite (#1866955)
+- test: introduce inst_recursive() helper function (#1866955)
+- tests: verify that Lock D-Bus signal is sent when IdleAction=lock (#1866955)
+- systemctl: simplify halt_main() (#2053273)
+- systemctl: shutdown don't fallback on auth fail (#2053273)
+- systemctl: reintroduce the original halt_main() (#2053273)
+- systemctl: preserve old behavior unless requested (#2053273)
+- pam_systemd: suppress LOG_DEBUG log messages if debugging is off (#2170084)
+- udev/net_id: introduce naming scheme for RHEL-8.8 (#2170499)
+- pam: add a call to pam_namespace (#1861836)
 
-* Mon Nov 07 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-68.1
-- time-util: fix buffer-over-run (#2139390)
-- core: move reset_arguments() to the end of main's finish (#2127170)
+* Tue Jan 31 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-71
+- manager: limit access to private dbus socket (#2119405)
+- journalctl: do not treat EINTR as an error when waiting for events (#2161683)
+- core: bring manager_startup() and manager_reload() more inline (#2059633)
+- pam: add a call to pam_namespace (#1861836)
+- virt: Support detection for ARM64 Hyper-V guests (#2158307)
+- virt: Fix the detection for Hyper-V VMs (#2158307)
+- basic: add STRERROR() wrapper for strerror_r() (#2155520)
+- coredump: put context array into a struct (#2155520)
+- coredump: do not allow user to access coredumps with changed uid/gid/capabilities (#2155520)
 
-* Tue Sep 27 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-68
+* Mon Jan 16 2023 systemd maintenance team <systemd-maint@redhat.com> - 239-70
+- basic: recognize pdfs filesystem as a network filesystem (#2094661)
+- core: move reset_arguments() to the end of main's finish (#2127131)
+- manager: move inc. of n_reloading into a function (#2136869)
+- core: Add new DBUS properties UnitsReloadStartTimestamp and UnitsLoadTimestampMontonic (#2136869)
+- core: Indicate the time when the manager started loading units the last time (#2136869)
+- core: do not touch /run/systemd/systemd-units-load from user session instances (#2136869)
+- sysctl: downgrade message when we have no permission (#2158160)
+- core: respect SELinuxContext= for socket creation (#2136738)
+- manager: use target process context to set socket context (#2136738)
+- virt: detect Amazon EC2 Nitro instance (#2117948)
+- machine-id-setup: generate machine-id from DMI product ID on Amazon EC2 (#2117948)
+- virt: use string table to detect VM or container (#2117948)
+- fileio: introduce read_full_virtual_file() for reading virtual files in sysfs, procfs (#2117948)
+- Use BIOS characteristics to distinguish EC2 bare-metal from VMs (#2117948)
+- device: drop refuse_after (#2043524)
+
+* Tue Nov 08 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-69
 - logind: optionally watch utmp for login data (#2122288)
 - logind: add hashtable for finding session by leader PID (#2122288)
 - core/load-fragment: move config_parse_sec_fix_0 to src/shared (#2122288)
 - sd-event: add relative timer calls (#2122288)
 - logind: add option to stop idle sessions after specified timeout (#2122288)
 - logind: schedule idle check full interval from now if we couldn't figure out atime timestamp (#2122288)
+- ci(lint): add shell linter - Differential ShellCheck (#2122499)
+- meson: do not compare objects of different types (#2122499)
+- journal-remote: use MHD_HTTP_CONTENT_TOO_LARGE as MHD_HTTP_PAYLOAD_TOO_LARGE is deprecated since 0.9.74 (#2122499)
+- Fix build with µhttpd 0.9.71 (#2122499)
+- ci: replace LGTM with CodeQL (#2122499)
+- ci(mergify): Update policy - Drop LGTM checks (#2122499)
+- time-util: fix buffer-over-run (#2139391)
 
 * Fri Aug 26 2022 systemd maintenance team <systemd-maint@redhat.com> - 239-67
 - resolved: pin stream while calling callbacks for it (#2110549)

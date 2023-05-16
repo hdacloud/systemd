@@ -1,11 +1,11 @@
-From 84a8245cf58fa7edea61eab5f1ebd86a3944c388 Mon Sep 17 00:00:00 2001
+From 9c95d8dda42de288a57638a44dd5ea967469063d Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Zbigniew=20J=C4=99drzejewski-Szmek?= <zbyszek@in.waw.pl>
 Date: Fri, 7 Oct 2022 12:28:31 +0200
 Subject: [PATCH] basic: add STRERROR() wrapper for strerror_r()
 
 (cherry picked from commit 2c5d05b3cd986568105d67891e4010b868dea24f)
 
-Related: #2155519
+Related: #2155520
 ---
  src/basic/util.h     | 10 ++++++++++
  src/test/test-util.c | 40 ++++++++++++++++++++++++++++++++++++++++

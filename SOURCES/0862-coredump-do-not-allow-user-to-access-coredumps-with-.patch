@@ -1,4 +1,4 @@
-From 9fa7f77c5a3d92fe03d6eec8384043555ea16dc6 Mon Sep 17 00:00:00 2001
+From d178865d3d9940423f4d99360e3dc2fcaf0b2c96 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Zbigniew=20J=C4=99drzejewski-Szmek?= <zbyszek@in.waw.pl>
 Date: Mon, 28 Nov 2022 12:12:55 +0100
 Subject: [PATCH] coredump: do not allow user to access coredumps with changed
@@ -36,7 +36,7 @@ ppc64el, but not the whole coredump handling.
 
 (cherry picked from commit 3e4d0f6cf99f8677edd6a237382a65bfe758de03)
 
-Resolves: #2155519
+Resolves: #2155520
 ---
  src/coredump/coredump.c | 190 ++++++++++++++++++++++++++++++++++++++--
  1 file changed, 182 insertions(+), 8 deletions(-)

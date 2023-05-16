@@ -1,4 +1,4 @@
-From 3ec7e3ece5474475b9123a67636f1ba3eec1e3c4 Mon Sep 17 00:00:00 2001
+From a521f942d5c304bca7c61bacb3c79e565853718e Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Thu, 7 Jul 2022 18:27:02 +0900
 Subject: [PATCH] time-util: fix buffer-over-run
@@ -7,7 +7,7 @@ Fixes #23928.
 
 (cherry picked from commit 9102c625a673a3246d7e73d8737f3494446bad4e)
 
-Resolves: #2139390
+Resolves: #2139391
 ---
  src/basic/time-util.c     | 2 +-
  src/test/test-time-util.c | 5 +++++

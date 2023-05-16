@@ -1,4 +1,4 @@
-From 944596e66a9cd947545c714c4682681fdbefc09f Mon Sep 17 00:00:00 2001
+From 4bb425eea9f3037a583a23d99f15aa71562f2481 Mon Sep 17 00:00:00 2001
 From: Anita Zhang <the.anitazha@gmail.com>
 Date: Thu, 17 Sep 2020 01:49:17 -0700
 Subject: [PATCH] core: move reset_arguments() to the end of main's finish
@@ -15,7 +15,7 @@ right before the return, when nothing else will be using the arg_* variables.
 
 (cherry picked from commit 7d9eea2bd3d4f83668c7a78754d201b226acbf1e)
 
-Resolves: #2127170
+Resolves: #2127131
 ---
  src/core/main.c | 3 ++-
  1 file changed, 2 insertions(+), 1 deletion(-)

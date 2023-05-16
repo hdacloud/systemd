@@ -1,4 +1,4 @@
-From 9274a3bec0d3b259a006574f6bfb559888b04533 Mon Sep 17 00:00:00 2001
+From 2fe9fb3e844d7991105c40d4363eed9069a6837d Mon Sep 17 00:00:00 2001
 From: Michal Sekletar <msekleta@redhat.com>
 Date: Fri, 18 Nov 2022 16:16:36 +0100
 Subject: [PATCH] basic: recognize pdfs filesystem as a network filesystem
@@ -11,7 +11,7 @@ https://software.fujitsu.com/jp/manual/manualfiles/m130027/j2ul1563/02enz200/j15
 
 RHEL-only
 
-Resolves: #2143100
+Resolves: #2094661
 ---
  src/basic/mount-util.c | 3 ++-
  1 file changed, 2 insertions(+), 1 deletion(-)
