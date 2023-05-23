@@ -33,17 +33,11 @@
 # See README.build-in-place.
 %bcond_with    inplace
 
-%if 0%{?facebook}
-%bcond_with selinux
-%else
-%bcond_without selinux
-%endif
-
 Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
 Version:        252.4
-Release:        598.11%{?dist}
+Release:        598.12%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -234,10 +228,7 @@ Recommends:     libpwquality.so.1%{?elf_suffix}
 Recommends:     libpwquality.so.1(LIBPWQUALITY_1.0)%{?elf_bits}
 Recommends:     libqrencode.so.4%{?elf_suffix}
 
-%if %{with selinux}
-# Force the SELinux module to be installed
-Requires:       %{name}-selinux = %{version}-%{release}
-%endif
+Requires:       (%{name}-selinux = %{version}-%{release} if selinux-policy)
 
 Recommends:     libbpf.so.0%{?elf_suffix}
 Recommends:     libbpf.so.0(LIBBPF_0.4.0)%{?elf_bits}
@@ -502,7 +493,6 @@ Standalone sysusers binary with no dependencies on the systemd-shared library or
 other libraries from systemd-libs. This package conflicts with the main systemd
 package and is meant for use in non-systemd systems.
 
-%if %{with selinux}
 %package selinux
 Summary:        SELinux module for systemd
 BuildArch:      noarch
@@ -512,24 +502,20 @@ BuildRequires:  selinux-policy
 BuildRequires:  selinux-policy-devel
 Requires(post): selinux-policy-base >= %{_selinux_policy_version}
 Requires(post): policycoreutils
-Requires(post): policycoreutils-python-utils
 Requires(pre):  libselinux-utils
 Requires(post): libselinux-utils
 
 %description selinux
 This package provides the SELinux policy module to ensure systemd
 runs properly under an environment with SELinux enabled.
-%endif
 
 %prep
 # pagure strips the '+' from 'hs+fb' for the top directory in the tar archive so
 # the top directory is hsfb-250.3 instead of hs+fb-250.3.
 %autosetup -n %{name}-hs%{?facebook:fb}-%{version} -p1
 
-%if %{with selinux}
 mkdir selinux
 cp %SOURCE100 %SOURCE101 %SOURCE102 %SOURCE103 selinux
-%endif
 
 %build
 %global ntpvendor %(source /etc/os-release; echo ${ID})
@@ -681,10 +667,8 @@ if ! diff -u %{SOURCE1} ${new_triggers}; then
    sleep 5
 fi
 
-%if %{with selinux}
 cd selinux
 %{__make} -f Makefile.selinux SHARE="%{_datadir}" TARGETS="systemd_hs"
-%endif
 
 %install
 %meson_install
@@ -822,12 +806,10 @@ python3 %{SOURCE2} %buildroot "%{rhel}" <<EOF
 %ghost %attr(0700,root,root) %dir /var/log/private
 EOF
 
-%if %{with selinux}
 install -d -p %{buildroot}%{_datadir}/selinux/devel/include/contrib
 install -p -m 0644 selinux/systemd_hs.if %{buildroot}%{_datadir}/selinux/devel/include/contrib
 install -d -p %{buildroot}%{_datadir}/selinux/packages
 install -p -m 0644 selinux/systemd_hs.pp.bz2 %{buildroot}%{_datadir}/selinux/packages
-%endif
 
 %check
 %if %{with tests}
@@ -1071,7 +1053,6 @@ if systemctl -q is-enabled systemd-resolved.service &>/dev/null &&
   fi
 fi
 
-%if %{with selinux}
 %pre selinux
 %selinux_relabel_pre
 
@@ -1088,7 +1069,6 @@ fi
 if [ $1 -eq 0 ]; then
     %selinux_relabel_post
 fi
-%endif
 
 %global _docdir_fmt %{name}
 
@@ -1148,13 +1128,17 @@ fi
 
 %files standalone-sysusers -f .file-list-standalone-sysusers
 
-%if %{with selinux}
 %files selinux
 %{_datadir}/selinux/devel/include/contrib/systemd_hs.if
 %{_datadir}/selinux/packages/systemd_hs.pp.bz2
-%endif
 
 %changelog
+
+* Tue May 23 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 252.4-598.12
+- Remove selinux bcond in favor of boolean dependency on selinux-policy so that
+  systemd-selinux is only installed if selinux-policy is installed
+- Add selinux file contexts for /efi
+- Remove policycoreutils-python-utils dependency from systemd-selinux
 
 * Mon May 15 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 252.4-598.11
 - Backport fixes for journald crashes and bad behavior when dealing with
