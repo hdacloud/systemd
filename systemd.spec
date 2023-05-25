@@ -4,9 +4,9 @@
 %global stable 1
 
 %if 0%{?facebook}
-%global hs_commit 90b17b51e8c4089f0b0d93aa437c2b4b1e3a8b67
+%global hs_commit 1d360fe852a59e3fd4253b234f72cc9bf28a1214
 %else
-%global hs_commit b2bf14d5dc581c4f111fe3edcea836bd317cad51
+%global hs_commit 41a7f97e13ba7bb986d97f6873fa3c3fe0808517
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -37,7 +37,7 @@ Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
 Version:        252.4
-Release:        598.12%{?dist}
+Release:        598.13%{?dist}
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -1133,6 +1133,9 @@ fi
 %{_datadir}/selinux/packages/systemd_hs.pp.bz2
 
 %changelog
+
+* Thu May 25 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 252.4-598.13
+- Backport https://github.com/systemd/systemd/pull/25385
 
 * Tue May 23 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 252.4-598.12
 - Remove selinux bcond in favor of boolean dependency on selinux-policy so that
