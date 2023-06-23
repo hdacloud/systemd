@@ -1,12 +1,10 @@
 #global commit c4b843473a75fb38ed5bf54e9d3cfb1cb3719efa
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
-%global stable 1
-
 %if 0%{?facebook}
-%global hs_commit 1d360fe852a59e3fd4253b234f72cc9bf28a1214
+%global hs_commit 29312dc9281668410f092c6f43234cb31a37e9bb
 %else
-%global hs_commit 41a7f97e13ba7bb986d97f6873fa3c3fe0808517
+%global hs_commit f98cd058e4e973ca9db22551f1332ce0855fe3cf
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -36,16 +34,17 @@
 Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
-Version:        252.4
-Release:        598.13%{?dist}
+Version:        253.5
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
-Release:        2
 %endif
+Release:        1.1%{?dist}
+
+%global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
 # For a breakdown of the licensing, see README
-License:        LGPLv2+ and MIT and GPLv2+
+License:        LGPL-2.1-or-later AND MIT AND GPL-2.0-or-later
 Summary:        System and Service Manager
 
 # download tarballs with "spectool -g systemd.spec"
@@ -69,11 +68,15 @@ Source13:       libsystemd-shared.abignore
 
 Source14:       10-oomd-defaults.conf
 Source15:       10-oomd-per-slice-defaults.conf
+Source16:       10-timeout-abort.conf
+Source17:       10-map-count.conf
 
 Source21:       macros.sysusers
 Source22:       sysusers.attr
 Source23:       sysusers.prov
 Source24:       sysusers.generate-pre.sh
+
+Source25:       98-default-mac-none.link
 
 # Needed for selinux subpackage
 Source100:      Makefile.selinux
@@ -93,9 +96,9 @@ GIT_DIR=../../src/systemd/.git git diffab -M v233..master@{2017-06-15} -- hwdb/[
 # than in the next section. Packit CI will drop any patches in this range before
 # applying upstream pull requests.
 
-Patch0001:      0001-pam-align-second-and-third-columns.patch
-Patch0002:      0002-pam-add-a-call-to-pam_namespace.patch
-Patch0003:      0003-pam-actually-align-the-columns.patch
+# https://github.com/systemd/systemd/issues/26488
+# https://bugzilla.redhat.com/show_bug.cgi?id=2164404
+Patch0001:      https://github.com/systemd/systemd/pull/26494.patch
 
 # Those are downstream-only patches, but we don't want them in packit builds:
 # https://bugzilla.redhat.com/show_bug.cgi?id=1738828
@@ -140,7 +143,9 @@ BuildRequires:  kmod-devel
 BuildRequires:  elfutils-devel
 BuildRequires:  openssl-devel
 BuildRequires:  gnutls-devel
+%if %{undefined rhel}
 BuildRequires:  qrencode-devel
+%endif
 BuildRequires:  libmicrohttpd-devel
 BuildRequires:  libxkbcommon-devel
 BuildRequires:  iptables-devel
@@ -158,12 +163,18 @@ BuildRequires:  gawk
 BuildRequires:  tree
 BuildRequires:  hostname
 BuildRequires:  python3
-BuildRequires:  python3dist(lxml)
+BuildRequires:  python3-devel
 BuildRequires:  python3dist(jinja2)
-BuildRequires:  firewalld-filesystem
-%if 0%{?have_gnu_efi}
-BuildRequires:  gnu-efi gnu-efi-devel
+BuildRequires:  python3dist(lxml)
+BuildRequires:  python3dist(pefile)
+%if %{undefined rhel}
+BuildRequires:  python3dist(pillow)
+BuildRequires:  python3dist(pytest-flakes)
 %endif
+BuildRequires:  python3dist(pytest)
+BuildRequires:  python3dist(zstd)
+# gzip and lzma are provided by the stdlib
+BuildRequires:  firewalld-filesystem
 BuildRequires:  libseccomp-devel
 %if 0%{?el8}
 BuildRequires:  meson >= 0.57
@@ -181,6 +192,13 @@ BuildRequires:  perl(IPC::SysV)
 # bpftool is not built for i368
 BuildRequires:  bpftool
 %global have_bpf 1
+%endif
+
+%if 0%{?fedora}
+%ifarch x86_64 aarch64
+# That package is only built for those two architectures
+BuildRequires:  xen-devel
+%endif
 %endif
 
 Requires(post): coreutils
@@ -215,10 +233,14 @@ Conflicts:      fedora-release < 23-0.12
 %endif
 Obsoletes:      timedatex < 0.6-3
 Provides:       timedatex = 0.6-3
+Conflicts:      %{name}-standalone-repart < %{version}-%{release}^
+Provides:       %{name}-repart = %{version}-%{release}
 Conflicts:      %{name}-standalone-tmpfiles < %{version}-%{release}^
 Provides:       %{name}-tmpfiles = %{version}-%{release}
 Conflicts:      %{name}-standalone-sysusers < %{version}-%{release}^
 Provides:       %{name}-sysusers = %{version}-%{release}
+Conflicts:      %{name}-standalone-shutdown < %{version}-%{release}^
+Provides:       %{name}-shutdown = %{version}-%{release}
 
 # Recommends to replace normal Requires deps for stuff that is dlopen()ed
 Recommends:     libidn2.so.0%{?elf_suffix}
@@ -226,7 +248,11 @@ Recommends:     libidn2.so.0(IDN2_0.0.0)%{?elf_bits}
 Recommends:     libpcre2-8.so.0%{?elf_suffix}
 Recommends:     libpwquality.so.1%{?elf_suffix}
 Recommends:     libpwquality.so.1(LIBPWQUALITY_1.0)%{?elf_bits}
+%if %{undefined rhel}
 Recommends:     libqrencode.so.4%{?elf_suffix}
+%endif
+Recommends:     libbpf.so.0%{?elf_suffix}
+Recommends:     libbpf.so.0(LIBBPF_0.4.0)%{?elf_bits}
 
 Requires:       (%{name}-selinux = %{version}-%{release} if selinux-policy)
 
@@ -255,12 +281,12 @@ utilities to control basic system configuration like the hostname, date, locale,
 maintain a list of logged-in users, system accounts, runtime directories and
 settings, and a logging daemons.
 %if 0%{?stable}
-This package was built from the %{version}-stable branch of systemd.
+This package was built from the %(c=%version; echo "v${c%.*}-stable") branch of systemd.
 %endif
 
 %package libs
 Summary:        systemd libraries
-License:        LGPLv2+ and MIT
+License:        LGPL-2.1-or-later AND MIT
 Obsoletes:      libudev < 183
 Obsoletes:      systemd < 185-4
 Conflicts:      systemd < 185-4
@@ -297,7 +323,7 @@ for information how to use those macros.
 
 %package devel
 Summary:        Development headers for systemd
-License:        LGPLv2+ and MIT
+License:        LGPL-2.1-or-later AND MIT
 Requires:       %{name}-libs%{_isa} = %{version}-%{release}
 Requires:       (%{name}-rpm-macros = %{version}-%{release} if rpm-build)
 Provides:       libudev-devel = %{version}
@@ -310,7 +336,7 @@ to libudev or libsystemd.
 
 %package udev
 Summary: Rule-based device node and kernel event manager
-License:        LGPLv2+
+License:        LGPL-2.1-or-later
 
 Requires:       systemd%{_isa} = %{version}-%{release}
 Requires(post):   systemd
@@ -340,8 +366,9 @@ Recommends:     libdw.so.1(ELFUTILS_0.186)%{?elf_bits}
 Recommends:     libelf.so.1%{?elf_suffix}
 Recommends:     libelf.so.1(ELFUTILS_1.7)%{?elf_bits}
 
-# used by home, cryptsetup, cryptenroll
+# used by home, cryptsetup, cryptenroll, logind
 Recommends:     libfido2.so.1%{?elf_suffix}
+Recommends:     libp11-kit.so.0%{?elf_suffix}
 Recommends:     libtss2-esys.so.0%{?elf_suffix}
 Recommends:     libtss2-mu.so.0%{?elf_suffix}
 Recommends:     libtss2-rc.so.0%{?elf_suffix}
@@ -366,14 +393,34 @@ It also contains tools to manage encrypted home areas and secrets bound to the
 machine, and to create or grow partitions and make file systems automatically.
 
 %if 0%{?have_gnu_efi}
+%package ukify
+Summary:        Tool to build Unified Kernel Images
+Requires:       %{name} = %{version}-%{release}
+
+# We prefer llvm-objcopy over objcopy.
+Requires:       (llvm or binutils)
+Recommends:     llvm
+
+Requires:       python3dist(pefile)
+Requires:       python3dist(zstd)
+Recommends:     python3dist(pillow)
+
+BuildArch:      noarch
+
+%description ukify
+This package provides ukify, a script that combines a kernel image, an initrd,
+with a command line, and possibly PCR measurements and other metadata, into a
+Unified Kernel Image (UKI).
+
 %package boot-unsigned
 Summary: UEFI boot manager (unsigned version)
 
 Provides: systemd-boot-unsigned-%{efi_arch} = %version-%release
 Provides: systemd-boot = %version-%release
 Provides: systemd-boot%{_isa} = %version-%release
-Conflicts: systemd-boot < %{version}-%{release}
-Obsoletes: systemd-boot < %{version}-%{release}
+# A provides with just the version, no release or dist, used to build systemd-boot
+Provides: version(systemd-boot-unsigned) = %version
+Provides: version(systemd-boot-unsigned)%{_isa} = %version
 
 # self-obsoletes to install both packages after split of systemd-boot
 Obsoletes:      systemd-udev < 252.2^
@@ -398,7 +445,7 @@ Requires(postun): systemd
 Obsoletes:      %{name} < 229-5
 # Bias the system towards libcurl-minimal if nothing pulls in full libcurl (#1997040)
 Suggests:       libcurl-minimal
-License:        LGPLv2+
+License:        LGPL-2.1-or-later
 
 %description container
 Systemd tools to spawn and manage containers and virtual machines.
@@ -410,7 +457,7 @@ systemd-importd.
 # Name is the same as in Debian
 Summary:        Tools to send journal events over the network
 Requires:       %{name}%{_isa} = %{version}-%{release}
-License:        LGPLv2+
+License:        LGPL-2.1-or-later
 Requires:       firewalld-filesystem
 Provides:       %{name}-journal-gateway = %{version}-%{release}
 Provides:       %{name}-journal-gateway%{_isa} = %{version}-%{release}
@@ -428,7 +475,7 @@ systemd-journal-upload.
 %package networkd
 Summary:        System daemon that manages network configurations
 Requires:       %{name}%{_isa} = %{version}-%{release}
-License:        LGPLv2+
+License:        LGPL-2.1-or-later
 %if 0%{?facebook} == 0
 # https://src.fedoraproject.org/rpms/systemd/pull-request/34
 Obsoletes:      systemd < 246.6-2
@@ -457,7 +504,7 @@ resolver, as well as an LLMNR and MulticastDNS resolver and responder.
 %package oomd-defaults
 Summary:        Configuration files for systemd-oomd
 Requires:       %{name} = %{version}-%{release}
-License:        LGPLv2+
+License:        LGPL-2.1-or-later
 BuildArch:      noarch
 
 %description oomd-defaults
@@ -467,31 +514,51 @@ a userspace out-of-memory (OOM) killer.
 %package tests
 Summary:       Internal unit tests for systemd
 Requires:      %{name}%{_isa} = %{version}-%{release}
-License:       LGPLv2+
+License:       LGPL-2.1-or-later
 
 %description tests
 "Installed tests" that are usually run as part of the build system. They can be
 useful to test systemd internals.
 
+%package standalone-repart
+Summary:       Standalone systemd-repart binary for use on systems without systemd
+Provides:      %{name}-repart = %{version}-%{release}
+RemovePathPostfixes: .standalone
+
+%description standalone-repart
+Standalone systemd-repart binary with no dependencies on the systemd-shared library or
+other libraries from systemd-libs. This package conflicts with the main systemd
+package and is meant for use on systems without systemd.
+
 %package standalone-tmpfiles
-Summary:       Standalone tmpfiles binary for use in non-systemd systems
+Summary:       Standalone systemd-tmpfiles binary for use on systems without systemd
 Provides:      %{name}-tmpfiles = %{version}-%{release}
 RemovePathPostfixes: .standalone
 
 %description standalone-tmpfiles
-Standalone tmpfiles binary with no dependencies on the systemd-shared library or
+Standalone systemd-tmpfiles binary with no dependencies on the systemd-shared library or
 other libraries from systemd-libs. This package conflicts with the main systemd
-package and is meant for use in non-systemd systems.
+package and is meant for use on systems without systemd.
 
 %package standalone-sysusers
-Summary:       Standalone sysusers binary for use in non-systemd systems
+Summary:       Standalone systemd-sysusers binary for use on systems without systemd
 Provides:      %{name}-sysusers = %{version}-%{release}
 RemovePathPostfixes: .standalone
 
 %description standalone-sysusers
-Standalone sysusers binary with no dependencies on the systemd-shared library or
+Standalone systemd-sysusers binary with no dependencies on the systemd-shared library or
 other libraries from systemd-libs. This package conflicts with the main systemd
-package and is meant for use in non-systemd systems.
+package and is meant for use on systems without systemd.
+
+%package standalone-shutdown
+Summary:       Standalone systemd-shutdown binary for use on systems without systemd
+Provides:      %{name}-shutdown = %{version}-%{release}
+RemovePathPostfixes: .standalone
+
+%description standalone-shutdown
+Standalone systemd-shutdown binary with no dependencies on the systemd-shared library or
+other libraries from systemd-libs. This package conflicts with the main systemd
+package and is meant for use in exitrds.
 
 %package selinux
 Summary:        SELinux module for systemd
@@ -513,6 +580,22 @@ runs properly under an environment with SELinux enabled.
 # pagure strips the '+' from 'hs+fb' for the top directory in the tar archive so
 # the top directory is hsfb-250.3 instead of hs+fb-250.3.
 %autosetup -n %{name}-hs%{?facebook:fb}-%{version} -p1
+
+# We want to update sd-boot from packaging scriptlets after package update.
+# Let's disable the service.
+sed -r -i '/^enable systemd-boot-update.service/d' presets/90-systemd.preset
+
+sed -r 's|/system/|/user/|g' %{SOURCE16} >10-timeout-abort.conf.user
+
+%generate_buildrequires
+%if 0%{?have_gnu_efi}
+if grep -q gnu-efi meson_options.txt; then
+  echo 'gnu-efi'
+  echo 'gnu-efi-devel'
+else
+  echo 'python3dist(pyelftools)'
+fi
+%endif
 
 mkdir selinux
 cp %SOURCE100 %SOURCE101 %SOURCE102 %SOURCE103 selinux
@@ -565,7 +648,7 @@ CONFIGURE_OPTS=(
 %endif
         -Delfutils=true
         -Dpwquality=true
-        -Dqrencode=true
+        -Dqrencode=%[%{defined rhel}?"false":"true"]
         -Dgnutls=true
         -Dmicrohttpd=true
         -Dlibidn2=true
@@ -573,7 +656,6 @@ CONFIGURE_OPTS=(
         -Dlibcurl=true
         -Dlibfido2=true
         -Defi=true
-        -Dgnu-efi=%{?have_gnu_efi:true}%{?!have_gnu_efi:false}
         -Dtpm=true
         -Dtpm2=true
         -Dhwdb=true
@@ -609,6 +691,9 @@ CONFIGURE_OPTS=(
         -Ddefault-llmnr=resolve
         # https://bugzilla.redhat.com/show_bug.cgi?id=2028169
         -Dstatus-unit-format-default=combined
+        # https://fedoraproject.org/wiki/Changes/Shorter_Shutdown_Timer
+        -Ddefault-timeout-sec=45
+        -Ddefault-user-timeout-sec=45
         -Doomd=true
         -Dadm-gid=4
         -Daudio-gid=63
@@ -643,6 +728,15 @@ CONFIGURE_OPTS+=(
         -Dcontainer-uid-base-min=10485760
 )
 %endif
+
+if grep gnu-efi meson_options.txt; then
+  CONFIGURE_OPTS+=( -Dgnu-efi=%[%{?have_gnu_efi}?"true":"false"] )
+else
+  # For now, let's build the bootloader in the same places where we
+  # built with gnu-efi. Later on, we might want to extend coverage, but
+  # considering that that support is untested, let's not do this now.
+  CONFIGURE_OPTS+=( -Dbootloader=%[%{?have_gnu_efi}?"true":"false"] )
+fi
 
 %if %{without lto}
 %global _lto_cflags %nil
@@ -755,9 +849,14 @@ install -D -t %{buildroot}/usr/lib/systemd/ %{SOURCE3}
 
 # systemd-oomd default configuration
 install -Dm0644 -t %{buildroot}%{_prefix}/lib/systemd/oomd.conf.d/ %{SOURCE14}
-install -Dm0644 -t %{buildroot}%{system_unit_dir}/user-.slice.d/ %{SOURCE15}
 install -Dm0644 -t %{buildroot}%{system_unit_dir}/system.slice.d/ %{SOURCE15}
 install -Dm0644 -t %{buildroot}%{user_unit_dir}/slice.d/ %{SOURCE15}
+# https://fedoraproject.org/wiki/Changes/Shorter_Shutdown_Timer
+install -Dm0644 -t %{buildroot}%{system_unit_dir}/service.d/ %{SOURCE16}
+install -Dm0644 10-timeout-abort.conf.user %{buildroot}%{user_unit_dir}/service.d/10-timeout-abort.conf
+
+# https://fedoraproject.org/wiki/Changes/IncreaseVmMaxMapCount
+install -Dm0644 -t %{buildroot}%{_prefix}/lib/sysctl.d/ %{SOURCE17}
 
 sed -i 's|#!/usr/bin/env python3|#!%{__python3}|' %{buildroot}/usr/lib/systemd/tests/run-unit-tests.py
 
@@ -765,6 +864,9 @@ install -m 0644 -D -t %{buildroot}%{_rpmconfigdir}/macros.d/ %{SOURCE21}
 install -m 0644 -D -t %{buildroot}%{_rpmconfigdir}/fileattrs/ %{SOURCE22}
 install -m 0755 -D -t %{buildroot}%{_rpmconfigdir}/ %{SOURCE23}
 install -m 0755 -D -t %{buildroot}%{_rpmconfigdir}/ %{SOURCE24}
+
+# https://bugzilla.redhat.com/show_bug.cgi?id=2107754
+install -Dm0644 -t %{buildroot}%{_prefix}/lib/systemd/network/ %{SOURCE25}
 
 %find_lang %{name}
 
@@ -908,11 +1010,17 @@ if systemctl -q is-enabled systemd-resolved.service &>/dev/null; then
   systemctl start systemd-resolved.service &>/dev/null || :
 fi
 
-%triggerpostun -- systemd < 247.3-2
+%triggerun -- systemd < 247.3-2
 # This is for upgrades from previous versions before oomd-defaults is available.
+systemctl --no-reload preset systemd-oomd.service &>/dev/null || :
+
+%triggerpostun -- systemd < 253~rc1-2
+# This is for upgrades from previous versions where systemd-journald-audit.socket
+# had a static enablement symlink.
 # We use %%triggerpostun here because rpm doesn't allow a second %%triggerun with
 # a different package version.
-systemctl --no-reload preset systemd-oomd.service &>/dev/null || :
+systemctl --no-reload preset systemd-journald-audit.socket &>/dev/null || :
+
 
 %global udev_services systemd-udev{d,-settle,-trigger}.service systemd-udevd-{control,kernel}.socket systemd-timesyncd.service %{?have_gnu_efi:systemd-boot-update.service}
 
@@ -1110,6 +1218,7 @@ fi
 %files udev -f .file-list-udev
 
 %if 0%{?have_gnu_efi}
+%files ukify -f .file-list-ukify
 %files boot-unsigned -f .file-list-boot
 %endif
 
@@ -1124,15 +1233,22 @@ fi
 
 %files tests -f .file-list-tests
 
+%files standalone-repart -f .file-list-standalone-repart
+
 %files standalone-tmpfiles -f .file-list-standalone-tmpfiles
 
 %files standalone-sysusers -f .file-list-standalone-sysusers
+
+%files standalone-shutdown -f .file-list-standalone-shutdown
 
 %files selinux
 %{_datadir}/selinux/devel/include/contrib/systemd_hs.if
 %{_datadir}/selinux/packages/systemd_hs.pp.bz2
 
 %changelog
+
+* Fri Jun 23 2023 Anita Zhang <the.anitazha@gmail.com> - 253.5-1.1
+- Sync from Fedora rawhide 5982ae9504c8f2697a839c6ce2a82287a60c1043
 
 * Thu May 25 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 252.4-598.13
 - Backport https://github.com/systemd/systemd/pull/25385
