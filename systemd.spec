@@ -172,7 +172,9 @@ BuildRequires:  python3dist(pillow)
 BuildRequires:  python3dist(pytest-flakes)
 %endif
 BuildRequires:  python3dist(pytest)
+%if %{undefined rhel}
 BuildRequires:  python3dist(zstd)
+%endif
 # gzip and lzma are provided by the stdlib
 BuildRequires:  firewalld-filesystem
 BuildRequires:  libseccomp-devel
@@ -402,7 +404,9 @@ Requires:       (llvm or binutils)
 Recommends:     llvm
 
 Requires:       python3dist(pefile)
+%if %{undefined rhel}
 Requires:       python3dist(zstd)
+%endif
 Recommends:     python3dist(pillow)
 
 BuildArch:      noarch
@@ -1246,6 +1250,9 @@ fi
 %{_datadir}/selinux/packages/systemd_hs.pp.bz2
 
 %changelog
+
+* Mon Jul 3 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 253.5-1.1
+- Condition out python3-zstd until it is added to EPEL
 
 * Fri Jun 23 2023 Anita Zhang <the.anitazha@gmail.com> - 253.5-1.1
 - Sync from Fedora rawhide 5982ae9504c8f2697a839c6ce2a82287a60c1043
