@@ -587,6 +587,9 @@ sed -r -i '/^enable systemd-boot-update.service/d' presets/90-systemd.preset
 
 sed -r 's|/system/|/user/|g' %{SOURCE16} >10-timeout-abort.conf.user
 
+mkdir selinux
+cp %SOURCE100 %SOURCE101 %SOURCE102 %SOURCE103 selinux
+
 %generate_buildrequires
 %if 0%{?have_gnu_efi}
 if grep -q gnu-efi meson_options.txt; then
@@ -596,9 +599,6 @@ else
   echo 'python3dist(pyelftools)'
 fi
 %endif
-
-mkdir selinux
-cp %SOURCE100 %SOURCE101 %SOURCE102 %SOURCE103 selinux
 
 %build
 %global ntpvendor %(source /etc/os-release; echo ${ID})
