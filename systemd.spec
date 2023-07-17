@@ -2,9 +2,9 @@
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
 %if 0%{?facebook}
-%global hs_commit 56f097a40674300444908809da2c7f2962a4c072
+%global hs_commit 71ccd05c9bc4ea613e33077c4c3532257bcd50fe
 %else
-%global hs_commit c8cecf12d59b11f1e75db1e49b20ba07c7db4c69
+%global hs_commit 0b9452a89eb4b49876acd4897ddeab3d8af7e816
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -105,6 +105,7 @@ Patch0001:      https://github.com/systemd/systemd/pull/26494.patch
 
 # Adjust upstream config to use our shared stack
 Patch0491:      fedora-use-system-auth-in-pam-systemd-user.patch
+Patch0901:      hyperscale-drop-bpftool-version-requirement-to-4.18.0.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
