@@ -1,0 +1,39 @@
+From 8d1b5fe8ee53ffd5885bee6131606d79dbbdde91 Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Tue, 3 Jan 2023 13:29:27 +0100
+Subject: [PATCH] Drop bpftool version requirement to 4.18.0
+
+The CentOS Stream 8 bpftool package has the skeleton and object
+generation features introduced in bpftool 5.6.0 and 5.13.0
+respectively backported to 4.18.0. The meson script doesn't know
+this, so we downgrade the required bpftool version to 4.18.0 to
+allow builds to pass on CentOS Stream 8.
+---
+ meson.build | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/meson.build b/meson.build
+index 35704947e3..6dff92bafb 100644
+--- a/meson.build
++++ b/meson.build
+@@ -1060,7 +1060,7 @@ endif
+ libbpf = dependency('libbpf', required : bpf_framework_required, version : libbpf_version_requirement)
+ conf.set10('HAVE_LIBBPF', libbpf.found())
+ 
+-bpftool_strip_version_requirement = '>= 5.13.0'
++bpftool_strip_version_requirement = '>= 4.18.0'
+ if bpf_compiler == 'gcc'
+         bpftool_strip_version_requirement = '>= 7.0.0'
+ endif
+@@ -1121,7 +1121,7 @@ else
+                         bpftool = find_program('bpftool',
+                                                '/usr/sbin/bpftool',
+                                                required : bpf_framework_required,
+-                                               version : '>= 5.6.0')
++                                               version : '>= 4.18.0')
+                 endif
+ 
+                 # We use `llvm-strip` as a fallback if `bpftool gen object` strip support is not available.
+-- 
+2.41.0
+
