@@ -2,9 +2,9 @@
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
 %if 0%{?facebook}
-%global hs_commit 29312dc9281668410f092c6f43234cb31a37e9bb
+%global hs_commit 56f097a40674300444908809da2c7f2962a4c072
 %else
-%global hs_commit f98cd058e4e973ca9db22551f1332ce0855fe3cf
+%global hs_commit c8cecf12d59b11f1e75db1e49b20ba07c7db4c69
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -172,7 +172,7 @@ BuildRequires:  python3dist(pillow)
 BuildRequires:  python3dist(pytest-flakes)
 %endif
 BuildRequires:  python3dist(pytest)
-%if %{undefined rhel}
+%if 0%{!?el8}
 BuildRequires:  python3dist(zstd)
 %endif
 # gzip and lzma are provided by the stdlib
@@ -189,6 +189,10 @@ BuildRequires:  valgrind-devel
 BuildRequires:  pkgconfig(bash-completion)
 BuildRequires:  perl
 BuildRequires:  perl(IPC::SysV)
+%if 0%{?el8}
+BuildRequires:  gnu-efi
+BuildRequires:  gnu-efi-devel
+%endif
 
 %ifnarch %ix86
 # bpftool is not built for i368
@@ -395,6 +399,7 @@ It also contains tools to manage encrypted home areas and secrets bound to the
 machine, and to create or grow partitions and make file systems automatically.
 
 %if 0%{?have_gnu_efi}
+%if 0%{!?el8}
 %package ukify
 Summary:        Tool to build Unified Kernel Images
 Requires:       %{name} = %{version}-%{release}
@@ -404,9 +409,7 @@ Requires:       (llvm or binutils)
 Recommends:     llvm
 
 Requires:       python3dist(pefile)
-%if %{undefined rhel}
 Requires:       python3dist(zstd)
-%endif
 Recommends:     python3dist(pillow)
 
 BuildArch:      noarch
@@ -415,6 +418,7 @@ BuildArch:      noarch
 This package provides ukify, a script that combines a kernel image, an initrd,
 with a command line, and possibly PCR measurements and other metadata, into a
 Unified Kernel Image (UKI).
+%endif
 
 %package boot-unsigned
 Summary: UEFI boot manager (unsigned version)
@@ -594,6 +598,7 @@ sed -r 's|/system/|/user/|g' %{SOURCE16} >10-timeout-abort.conf.user
 mkdir selinux
 cp %SOURCE100 %SOURCE101 %SOURCE102 %SOURCE103 selinux
 
+%if 0%{!?el8}
 %generate_buildrequires
 %if 0%{?have_gnu_efi}
 if grep -q gnu-efi meson_options.txt; then
@@ -602,6 +607,7 @@ if grep -q gnu-efi meson_options.txt; then
 else
   echo 'python3dist(pyelftools)'
 fi
+%endif
 %endif
 
 %build
@@ -652,7 +658,7 @@ CONFIGURE_OPTS=(
 %endif
         -Delfutils=true
         -Dpwquality=true
-        -Dqrencode=%[%{defined rhel}?"false":"true"]
+        -Dqrencode=%{?rhel:false}%{?!rhel:true}
         -Dgnutls=true
         -Dmicrohttpd=true
         -Dlibidn2=true
@@ -734,12 +740,12 @@ CONFIGURE_OPTS+=(
 %endif
 
 if grep gnu-efi meson_options.txt; then
-  CONFIGURE_OPTS+=( -Dgnu-efi=%[%{?have_gnu_efi}?"true":"false"] )
+  CONFIGURE_OPTS+=( -Dgnu-efi=%{?have_gnu_efi:true}%{?!have_gnu_efi:false} )
 else
   # For now, let's build the bootloader in the same places where we
   # built with gnu-efi. Later on, we might want to extend coverage, but
   # considering that that support is untested, let's not do this now.
-  CONFIGURE_OPTS+=( -Dbootloader=%[%{?have_gnu_efi}?"true":"false"] )
+  CONFIGURE_OPTS+=( -Dbootloader=%{?have_gnu_efi:true}%{?!have_gnu_efi:false} )
 fi
 
 %if %{without lto}
@@ -1222,7 +1228,9 @@ fi
 %files udev -f .file-list-udev
 
 %if 0%{?have_gnu_efi}
+%if 0%{!?el8}
 %files ukify -f .file-list-ukify
+%endif
 %files boot-unsigned -f .file-list-boot
 %endif
 
@@ -1251,7 +1259,12 @@ fi
 
 %changelog
 
-* Mon Jul 3 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 253.5-1.1
+* Mon Jul 17 2023 Daan De Meyer <daan.j.demeyer@glail.com> - 253.5-1.1
+- Add back python3-zstd on c9s now that it's been added to EPEL 9
+- Add back support for c8s builds (without ukify)
+- Add full backport of bpftool version requirement lowering
+
+* Mon Jul 03 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 253.5-1.1
 - Condition out python3-zstd until it is added to EPEL
 
 * Fri Jun 23 2023 Anita Zhang <the.anitazha@gmail.com> - 253.5-1.1
