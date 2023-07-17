@@ -190,9 +190,12 @@ BuildRequires:  valgrind-devel
 BuildRequires:  pkgconfig(bash-completion)
 BuildRequires:  perl
 BuildRequires:  perl(IPC::SysV)
+# %generate_buildrequires doesn't work on c8s so we just add all of them as
+# BuildRequires instead.
 %if 0%{?el8}
 BuildRequires:  gnu-efi
 BuildRequires:  gnu-efi-devel
+BuildRequires:  python3dist(pyelftools)
 %endif
 
 %ifnarch %ix86
