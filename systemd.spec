@@ -192,11 +192,9 @@ BuildRequires:  perl
 BuildRequires:  perl(IPC::SysV)
 # %generate_buildrequires doesn't work on c8s so we just add all of them as
 # BuildRequires instead.
-%if 0%{?el8}
 BuildRequires:  gnu-efi
 BuildRequires:  gnu-efi-devel
 BuildRequires:  python3dist(pyelftools)
-%endif
 
 %ifnarch %ix86
 # bpftool is not built for i368
@@ -601,18 +599,6 @@ sed -r 's|/system/|/user/|g' %{SOURCE16} >10-timeout-abort.conf.user
 
 mkdir selinux
 cp %SOURCE100 %SOURCE101 %SOURCE102 %SOURCE103 selinux
-
-%if 0%{!?el8}
-%generate_buildrequires
-%if 0%{?have_gnu_efi}
-if grep -q gnu-efi meson_options.txt; then
-  echo 'gnu-efi'
-  echo 'gnu-efi-devel'
-else
-  echo 'python3dist(pyelftools)'
-fi
-%endif
-%endif
 
 %build
 %global ntpvendor %(source /etc/os-release; echo ${ID})
@@ -1263,7 +1249,10 @@ fi
 
 %changelog
 
-* Mon Jul 17 2023 Daan De Meyer <daan.j.demeyer@glail.com> - 253.5-1.1
+* Tue Jul 18 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 253.5-1.1
+- Remove %generate_buildrequires in general instead of only on c8s
+
+* Mon Jul 17 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 253.5-1.1
 - Add back python3-zstd on c9s now that it's been added to EPEL 9
 - Add back support for c8s builds (without ukify)
 - Add full backport of bpftool version requirement lowering
