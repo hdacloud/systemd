@@ -173,13 +173,13 @@ BuildRequires:  python3dist(pillow)
 BuildRequires:  python3dist(pytest-flakes)
 %endif
 BuildRequires:  python3dist(pytest)
-%if 0%{!?el8}
+%if %{undefined rhel} || %{rhel} > 8
 BuildRequires:  python3dist(zstd)
 %endif
 # gzip and lzma are provided by the stdlib
 BuildRequires:  firewalld-filesystem
 BuildRequires:  libseccomp-devel
-%if 0%{?el8}
+%if %{defined rhel} && %{rhel} < 9
 BuildRequires:  meson >= 0.57
 %else
 BuildRequires:  meson >= 0.43
@@ -192,9 +192,11 @@ BuildRequires:  perl
 BuildRequires:  perl(IPC::SysV)
 # %generate_buildrequires doesn't work on c8s so we just add all of them as
 # BuildRequires instead.
+%if %{defined rhel} && %{rhel} < 9
 BuildRequires:  gnu-efi
 BuildRequires:  gnu-efi-devel
 BuildRequires:  python3dist(pyelftools)
+%endif
 
 %ifnarch %ix86
 # bpftool is not built for i368
@@ -401,7 +403,7 @@ It also contains tools to manage encrypted home areas and secrets bound to the
 machine, and to create or grow partitions and make file systems automatically.
 
 %if 0%{?have_gnu_efi}
-%if 0%{!?el8}
+%if %{undefined rhel} || %{rhel} > 8
 %package ukify
 Summary:        Tool to build Unified Kernel Images
 Requires:       %{name} = %{version}-%{release}
@@ -599,6 +601,18 @@ sed -r 's|/system/|/user/|g' %{SOURCE16} >10-timeout-abort.conf.user
 
 mkdir selinux
 cp %SOURCE100 %SOURCE101 %SOURCE102 %SOURCE103 selinux
+
+%if %{undefined rhel} || %{rhel} > 8
+%generate_buildrequires
+%if 0%{?have_gnu_efi}
+if grep -q gnu-efi meson_options.txt; then
+  echo 'gnu-efi'
+  echo 'gnu-efi-devel'
+else
+  echo 'python3dist(pyelftools)'
+fi
+%endif
+%endif
 
 %build
 %global ntpvendor %(source /etc/os-release; echo ${ID})
@@ -1218,7 +1232,7 @@ fi
 %files udev -f .file-list-udev
 
 %if 0%{?have_gnu_efi}
-%if 0%{!?el8}
+%if %{undefined rhel} || %{rhel} > 8
 %files ukify -f .file-list-ukify
 %endif
 %files boot-unsigned -f .file-list-boot
@@ -1250,7 +1264,7 @@ fi
 %changelog
 
 * Tue Jul 18 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 253.5-1.1
-- Remove %generate_buildrequires in general instead of only on c8s
+- Use the %rhel macro for checks instead of explicitly checking against %el8.
 
 * Mon Jul 17 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 253.5-1.1
 - Add back python3-zstd on c9s now that it's been added to EPEL 9
