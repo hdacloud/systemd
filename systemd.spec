@@ -105,7 +105,6 @@ Patch0001:      https://github.com/systemd/systemd/pull/26494.patch
 
 # Adjust upstream config to use our shared stack
 Patch0491:      fedora-use-system-auth-in-pam-systemd-user.patch
-Patch0901:      hyperscale-drop-bpftool-version-requirement-to-4.18.0.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -599,8 +598,15 @@ sed -r -i '/^enable systemd-boot-update.service/d' presets/90-systemd.preset
 
 sed -r 's|/system/|/user/|g' %{SOURCE16} >10-timeout-abort.conf.user
 
-mkdir selinux
-cp %SOURCE100 %SOURCE101 %SOURCE102 %SOURCE103 selinux
+# Lower the bpftool version requirement to 4.18.0 which has all the required
+# functionality backported in C8S/C9S.
+sed -r -i.old -e 's/>= 5.13.0/>= 4.18.0/g' -e 's/>= 5.6.0/>= 4.18.0/g' meson.build
+# Make sure we don't update the timestamp of meson.build to avoid rebuilds.
+touch -r meson.build.old meson.build
+rm meson.build.old
+
+mkdir -p /tmp/selinux
+cp %SOURCE100 %SOURCE101 %SOURCE102 %SOURCE103 /tmp/selinux
 
 %if %{undefined rhel} || 0%{?rhel} > 8
 %generate_buildrequires
@@ -775,7 +781,7 @@ if ! diff -u %{SOURCE1} ${new_triggers}; then
    sleep 5
 fi
 
-cd selinux
+cd /tmp/selinux
 %{__make} -f Makefile.selinux SHARE="%{_datadir}" TARGETS="systemd_hs"
 
 %install
@@ -923,9 +929,9 @@ python3 %{SOURCE2} %buildroot "%{?rhel}" <<EOF
 EOF
 
 install -d -p %{buildroot}%{_datadir}/selinux/devel/include/contrib
-install -p -m 0644 selinux/systemd_hs.if %{buildroot}%{_datadir}/selinux/devel/include/contrib
+install -p -m 0644 /tmp/selinux/systemd_hs.if %{buildroot}%{_datadir}/selinux/devel/include/contrib
 install -d -p %{buildroot}%{_datadir}/selinux/packages
-install -p -m 0644 selinux/systemd_hs.pp.bz2 %{buildroot}%{_datadir}/selinux/packages
+install -p -m 0644 /tmp/selinux/systemd_hs.pp.bz2 %{buildroot}%{_datadir}/selinux/packages
 
 %check
 %if %{with tests}
@@ -1262,6 +1268,12 @@ fi
 %{_datadir}/selinux/packages/systemd_hs.pp.bz2
 
 %changelog
+
+* Thu Aug 03 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 253.5-1.1
+- Replace bpftool version requirement patch with sed so it works across systemd
+  releases
+- Do selinux build in /tmp/selinux to avoid polluting source directory
+- Make sure we override existing output files when calling bzip2.
 
 * Tue Jul 18 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 253.5-1.1
 - Use the %{?rhel} macro for checks instead of explicitly checking against %{?el8}.
