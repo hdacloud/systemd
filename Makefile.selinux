@@ -6,7 +6,7 @@ all: ${TARGETS:=.pp.bz2}
 
 %.pp.bz2: %.pp
 	@echo Compressing $^ -\ $@
-	bzip2 -9 $^
+	bzip2 -9 -f $^
 
 %.pp: %.te
 	make -f ${SHARE}/selinux/devel/Makefile $@
