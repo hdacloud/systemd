@@ -263,7 +263,9 @@ Recommends:     libqrencode.so.4%{?elf_suffix}
 Recommends:     libbpf.so.0%{?elf_suffix}
 Recommends:     libbpf.so.0(LIBBPF_0.4.0)%{?elf_bits}
 
+%if 0%{?facebook} == 0
 Requires:       (%{name}-selinux = %{version}-%{release} if selinux-policy)
+%endif
 
 Recommends:     libbpf.so.0%{?elf_suffix}
 Recommends:     libbpf.so.0(LIBBPF_0.4.0)%{?elf_bits}
