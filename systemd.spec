@@ -1280,6 +1280,7 @@ rm -f %{name}.lang
 * Mon Aug 07 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 253.5-1.1
 - Gate out systemd-selinux dependency on Facebook specific builds
 - Backport custom %clean implementation from rawhide
+- Backport selinux triggers logging revert from rawhide
 
 * Thu Aug 03 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 253.5-1.1
 - Replace bpftool version requirement patch with sed so it works across systemd
