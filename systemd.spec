@@ -1269,7 +1269,17 @@ fi
 %{_datadir}/selinux/devel/include/contrib/systemd_hs.if
 %{_datadir}/selinux/packages/systemd_hs.pp.bz2
 
+%clean
+rm -rf $RPM_BUILD_ROOT
+rm -f 10-timeout-abort.conf.user
+rm -f .file-list-*
+rm -f %{name}.lang
+
 %changelog
+
+* Mon Aug 07 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 253.5-1.1
+- Gate out systemd-selinux dependency on Facebook specific builds
+- Backport custom %clean implementation from rawhide
 
 * Thu Aug 03 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 253.5-1.1
 - Replace bpftool version requirement patch with sed so it works across systemd
