@@ -2,9 +2,9 @@
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
 %if 0%{?facebook}
-%global hs_commit 71ccd05c9bc4ea613e33077c4c3532257bcd50fe
+%global hs_commit 8e75d008578374de1ed2b8da60e5885f7866d5e5
 %else
-%global hs_commit 0b9452a89eb4b49876acd4897ddeab3d8af7e816
+%global hs_commit 23abb83a514c7fee38207630c8f2e544933121a7
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -34,7 +34,7 @@
 Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 %if %{without inplace}
-Version:        253.5
+Version:        253.7
 %else
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
@@ -1276,6 +1276,9 @@ rm -f .file-list-*
 rm -f %{name}.lang
 
 %changelog
+
+* Wed Aug 09 2023 Anita Zhang <the.anitazha@gmail.com> - 253.7-1.1
+- Bump release to 253.7.
 
 * Mon Aug 07 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 253.5-1.1
 - Gate out systemd-selinux dependency on Facebook specific builds
