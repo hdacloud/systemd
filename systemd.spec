@@ -39,7 +39,7 @@ Version:        253.7
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
 %endif
-Release:        1.1%{?dist}
+Release:        1.2%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -746,7 +746,7 @@ CONFIGURE_OPTS=(
 CONFIGURE_OPTS+=(
         -Dntp-servers='1.ntp.vip.facebook.com 2.ntp.vip.facebook.com 3.ntp.vip.facebook.com 4.ntp.vip.facebook.com'
         -Ddns-servers='10.127.255.51 10.191.255.51 2401:db00:eef0:a53:: 2401:db00:eef0:b53::'
-        -Dsupport-url='https://www.facebook.com/groups/systemd.and.friends'
+        -Dsupport-url='https://fb.workplace.com/groups/systemd.and.friends'
         -Dcontainer-uid-base-min=10485760
 )
 %endif
@@ -1276,6 +1276,9 @@ rm -f .file-list-*
 rm -f %{name}.lang
 
 %changelog
+
+* Sun Aug 13 2023 Anita Zhang <the.anitazha@gmail.com> - 253.7-1.2
+- Update facebook support URL.
 
 * Wed Aug 09 2023 Anita Zhang <the.anitazha@gmail.com> - 253.7-1.1
 - Bump release to 253.7.
