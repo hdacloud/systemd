@@ -39,7 +39,7 @@ Version:        253.7
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
 %endif
-Release:        1.2%{?dist}
+Release:        1.3%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -105,6 +105,12 @@ Patch0001:      https://github.com/systemd/systemd/pull/26494.patch
 
 # Adjust upstream config to use our shared stack
 Patch0491:      fedora-use-system-auth-in-pam-systemd-user.patch
+
+#repart: Use 4096 as the fallback sector size for verity/luks/filesystems
+Patch0492:      28812.patch
+
+# repart: Set sector size of loopback devices
+Patch0493:      28479.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -1276,6 +1282,8 @@ rm -f .file-list-*
 rm -f %{name}.lang
 
 %changelog
+* Wed Aug 16 2023 Anita Zhang <the.anitazha@gmail.com> - 253.7-1.3
+- Backport 2 fixes for repart.
 
 * Sun Aug 13 2023 Anita Zhang <the.anitazha@gmail.com> - 253.7-1.2
 - Update facebook support URL.

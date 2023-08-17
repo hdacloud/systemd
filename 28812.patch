@@ -1,0 +1,273 @@
+From 28008eb0bafcb3765e0ece7cb78710066f0ac2b8 Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Sat, 12 Aug 2023 13:28:10 +0200
+Subject: [PATCH 1/3] mkfs-util: Set sector size environment variables when
+ invoking mkfs.ext4
+
+Let's inform mkfs.ext4 about the sector size we're using.
+---
+ src/shared/mkfs-util.c | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/src/shared/mkfs-util.c b/src/shared/mkfs-util.c
+index 179bce6af6..8038abb945 100644
+--- a/src/shared/mkfs-util.c
++++ b/src/shared/mkfs-util.c
+@@ -268,7 +268,7 @@ int make_filesystem(
+                 char * const *extra_mkfs_args) {
+ 
+         _cleanup_free_ char *mkfs = NULL, *mangled_label = NULL;
+-        _cleanup_strv_free_ char **argv = NULL;
++        _cleanup_strv_free_ char **argv = NULL, **env = NULL;
+         _cleanup_(unlink_and_freep) char *protofile = NULL;
+         char vol_id[CONST_MAX(SD_ID128_UUID_STRING_MAX, 8U + 1U)] = {};
+         int r;
+@@ -385,6 +385,15 @@ int make_filesystem(
+                 if (root && strv_extend_strv(&argv, STRV_MAKE("-d", root), false) < 0)
+                         return log_oom();
+ 
++                if (sector_size > 0)
++                        FOREACH_STRING(s, "MKE2FS_DEVICE_SECTSIZE", "MKE2FS_DEVICE_PHYS_SECTSIZE") {
++                                if (strv_extend(&env, s) < 0)
++                                        return log_oom();
++
++                                if (strv_extendf(&env, "%"PRIu64, sector_size) < 0)
++                                        return log_oom();
++                        }
++
+         } else if (streq(fstype, "btrfs")) {
+                 argv = strv_new(mkfs,
+                                 "-q",
+@@ -496,6 +505,11 @@ int make_filesystem(
+         if (r == 0) {
+                 /* Child */
+ 
++                STRV_FOREACH_PAIR(k, v, env)
++                        if (setenv(*k, *v, /* replace = */ true) < 0) {
++                                log_error_errno(r, "Failed to set %s=%s environment variable: %m", *k, *v);
++                                _exit(EXIT_FAILURE);
++                        }
+                 execvp(mkfs, argv);
+ 
+                 log_error_errno(errno, "Failed to execute %s: %m", mkfs);
+-- 
+2.41.0
+
+
+From 8a2ee7ec8c200464302693456561f99bf92f0df4 Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Sat, 12 Aug 2023 13:29:50 +0200
+Subject: [PATCH 2/3] mkfs-util: Pass sector size to mkfs.f2fs
+
+Let's pass the sector size to mkfs.f2fs as well.
+---
+ src/shared/mkfs-util.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/src/shared/mkfs-util.c b/src/shared/mkfs-util.c
+index 8038abb945..1f73ff3742 100644
+--- a/src/shared/mkfs-util.c
++++ b/src/shared/mkfs-util.c
+@@ -419,6 +419,14 @@ int make_filesystem(
+                                 "-t", one_zero(discard),
+                                 node);
+ 
++                if (sector_size > 0) {
++                        if (strv_extend(&argv, "-w") < 0)
++                                return log_oom();
++
++                        if (strv_extendf(&argv, "%"PRIu64, sector_size) < 0)
++                                return log_oom();
++                }
++
+         } else if (streq(fstype, "xfs")) {
+                 const char *j;
+ 
+-- 
+2.41.0
+
+
+From 8ecfc1f65ae27c0a44afd2e28a30a9fa03377cdc Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Sat, 12 Aug 2023 13:30:46 +0200
+Subject: [PATCH 3/3] repart: Use 4096 as the fallback sector size for
+ verity/luks/filesystems
+
+When we don't know the sector size of the actual block device, because
+we're building an image in a loopback file and no sector size was specified
+explicitly, let's use 4096 as the sector size for filesystems, verity and
+LUKS. This should be the most compatible option, since 4096 will also work
+on devices with sector size 512 or 2048.
+
+For the actual GPT partition table size, we stick with 512 as the default
+value since UEFI firmware and the kernel will only try to read the GPT
+partition table from the first LBA on the device and the sector size for
+most devices is still 512. It can also be trivially modified when copying
+the image to another device using --copy-from + --sector-size.
+---
+ src/partition/repart.c | 60 +++++++++++++++++++++++++++++++-----------
+ 1 file changed, 44 insertions(+), 16 deletions(-)
+
+diff --git a/src/partition/repart.c b/src/partition/repart.c
+index 0431c6a86b..1796b9ed35 100644
+--- a/src/partition/repart.c
++++ b/src/partition/repart.c
+@@ -96,6 +96,10 @@
+ /* LUKS2 volume key size. */
+ #define VOLUME_KEY_SIZE (512ULL/8ULL)
+ 
++/* Use 4K as the default filesystem sector size because as long as the partitions are aligned to 4K, the
++ * filesystems will then also be compatible with sector sizes 512, 1024 and 2048. */
++#define DEFAULT_FILESYSTEM_SECTOR_SIZE 4096ULL
++
+ /* Note: When growing and placing new partitions we always align to 4K sector size. It's how newer hard disks
+  * are designed, and if everything is aligned to that performance is best. And for older hard disks with 512B
+  * sector size devices were generally assumed to have an even number of sectors, hence at the worst we'll
+@@ -267,8 +271,7 @@ typedef struct Context {
+         uint64_t start, end, total;
+ 
+         struct fdisk_context *fdisk_context;
+-        uint64_t sector_size;
+-        uint64_t grain_size;
++        uint64_t sector_size, grain_size, fs_sector_size;
+ 
+         sd_id128_t seed;
+ 
+@@ -1988,7 +1991,7 @@ static int context_load_partition_table(Context *context) {
+         sd_id128_t disk_uuid;
+         size_t n_partitions;
+         unsigned long secsz;
+-        uint64_t grainsz;
++        uint64_t grainsz, fs_secsz = DEFAULT_FILESYSTEM_SECTOR_SIZE;
+         int r;
+ 
+         assert(context);
+@@ -2002,20 +2005,31 @@ static int context_load_partition_table(Context *context) {
+         if (!c)
+                 return log_oom();
+ 
+-        if (arg_sector_size > 0)
++        if (arg_sector_size > 0) {
+                 r = fdisk_save_user_sector_size(c, /* phy= */ 0, arg_sector_size);
+-        else {
++                fs_secsz = arg_sector_size;
++        } else {
+                 uint32_t ssz;
++                struct stat st;
+ 
+                 r = context_open_and_lock_backing_fd(context, context->node);
+                 if (r < 0)
+                         return r;
+ 
++                if (fstat(context->backing_fd, &st) < 0)
++                        return log_error_errno(r, "Failed to stat %s: %m", context->node);
++
+                 /* Auto-detect sector size if not specified. */
+                 r = probe_sector_size_prefer_ioctl(context->backing_fd, &ssz);
+                 if (r < 0)
+                         return log_error_errno(r, "Failed to probe sector size of '%s': %m", context->node);
+ 
++                /* If we found the sector size and we're operating on a block device, use it as the file
++                 * system sector size as well, as we know its the sector size of the actual block device and
++                 * not just the offset at which we found the GPT header. */
++                if (r > 0 && S_ISBLK(st.st_mode))
++                        fs_secsz = ssz;
++
+                 r = fdisk_save_user_sector_size(c, /* phy= */ 0, ssz);
+         }
+         if (r < 0)
+@@ -2041,8 +2055,9 @@ static int context_load_partition_table(Context *context) {
+                         return log_error_errno(errno, "Failed to stat block device '%s': %m", context->node);
+ 
+                 if (S_ISREG(st.st_mode) && st.st_size == 0) {
+-                        /* User the fallback values if we have no better idea */
+-                        context->sector_size = arg_sector_size ?: 512;
++                        /* Use the fallback values if we have no better idea */
++                        context->sector_size = fdisk_get_sector_size(c);
++                        context->fs_sector_size = fs_secsz;
+                         context->grain_size = 4096;
+                         return /* from_scratch = */ true;
+                 }
+@@ -2318,6 +2333,7 @@ add_initial_free_area:
+         context->end = last_lba;
+         context->total = nsectors;
+         context->sector_size = secsz;
++        context->fs_sector_size = fs_secsz;
+         context->grain_size = grainsz;
+         context->fdisk_context = TAKE_PTR(c);
+ 
+@@ -3271,7 +3287,7 @@ static int partition_encrypt(Context *context, Partition *p, const char *node) {
+ #if HAVE_LIBCRYPTSETUP && HAVE_CRYPT_SET_DATA_OFFSET && HAVE_CRYPT_REENCRYPT_INIT_BY_PASSPHRASE && HAVE_CRYPT_REENCRYPT
+         struct crypt_params_luks2 luks_params = {
+                 .label = strempty(ASSERT_PTR(p)->new_label),
+-                .sector_size = ASSERT_PTR(context)->sector_size,
++                .sector_size = ASSERT_PTR(context)->fs_sector_size,
+                 .data_device = node,
+         };
+         struct crypt_params_reencrypt reencrypt_params = {
+@@ -3310,7 +3326,7 @@ static int partition_encrypt(Context *context, Partition *p, const char *node) {
+                 return log_error_errno(r, "Failed to create temporary LUKS header file: %m");
+ 
+         /* Weird cryptsetup requirement which requires the header file to be the size of at least one sector. */
+-        r = ftruncate(fileno(h), context->sector_size);
++        r = ftruncate(fileno(h), luks_params.sector_size);
+         if (r < 0)
+                 return log_error_errno(r, "Failed to grow temporary LUKS header file: %m");
+ 
+@@ -3549,8 +3565,8 @@ static int partition_format_verity_hash(
+                                 .flags = CRYPT_VERITY_CREATE_HASH,
+                                 .hash_name = "sha256",
+                                 .hash_type = 1,
+-                                .data_block_size = context->sector_size,
+-                                .hash_block_size = context->sector_size,
++                                .data_block_size = context->fs_sector_size,
++                                .hash_block_size = context->fs_sector_size,
+                                 .salt_size = 32,
+                         });
+         if (r < 0) {
+@@ -4090,7 +4106,7 @@ static int context_mkfs(Context *context) {
+                 }
+ 
+                 r = make_filesystem(partition_target_path(t), p->format, strempty(p->new_label), root,
+-                                    p->fs_uuid, arg_discard, context->sector_size, NULL);
++                                    p->fs_uuid, arg_discard, context->fs_sector_size, NULL);
+                 if (r < 0)
+                         return r;
+ 
+@@ -5423,8 +5439,14 @@ static int context_minimize(Context *context) {
+                                 return r;
+                 }
+ 
+-                r = make_filesystem(d ? d->node : temp, p->format, strempty(p->new_label), root, fs_uuid,
+-                                    arg_discard, context->sector_size, NULL);
++                r = make_filesystem(d ? d->node : temp,
++                                    p->format,
++                                    strempty(p->new_label),
++                                    root,
++                                    fs_uuid,
++                                    arg_discard,
++                                    context->fs_sector_size,
++                                    NULL);
+                 if (r < 0)
+                         return r;
+ 
+@@ -5477,8 +5499,14 @@ static int context_minimize(Context *context) {
+                 if (r < 0 && r != -ENOENT && !ERRNO_IS_PRIVILEGE(r))
+                         return log_error_errno(r, "Failed to make loopback device of %s: %m", temp);
+ 
+-                r = make_filesystem(d ? d->node : temp, p->format, strempty(p->new_label), root, p->fs_uuid,
+-                                    arg_discard, context->sector_size, NULL);
++                r = make_filesystem(d ? d->node : temp,
++                                    p->format,
++                                    strempty(p->new_label),
++                                    root,
++                                    p->fs_uuid,
++                                    arg_discard,
++                                    context->fs_sector_size,
++                                    NULL);
+                 if (r < 0)
+                         return r;
+ 
+-- 
+2.41.0
+
