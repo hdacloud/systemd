@@ -2,9 +2,9 @@
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
 %if 0%{?facebook}
-%global hs_commit 8e75d008578374de1ed2b8da60e5885f7866d5e5
+%global hs_commit dc22e2f4c654d485d3eaf2b3074fb5d9b5d06aa9
 %else
-%global hs_commit 23abb83a514c7fee38207630c8f2e544933121a7
+%global hs_commit b3b10ef59604e8fb7d657f70a32bb56cea972f1e
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -105,12 +105,6 @@ Patch0001:      https://github.com/systemd/systemd/pull/26494.patch
 
 # Adjust upstream config to use our shared stack
 Patch0491:      fedora-use-system-auth-in-pam-systemd-user.patch
-
-#repart: Use 4096 as the fallback sector size for verity/luks/filesystems
-Patch0492:      28812.patch
-
-# repart: Set sector size of loopback devices
-Patch0493:      28479.patch
 
 %ifarch %{ix86} x86_64 aarch64
 %global have_gnu_efi 1
@@ -586,7 +580,11 @@ BuildRequires:  bzip2
 BuildRequires:  make
 BuildRequires:  selinux-policy
 BuildRequires:  selinux-policy-devel
+%if 0%{?facebook}
+Requires(post): selinux-policy-base
+%else
 Requires(post): selinux-policy-base >= %{_selinux_policy_version}
+%endif
 Requires(post): policycoreutils
 Requires(pre):  libselinux-utils
 Requires(post): libselinux-utils
@@ -1282,6 +1280,10 @@ rm -f .file-list-*
 rm -f %{name}.lang
 
 %changelog
+* Sun Aug 20 2023 Anita Zhang <the.anitazha@gmail.com> - 253.7-1.4
+- Gate out selinux-policy-base versioning for facebook
+- Move repart fixes to staging repo (#28479, #28812)
+
 * Wed Aug 16 2023 Anita Zhang <the.anitazha@gmail.com> - 253.7-1.3
 - Backport 2 fixes for repart.
 
