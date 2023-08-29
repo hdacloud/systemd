@@ -205,8 +205,15 @@ BuildRequires:  bpftool
 
 %if 0%{?fedora}
 %ifarch x86_64 aarch64
+%global have_xen 1
 # That package is only built for those two architectures
 BuildRequires:  xen-devel
+%endif
+%endif
+
+%if 0%{?have_gnu_efi}
+%if %{undefined rhel} || 0%{?rhel} > 8
+%global want_ukify 1
 %endif
 %endif
 
@@ -404,7 +411,7 @@ It also contains tools to manage encrypted home areas and secrets bound to the
 machine, and to create or grow partitions and make file systems automatically.
 
 %if 0%{?have_gnu_efi}
-%if %{undefined rhel} || 0%{?rhel} > 8
+%if 0%{?want_ukify}
 %package ukify
 Summary:        Tool to build Unified Kernel Images
 Requires:       %{name} = %{version}-%{release}
@@ -671,6 +678,11 @@ CONFIGURE_OPTS=(
         -Dlibcryptsetup=false
 %else
         -Dlibcryptsetup=true
+%if %{undefined rhel} || 0%{?rhel} > 8
+        -Dlibcryptsetup-plugins=true
+%else
+        -Dlibcryptsetup-plugins=false
+%endif
 %endif
         -Delfutils=true
         -Dpwquality=true
@@ -681,6 +693,7 @@ CONFIGURE_OPTS=(
         -Dlibiptc=false
         -Dlibcurl=true
         -Dlibfido2=true
+        -Dxenctrl=%{?have_xen:true}%{?!have_xen:false}
         -Defi=true
         -Dtpm=true
         -Dtpm2=true
@@ -761,7 +774,12 @@ else
   # For now, let's build the bootloader in the same places where we
   # built with gnu-efi. Later on, we might want to extend coverage, but
   # considering that that support is untested, let's not do this now.
-  CONFIGURE_OPTS+=( -Dbootloader=%{?have_gnu_efi:true}%{?!have_gnu_efi:false} )
+  # Note, ukify requires bootloader, let's also explicitly enable/disable it
+  # here for https://github.com/systemd/systemd/pull/24175.
+  CONFIGURE_OPTS+=(
+        -Dbootloader=%{?have_gnu_efi:true}%{?!have_gnu_efi:false}
+        -Dukify=%{?want_ukify:true}%{?!want_ukify:false}
+  )
 fi
 
 %if %{without lto}
@@ -1244,7 +1262,7 @@ fi
 %files udev -f .file-list-udev
 
 %if 0%{?have_gnu_efi}
-%if %{undefined rhel} || 0%{?rhel} > 8
+%if 0%{?want_ukify}
 %files ukify -f .file-list-ukify
 %endif
 %files boot-unsigned -f .file-list-boot
