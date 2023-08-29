@@ -678,6 +678,11 @@ CONFIGURE_OPTS=(
         -Dlibcryptsetup=false
 %else
         -Dlibcryptsetup=true
+%if %{undefined rhel} || 0%{?rhel} > 8
+        -Dlibcryptsetup-plugins=true
+%else
+        -Dlibcryptsetup-plugins=false
+%endif
 %endif
         -Delfutils=true
         -Dpwquality=true
