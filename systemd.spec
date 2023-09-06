@@ -2,9 +2,9 @@
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
 %if 0%{?facebook}
-%global hs_commit dc22e2f4c654d485d3eaf2b3074fb5d9b5d06aa9
+%global hs_commit 87642635010e6fd1ae3329baac821a45c8838261
 %else
-%global hs_commit b3b10ef59604e8fb7d657f70a32bb56cea972f1e
+%global hs_commit 3071a8f20815d537116b887a76c96955b34eed2d
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -39,7 +39,7 @@ Version:        253.7
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
 %endif
-Release:        1.4%{?dist}
+Release:        1.5%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -1298,6 +1298,9 @@ rm -f .file-list-*
 rm -f %{name}.lang
 
 %changelog
+* Wed Sep 06 2023 Anita Zhang <the.anitazha@gmail.com> - 253.7-1.5
+- Backport fix for rlim_max
+
 * Sun Aug 20 2023 Anita Zhang <the.anitazha@gmail.com> - 253.7-1.4
 - Gate out selinux-policy-base versioning for facebook
 - Move repart fixes to staging repo (#28479, #28812)
