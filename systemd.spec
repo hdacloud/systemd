@@ -2,9 +2,9 @@
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
 %if 0%{?facebook}
-%global hs_commit 87642635010e6fd1ae3329baac821a45c8838261
+%global hs_commit 9d24499df65a22d10953508b0808a87768c964c1
 %else
-%global hs_commit 3071a8f20815d537116b887a76c96955b34eed2d
+%global hs_commit 59ef89051aa8e6cfd2e5060b48275caeb5af0da3
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -39,7 +39,7 @@ Version:        253.7
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
 %endif
-Release:        1.5%{?dist}
+Release:        1.6%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -1298,6 +1298,9 @@ rm -f .file-list-*
 rm -f %{name}.lang
 
 %changelog
+* Thu Sep 14 2023 Anita Zhang <the.anitazha@gmail.com> - 253.7-1.6
+- Backport fix for #27287 (daemon-reload deadlock)
+
 * Wed Sep 06 2023 Anita Zhang <the.anitazha@gmail.com> - 253.7-1.5
 - Backport fix for rlim_max
 
