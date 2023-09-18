@@ -959,7 +959,8 @@ install -p -m 0644 /tmp/selinux/systemd_hs.pp.bz2 %{buildroot}%{_datadir}/selinu
 
 %check
 %if %{with tests}
-meson test -C %{_vpath_builddir} -t 6 --print-errorlogs
+# Add --num-processes 1 as workaround for issue: AttributeError: 'NoneType' object has no attribute '_add_reader' - https://github.com/python/cpython/issues/82200
+meson test -C %{_vpath_builddir} -t 6 --print-errorlogs --num-processes 1
 %endif
 
 #############################################################################################
@@ -1298,6 +1299,9 @@ rm -f .file-list-*
 rm -f %{name}.lang
 
 %changelog
+* Mon Sep 18 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 253.7-1.7
+- Limit parallelism when running tests to avoid hitting bug in python 3.6
+
 * Thu Sep 14 2023 Anita Zhang <the.anitazha@gmail.com> - 253.7-1.6
 - Backport fix for #27287 (daemon-reload deadlock)
 
