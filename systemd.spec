@@ -2,9 +2,9 @@
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
 %if 0%{?facebook}
-%global hs_commit 9d24499df65a22d10953508b0808a87768c964c1
+%global hs_commit 6ecdef4d56122be0f141dc47435bec294e22f937
 %else
-%global hs_commit 59ef89051aa8e6cfd2e5060b48275caeb5af0da3
+%global hs_commit 1f18345f5fce3cfd90d0a476052bf756b658ff2b
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -39,7 +39,7 @@ Version:        253.7
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
 %endif
-Release:        1.6%{?dist}
+Release:        1.7%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -1299,6 +1299,9 @@ rm -f .file-list-*
 rm -f %{name}.lang
 
 %changelog
+* Mon Oct 09 2023 Anita Zhang <the.anitazha@gmail.com> - 253.7-1.7
+- Add threads dependency to test-process-util to fix C8s build
+
 * Mon Sep 18 2023 Daan De Meyer <daan.j.demeyer@gmail.com> - 253.7-1.7
 - Limit parallelism when running tests to avoid hitting bug in python 3.6
 
