@@ -39,7 +39,7 @@ Version:        253.7
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
 %endif
-Release:        1.7%{?dist}
+Release:        1.8%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -68,7 +68,6 @@ Source13:       libsystemd-shared.abignore
 
 Source14:       10-oomd-defaults.conf
 Source15:       10-oomd-per-slice-defaults.conf
-Source16:       10-timeout-abort.conf
 Source17:       10-map-count.conf
 
 Source21:       macros.sysusers
@@ -609,8 +608,6 @@ runs properly under an environment with SELinux enabled.
 # Let's disable the service.
 sed -r -i '/^enable systemd-boot-update.service/d' presets/90-systemd.preset
 
-sed -r 's|/system/|/user/|g' %{SOURCE16} >10-timeout-abort.conf.user
-
 # Lower the bpftool version requirement to 4.18.0 which has all the required
 # functionality backported in C8S/C9S.
 sed -r -i.old -e 's/>= 5.13.0/>= 4.18.0/g' -e 's/>= 5.6.0/>= 4.18.0/g' meson.build
@@ -730,9 +727,6 @@ CONFIGURE_OPTS=(
         -Ddefault-llmnr=resolve
         # https://bugzilla.redhat.com/show_bug.cgi?id=2028169
         -Dstatus-unit-format-default=combined
-        # https://fedoraproject.org/wiki/Changes/Shorter_Shutdown_Timer
-        -Ddefault-timeout-sec=45
-        -Ddefault-user-timeout-sec=45
         -Doomd=true
         -Dadm-gid=4
         -Daudio-gid=63
@@ -895,9 +889,6 @@ install -D -t %{buildroot}/usr/lib/systemd/ %{SOURCE3}
 install -Dm0644 -t %{buildroot}%{_prefix}/lib/systemd/oomd.conf.d/ %{SOURCE14}
 install -Dm0644 -t %{buildroot}%{system_unit_dir}/system.slice.d/ %{SOURCE15}
 install -Dm0644 -t %{buildroot}%{user_unit_dir}/slice.d/ %{SOURCE15}
-# https://fedoraproject.org/wiki/Changes/Shorter_Shutdown_Timer
-install -Dm0644 -t %{buildroot}%{system_unit_dir}/service.d/ %{SOURCE16}
-install -Dm0644 10-timeout-abort.conf.user %{buildroot}%{user_unit_dir}/service.d/10-timeout-abort.conf
 
 # https://fedoraproject.org/wiki/Changes/IncreaseVmMaxMapCount
 install -Dm0644 -t %{buildroot}%{_prefix}/lib/sysctl.d/ %{SOURCE17}
@@ -1299,6 +1290,9 @@ rm -f .file-list-*
 rm -f %{name}.lang
 
 %changelog
+* Fri Oct 13 2023 Anita Zhang <the.anitazha@gmail.com> - 253.7-1.8
+- Revert changes related to https://fedoraproject.org/wiki/Changes/Shorter_Shutdown_Timer
+
 * Mon Oct 09 2023 Anita Zhang <the.anitazha@gmail.com> - 253.7-1.7
 - Add threads dependency to test-process-util to fix C8s build
 
