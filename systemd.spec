@@ -2,7 +2,7 @@
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
 %if 0%{?facebook}
-%global hs_commit 6ecdef4d56122be0f141dc47435bec294e22f937
+%global hs_commit ef31573b60e69f48f5889f9bfb39abf84d60c872
 %else
 %global hs_commit 1f18345f5fce3cfd90d0a476052bf756b658ff2b
 %endif
@@ -39,7 +39,7 @@ Version:        253.7
 # determine the build information from local checkout
 Version:        %(tools/meson-vcs-tag.sh . error | sed -r 's/-([0-9])/.^\1/; s/-g/_g/')
 %endif
-Release:        1.8%{?dist}
+Release:        1.9%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -1290,6 +1290,9 @@ rm -f .file-list-*
 rm -f %{name}.lang
 
 %changelog
+* Tue Nov 07 2023 Anita Zhang <the.anitazha@gmail.com> - 253.7-1.9
+- FB only: bump netlink timeout to infinity to deal with kernel stalls
+
 * Fri Oct 13 2023 Anita Zhang <the.anitazha@gmail.com> - 253.7-1.8
 - Revert changes related to https://fedoraproject.org/wiki/Changes/Shorter_Shutdown_Timer
 
