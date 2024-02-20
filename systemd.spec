@@ -2,9 +2,9 @@
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
 %if 0%{?facebook}
-%global hs_commit 60ba4f39786d86e81142ac863fc09674182a816a
+%define commit 60ba4f39786d86e81142ac863fc09674182a816a
 %else
-%global hs_commit 60ba4f39786d86e81142ac863fc09674182a816a
+%define commit 60ba4f39786d86e81142ac863fc09674182a816a
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -51,7 +51,7 @@ License:        LGPL-2.1-or-later AND MIT AND GPL-2.0-or-later
 Summary:        System and Service Manager
 
 # download tarballs with "spectool -g systemd.spec"
-Source0:        %{url}/archive/%{hs_commit}/%{name}-hs%{?facebook:+fb}-%{version}.tar.gz
+Source0:        %{url}/archive/%{commit}/%{name}-hs%{?facebook:+fb}-%{version}.tar.gz
 # This file must be available before %%prep.
 # It is generated during systemd build and can be found in build/src/core/.
 Source1:        triggers.systemd
