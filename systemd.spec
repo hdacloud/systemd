@@ -1,6 +1,12 @@
 #global commit c4b843473a75fb38ed5bf54e9d3cfb1cb3719efa
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
+%if 0%{?facebook}
+%define commit 60ba4f39786d86e81142ac863fc09674182a816a
+%else
+%define commit 60ba4f39786d86e81142ac863fc09674182a816a
+%endif
+
 # We ship a .pc file but don't want to have a dep on pkg-config. We
 # strip the automatically generated dep here and instead co-own the
 # directory.
@@ -45,13 +51,7 @@ License:        LGPL-2.1-or-later AND MIT AND GPL-2.0-or-later
 Summary:        System and Service Manager
 
 # download tarballs with "spectool -g systemd.spec"
-%if %{defined commit}
-Source0:        https://github.com/systemd/systemd%{?stable:-stable}/archive/%{commit}/%{name}-%{shortcommit}.tar.gz
-%elif 0%{?facebook}
-Source0:        %{url}/archive/60ba4f39786d86e81142ac863fc09674182a816a/%{name}-hs+fb-%{version}.tar.gz
-%else
-Source0:        %{url}/archive/60ba4f39786d86e81142ac863fc09674182a816a/%{name}-hs-%{version}.tar.gz
-%endif
+Source0:        %{url}/archive/%{commit}/%{name}-hs%{?facebook:+fb}-%{version}.tar.gz
 # This file must be available before %%prep.
 # It is generated during systemd build and can be found in build/src/core/.
 Source1:        triggers.systemd
@@ -626,13 +626,9 @@ This package provides the SELinux policy module to ensure systemd
 runs properly under an environment with SELinux enabled.
 
 %prep
-%if %{defined commit}
-%autosetup -n %{?commit:%{name}%[%stable?"-stable":""]-%{commit}}%{!?commit:%{name}%[%stable?"-stable":""]-%{version_no_tilde}} -p1
-%else
 # pagure strips the '+' from 'hs+fb' for the top directory in the tar archive so
 # the top directory is hsfb-250.3 instead of hs+fb-250.3.
 %autosetup -n %{name}-hs%{?facebook:fb}-%{version} -p1
-%endif
 
 mkdir -p /tmp/selinux
 cp %SOURCE100 %SOURCE101 %SOURCE102 %SOURCE103 /tmp/selinux
