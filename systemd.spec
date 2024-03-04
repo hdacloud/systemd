@@ -2,9 +2,9 @@
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
 %if 0%{?facebook}
-%define commit 60ba4f39786d86e81142ac863fc09674182a816a
+%define commit e7f976ec62dfd8398e4c0ac6bbaecb1ebeffc0f0
 %else
-%define commit 60ba4f39786d86e81142ac863fc09674182a816a
+%define commit e7f976ec62dfd8398e4c0ac6bbaecb1ebeffc0f0
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -39,9 +39,9 @@
 
 Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
-# Allow users to specify the version and release when building the rpm by
+# Allow users to specify the version and release when building the rpm by 
 # setting the %%version_override and %%release_override macros.
-Version:        %{?version_override}%{!?version_override:255.3}
+Version:        %{?version_override}%{!?version_override:255.4}
 Release:        %{?release_override:%{release_override}%{?dist}}%{!?release_override:%autorelease}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
@@ -112,10 +112,10 @@ Patch0001:      https://github.com/systemd/systemd/pull/26494.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=2251843
 Patch0491:      https://github.com/systemd/systemd/pull/30846.patch
 
+%endif
+
 # Adjust upstream config to use our shared stack
 Patch0499:      fedora-use-system-auth-in-pam-systemd-user.patch
-
-%endif
 
 %ifarch %{ix86} x86_64 aarch64
 %global want_bootloader 1
@@ -293,6 +293,15 @@ Recommends:     libcryptsetup.so.12%{?elf_suffix}
 Recommends:     libcryptsetup.so.12(CRYPTSETUP_2.4)%{?elf_bits}
 
 %if %{with upstream}
+# Libkmod is used to load modules.
+Recommends:     libkmod.so.2%{?elf_suffix}
+# kmod_list_next, kmod_load_resources, kmod_module_get_initstate,
+# kmod_module_get_module, kmod_module_get_name, kmod_module_new_from_lookup,
+# kmod_module_probe_insert_module, kmod_module_unref, kmod_module_unref_list,
+# kmod_new, kmod_set_log_fn, kmod_unref, kmod_validate_resources
+# are part of LIBKMOD_5.
+Recommends:     libkmod.so.2(LIBKMOD_5)%{?elf_bits}
+
 Recommends:     libarchive.so.13%{?elf_suffix}
 %endif
 
@@ -381,6 +390,13 @@ Obsoletes:      udev < 183
 Conflicts:      systemd-timesyncd < %{version}-%{release}
 Obsoletes:      systemd-timesyncd < %{version}-%{release}
 Provides:       systemd-timesyncd = %{version}-%{release}
+
+%if %{with upstream}
+# Libkmod is used to load modules. Assume that if we need udevd, we certainly
+# want to load modules, so make this into a hard dependency here.
+Requires:       libkmod.so.2%{?elf_suffix}
+Requires:       libkmod.so.2(LIBKMOD_5)%{?elf_bits}
+%endif
 
 # Recommends to replace normal Requires deps for stuff that is dlopen()ed
 # used by dissect, integritysetup, veritysetyp, growfs, repart, cryptenroll, home
@@ -759,7 +775,7 @@ CONFIGURE_OPTS+=(
 %global _lto_cflags %nil
 %endif
 
-{ %meson "${CONFIGURE_OPTS[@]}"; }
+{ %meson "${CONFIGURE_OPTS[@]}" %{?meson_extra_configure_options} ; }
 
 %meson_build
 
