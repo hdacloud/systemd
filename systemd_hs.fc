@@ -1,4 +1,0 @@
-/usr/lib/systemd/libsystemd-core-.+\.so.* --        system_u:object_r:lib_t:s0
-/usr/lib/systemd/libsystemd-shared-.+\.so.* --      system_u:object_r:lib_t:s0
-/efi    system_u:object_r:boot_t:s0
-/efi/.* system_u:object_r:boot_t:s0

@@ -85,8 +85,6 @@ Source25:       98-default-mac-none.link
 # Needed for selinux subpackage
 Source100:      Makefile.selinux
 Source101:      systemd_hs.te
-Source102:      systemd_hs.if
-Source103:      systemd_hs.fc
 
 %if 0
 GIT_DIR=../../src/systemd/.git git format-patch-ab --no-signature -M -N v235..v235-stable
@@ -647,7 +645,7 @@ runs properly under an environment with SELinux enabled.
 %autosetup -n %{name}-hs%{?facebook:fb}-%{version} -p1
 
 mkdir -p /tmp/selinux
-cp %SOURCE100 %SOURCE101 %SOURCE102 %SOURCE103 /tmp/selinux
+cp %SOURCE100 %SOURCE101 /tmp/selinux
 
 %build
 %global ntpvendor %(source /etc/os-release; echo ${ID})

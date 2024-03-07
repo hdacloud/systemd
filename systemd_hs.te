@@ -1,57 +1,46 @@
 policy_module(systemd_hs,0.0.1)
 
-# systemd overrides for 247
 gen_require(`
+	type cgroup_t;
+	type default_t;
+	type init_exec_t;
 	type init_t;
 	type init_var_run_t;
-	type kmsg_device_t;
-	type proc_kmsg_t;
-	type proc_security_t;
-	type systemd_hostnamed_t;
-	type systemd_localed_t;
-	type systemd_logind_t;
-	type systemd_resolved_t;
-	type systemd_tmpfiles_t;
-	type systemd_hwdb_t;
-	type systemd_sysctl_t;
-	type security_t;
-	type tpm_device_t;
-	type ramfs_t;
-	type shadow_t;
+	type kernel_t;
+	type loadkeys_t;
 	type syslogd_t;
-	type user_tmp_t;
-	type systemd_machined_t;
+	type syslogd_var_run_t;
 	type system_dbusd_var_run_t;
+	type systemd_gpt_generator_t;
+	type systemd_network_generator_t;
 	type systemd_networkd_t;
+	type systemd_userdbd_t;
+	type tmpfs_t;
 ')
 
 #============= init_t ==============
-allow init_t kmsg_device_t:chr_file mounton;
-allow init_t proc_kmsg_t:file { getattr mounton };
-allow init_t ramfs_t:file manage_file_perms;
-allow init_t tpm_device_t:chr_file { read write open };
-allow init_t shadow_t:file { read open };
+allow init_t self:netlink_netfilter_socket { bind create getattr getopt setopt };
+allow init_t self:vsock_socket { bind connect create getopt setopt };
+allow init_t syslogd_var_run_t:file { setattr write };
 
-#============= systemd_hwdb_t ==============
-allow systemd_hwdb_t security_t:file { read open };
-allow systemd_hwdb_t self:netlink_selinux_socket { create bind };
-
-#============= systemd_sysctl_t ==============
-allow systemd_sysctl_t proc_security_t:file read;
+#============= loadkeys_t ==============
+allow loadkeys_t default_t:lnk_file read;
+allow loadkeys_t init_exec_t:file getattr;
 
 #============= syslogd_t ==============
-allow syslogd_t user_tmp_t:dir search;
 
-#============= systemd_machined_t ==============
-allow systemd_machined_t init_var_run_t:sock_file manage_sock_file_perms;
+#!!!! This avc can be allowed using the boolean 'logging_syslogd_list_non_security_dirs'
+allow syslogd_t cgroup_t:dir read;
+
+#============= systemd_gpt_generator_t ==============
+allow systemd_gpt_generator_t tmpfs_t:filesystem mount;
+
+#============= systemd_network_generator_t ==============
+allow systemd_network_generator_t init_var_run_t:file { create getattr open read rename setattr write };
+allow systemd_network_generator_t kernel_t:unix_dgram_socket sendto;
 
 #============= systemd_networkd_t ==============
-allow systemd_networkd_t system_dbusd_var_run_t:sock_file *;
+allow systemd_networkd_t system_dbusd_var_run_t:sock_file watch;
 
-selinux_use_status_page(init_t)
-selinux_use_status_page(systemd_hostnamed_t)
-selinux_use_status_page(systemd_localed_t)
-selinux_use_status_page(systemd_logind_t)
-selinux_use_status_page(systemd_resolved_t)
-selinux_use_status_page(systemd_tmpfiles_t)
-selinux_use_status_page(systemd_hwdb_t)
+#============= systemd_userdbd_t ==============
+allow systemd_userdbd_t self:capability sys_resource;
