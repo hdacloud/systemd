@@ -2,7 +2,7 @@
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
 %if 0%{?facebook}
-%define commit e7f976ec62dfd8398e4c0ac6bbaecb1ebeffc0f0
+%define commit f0c7792e2aaf72dd7f465c81e64729ab9b9f78eb
 %else
 %define commit e7f976ec62dfd8398e4c0ac6bbaecb1ebeffc0f0
 %endif
