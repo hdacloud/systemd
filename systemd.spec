@@ -42,7 +42,7 @@ Url:            https://pagure.io/centos-sig-hyperscale/systemd
 # Allow users to specify the version and release when building the rpm by 
 # setting the %%version_override and %%release_override macros.
 Version:        %{?version_override}%{!?version_override:255.4}
-Release:        %{?release_override:%{release_override}%{?dist}}%{!?release_override:%autorelease}
+Release:        %{?release_override}%{!?release_override:1.1}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
