@@ -14,7 +14,7 @@ Fixes #26488.
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/src/core/manager.c b/src/core/manager.c
-index 7b394794b0d4..306477c6e6c2 100644
+index 7b394794b0d4d..306477c6e6c2d 100644
 --- a/src/core/manager.c
 +++ b/src/core/manager.c
 @@ -3822,8 +3822,8 @@ static int manager_run_generators(Manager *m) {
