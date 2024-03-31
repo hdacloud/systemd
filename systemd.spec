@@ -2,9 +2,9 @@
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
 %if 0%{?facebook}
-%define commit c013ba38f4a9c13e39f28f487c6248db20bf0985
+%define commit 3eba66c37877b1858d077b704000923ceed412c9
 %else
-%define commit d5e7fbc2fb94a43368d7d1006b7d98b0b658cb0e
+%define commit 74d0d1174b780d99786c7dd4d3dbb1c249fb5dc3
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -42,7 +42,7 @@ Url:            https://pagure.io/centos-sig-hyperscale/systemd
 # Allow users to specify the version and release when building the rpm by 
 # setting the %%version_override and %%release_override macros.
 Version:        %{?version_override}%{!?version_override:255.4}
-Release:        %{?release_override}%{!?release_override:1.2}%{?dist}
+Release:        %{?release_override}%{!?release_override:1.3}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
