@@ -2,9 +2,9 @@
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
 %if 0%{?facebook}
-%define commit 46c02998403a5412f630df66b36a307e506f57c4
+%define commit f820150158ee84335230a66b633930b732f1c413
 %else
-%define commit 7fc71816072669f6b17bb755435d4890d44c0811
+%define commit bf2aaa696d4e04e20b1a0fecee379d10a553d0cf
 %endif
 
 # We ship a .pc file but don't want to have a dep on pkg-config. We
@@ -21,28 +21,29 @@
 %global elf_suffix ()%{elf_bits}
 %endif
 
-%bcond bzip2  1
-%bcond gnutls 1
-%bcond lz4    1
-%bcond xz     1
-%bcond zlib   1
-%bcond zstd   1
+%bcond bzip2     1
+%bcond gnutls    1
+%bcond lz4       1
+%bcond xz        1
+%bcond zlib      1
+%bcond zstd      1
 
 # Bootstrap may be needed to break circular dependencies with cryptsetup,
 # e.g. when re-building cryptsetup on a json-c SONAME-bump.
 %bcond bootstrap 0
 %bcond tests     1
 %bcond lto       1
+%bcond docs      1
 
 # Build from git main
-%bcond upstream 0
+%bcond upstream  0
 
 Name:           systemd
 Url:            https://pagure.io/centos-sig-hyperscale/systemd
 # Allow users to specify the version and release when building the rpm by 
 # setting the %%version_override and %%release_override macros.
-Version:        %{?version_override}%{!?version_override:255.4}
-Release:        %{?release_override}%{!?release_override:1.7}%{?dist}
+Version:        %{?version_override}%{!?version_override:255.5}
+Release:        %{?release_override}%{!?release_override:1.1}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -115,7 +116,7 @@ Patch0491:      https://github.com/systemd/systemd/pull/30846.patch
 # Adjust upstream config to use our shared stack
 Patch0499:      fedora-use-system-auth-in-pam-systemd-user.patch
 
-%ifarch %{ix86} x86_64 aarch64
+%ifarch %{ix86} x86_64 aarch64 riscv64
 %global want_bootloader 1
 %endif
 
@@ -168,14 +169,18 @@ BuildRequires:  qrencode-devel
 BuildRequires:  libmicrohttpd-devel
 BuildRequires:  libxkbcommon-devel
 BuildRequires:  iptables-devel
+BuildRequires:  pkgconfig(bash-completion)
+BuildRequires:  pkgconfig(libarchive)
 BuildRequires:  pkgconfig(libfido2)
 BuildRequires:  pkgconfig(tss2-esys)
 BuildRequires:  pkgconfig(tss2-rc)
 BuildRequires:  pkgconfig(tss2-mu)
 BuildRequires:  pkgconfig(libbpf)
 BuildRequires:  systemtap-sdt-devel
+%if %{with docs}
 BuildRequires:  libxslt
 BuildRequires:  docbook-style-xsl
+%endif
 BuildRequires:  pkgconfig
 BuildRequires:  gperf
 BuildRequires:  gawk
@@ -201,13 +206,8 @@ BuildRequires:  libseccomp-devel
 BuildRequires:  meson >= 0.43
 BuildRequires:  gettext
 # We use RUNNING_ON_VALGRIND in tests, so the headers need to be available
+%ifarch %{valgrind_arches}
 BuildRequires:  valgrind-devel
-BuildRequires:  pkgconfig(bash-completion)
-BuildRequires:  perl
-BuildRequires:  perl(IPC::SysV)
-
-%if %{with upstream}
-BuildRequires:  pkgconfig(libarchive)
 %endif
 
 %ifnarch %ix86
@@ -264,6 +264,19 @@ Provides:       %{name}-sysusers = %{version}-%{release}
 Conflicts:      %{name}-standalone-shutdown < %{version}-%{release}^
 Provides:       %{name}-shutdown = %{version}-%{release}
 
+%if "%{_sbindir}" == "%{_bindir}"
+# Compat symlinks for Requires in other packages.
+# We rely on filesystem to create the symlinks for us.
+Requires:       filesystem(unmerged-sbin-symlinks)
+Provides:       /usr/sbin/halt
+Provides:       /usr/sbin/init
+Provides:       /usr/sbin/poweroff
+Provides:       /usr/sbin/reboot
+Provides:       /usr/sbin/runlevel
+Provides:       /usr/sbin/shutdown
+Provides:       /usr/sbin/telinit
+%endif
+
 # Recommends to replace normal Requires deps for stuff that is dlopen()ed
 Recommends:     libidn2.so.0%{?elf_suffix}
 Recommends:     libidn2.so.0(IDN2_0.0.0)%{?elf_bits}
@@ -290,7 +303,6 @@ Recommends:     libelf.so.1(ELFUTILS_1.7)%{?elf_bits}
 Recommends:     libcryptsetup.so.12%{?elf_suffix}
 Recommends:     libcryptsetup.so.12(CRYPTSETUP_2.4)%{?elf_bits}
 
-%if %{with upstream}
 # Libkmod is used to load modules.
 Recommends:     libkmod.so.2%{?elf_suffix}
 # kmod_list_next, kmod_load_resources, kmod_module_get_initstate,
@@ -301,7 +313,6 @@ Recommends:     libkmod.so.2%{?elf_suffix}
 Recommends:     libkmod.so.2(LIBKMOD_5)%{?elf_bits}
 
 Recommends:     libarchive.so.13%{?elf_suffix}
-%endif
 
 %description
 systemd is a system and service manager that runs as PID 1 and starts the rest
@@ -373,9 +384,9 @@ Summary: Rule-based device node and kernel event manager
 License:        LGPL-2.1-or-later
 
 Requires:       systemd%{_isa} = %{version}-%{release}
-Requires(post):   systemd
-Requires(preun):  systemd
-Requires(postun): systemd
+Requires(post):   systemd%{_isa} = %{version}-%{release}
+Requires(preun):  systemd%{_isa} = %{version}-%{release}
+Requires(postun): systemd%{_isa} = %{version}-%{release}
 Requires(post): grep
 Requires:       kmod >= 18-4
 %if 0%{?facebook} == 0
@@ -389,12 +400,10 @@ Conflicts:      systemd-timesyncd < %{version}-%{release}
 Obsoletes:      systemd-timesyncd < %{version}-%{release}
 Provides:       systemd-timesyncd = %{version}-%{release}
 
-%if %{with upstream}
 # Libkmod is used to load modules. Assume that if we need udevd, we certainly
 # want to load modules, so make this into a hard dependency here.
 Requires:       libkmod.so.2%{?elf_suffix}
 Requires:       libkmod.so.2(LIBKMOD_5)%{?elf_bits}
-%endif
 
 # Recommends to replace normal Requires deps for stuff that is dlopen()ed
 # used by dissect, integritysetup, veritysetyp, growfs, repart, cryptenroll, home
@@ -429,6 +438,13 @@ Obsoletes:      systemd-udev < 252.2^
 Conflicts:      %{name}-standalone-repart < %{version}-%{release}^
 Provides:       %{name}-repart = %{version}-%{release}
 
+%if "%{_sbindir}" == "%{_bindir}"
+# Compat symlinks for Requires in other packages.
+# We rely on filesystem to create the symlinks for us.
+Requires:       filesystem(unmerged-sbin-symlinks)
+Provides:       /usr/sbin/udevadm
+%endif
+
 %description udev
 This package contains systemd-udev and the rules and hardware database needed to
 manage device nodes. This package is necessary on physical machines and in
@@ -444,10 +460,18 @@ machine, and to create or grow partitions and make file systems automatically.
 Summary:        Tool to build Unified Kernel Images
 Requires:       %{name} = %{version}-%{release}
 
+Requires:       systemd-boot
 Requires:       python3dist(pefile)
 Requires:       python3dist(zstd)
 Requires:       python3dist(cryptography)
 Recommends:     python3dist(pillow)
+
+# for tests
+%ifarch riscv64
+# 2.42 received support for riscv64 + efi targets
+%global binutils_version_req >= 2.42
+%endif
+BuildRequires:  binutils %{?binutils_version_req}
 
 BuildArch:      noarch
 
@@ -482,9 +506,9 @@ the version that works with Secure Boot.
 # Name is the same as in Debian
 Summary: Tools for containers and VMs
 Requires:       %{name}%{_isa} = %{version}-%{release}
-Requires(post):   systemd
-Requires(preun):  systemd
-Requires(postun): systemd
+Requires(post):   systemd%{_isa} = %{version}-%{release}
+Requires(preun):  systemd%{_isa} = %{version}-%{release}
+Requires(postun): systemd%{_isa} = %{version}-%{release}
 # obsolete parent package so that dnf will install new subpackage on upgrade (#1260394)
 Obsoletes:      %{name} < 229-5
 # Bias the system towards libcurl-minimal if nothing pulls in full libcurl (#1997040)
@@ -519,6 +543,7 @@ systemd-journal-upload.
 %package networkd
 Summary:        System daemon that manages network configurations
 Requires:       %{name}%{_isa} = %{version}-%{release}
+%{?fedora:Recommends:     %{name}-udev = %{version}-%{release}}
 License:        LGPL-2.1-or-later
 %if 0%{?facebook} == 0
 # https://src.fedoraproject.org/rpms/systemd/pull-request/34
@@ -572,6 +597,7 @@ Requires:      %{name}%{_isa} = %{version}-%{release}
 # This dependency is provided transitively. Also add it explicitly to
 # appease rpminspect, https://github.com/rpminspect/rpminspect/issues/1231:
 Requires:      %{name}-libs%{_isa} = %{version}-%{release}
+Requires:      python3dist(psutil)
 
 License:       LGPL-2.1-or-later
 
@@ -652,7 +678,7 @@ cp %SOURCE100 %SOURCE101 /tmp/selinux
 %{!?ntpvendor: echo 'NTP vendor zone is not set!'; exit 1}
 
 CONFIGURE_OPTS=(
-        -Dmode=release
+        -Dmode=%[%{with upstream}?"developer":"release"]
         -Dsysvinit-path=/etc/rc.d/init.d
         -Drc-local=/etc/rc.d/rc.local
         -Dntp-servers='0.%{ntpvendor}.pool.ntp.org 1.%{ntpvendor}.pool.ntp.org 2.%{ntpvendor}.pool.ntp.org 3.%{ntpvendor}.pool.ntp.org'
@@ -707,14 +733,12 @@ CONFIGURE_OPTS=(
         -Ddefault-network=true
         -Dtests=unsafe
         -Dinstall-tests=true
-        -Dtty-gid=5
-        -Dusers-gid=100
         -Dnobody-user=nobody
         -Dnobody-group=nobody
         -Dcompat-mutable-uid-boundaries=true
         -Dsplit-bin=true
         -Db_ndebug=false
-        -Dman=enabled
+        -Dman=%[%{with docs}?"enabled":"disabled"]
         # there is stuff that relies on the "v" prefix
         -Dversion-tag=v%{version}%[%{without upstream}?"-%{release}":""]
         # https://bugzilla.redhat.com/show_bug.cgi?id=1906010
@@ -729,23 +753,24 @@ CONFIGURE_OPTS=(
         -Dstatus-unit-format-default=combined
         -Dconfigfiledir=/usr/lib
         -Doomd=true
+
         -Dadm-gid=4
-        -Daudio-gid=63
+        -Dtty-gid=5
+        -Ddisk-gid=6
+        -Dlp-gid=7
+        -Dkmem-gid=9
+        -Dwheel-gid=10
         -Dcdrom-gid=11
         -Ddialout-gid=18
-        -Ddisk-gid=6
-        -Dinput-gid=104
-        -Dkmem-gid=9
+        -Dutmp-gid=22
+        -Dtape-gid=33
         -Dkvm-gid=36
-        -Dlp-gid=7
+        -Dvideo-gid=39
+        -Daudio-gid=63
+        -Dusers-gid=100
+        -Dinput-gid=104
         -Drender-gid=105
         -Dsgx-gid=106
-        -Dtape-gid=33
-        -Dtty-gid=5
-        -Dusers-gid=100
-        -Dutmp-gid=22
-        -Dvideo-gid=39
-        -Dwheel-gid=10
         -Dsystemd-journal-gid=190
         -Dsystemd-network-uid=192
         -Dsystemd-resolve-uid=193
@@ -795,8 +820,10 @@ cd /tmp/selinux
 %meson_install
 
 # udev links
+%if "%{_sbindir}" != "%{_bindir}"
 mkdir -p %{buildroot}/%{_sbindir}
 ln -sf ../bin/udevadm %{buildroot}%{_sbindir}/udevadm
+%endif
 
 # Compatiblity and documentation files
 touch %{buildroot}/etc/crypttab
@@ -914,6 +941,13 @@ install -m 0755 -D -t %{buildroot}%{_rpmconfigdir}/ %{SOURCE24}
 # https://bugzilla.redhat.com/show_bug.cgi?id=2107754
 install -Dm0644 -t %{buildroot}%{_prefix}/lib/systemd/network/ %{SOURCE25}
 
+%if "%{_sbindir}" == "%{_bindir}"
+# Systemd has the split-sbin option which is also used to select the directory
+# for alias symlinks. We need to keep split-sbin=true for now, to support
+# unmerged systems. Move the symlinks here instead.
+mv -v %{buildroot}/usr/sbin/* %{buildroot}%{_bindir}/
+%endif
+
 %find_lang %{name}
 
 # Split files in build root into rpms
@@ -936,33 +970,6 @@ meson test -C %{_vpath_builddir} -t 6 --print-errorlogs
 %post
 systemd-machine-id-setup &>/dev/null || :
 
-# FIXME: move to %postun. We want to restart systemd *after* removing
-# files from the old rpm. Right now we may still have bits the old
-# setup if the files are not present in the new version. But before
-# implement restarting of *other* services after the transaction, moving
-# this would make things worse, increasing the number of warnings we get
-# about needed daemon-reload.
-
-systemctl daemon-reexec &>/dev/null || {
-  # systemd v239 had bug #9553 in D-Bus authentication of the private socket,
-  # which was later fixed in v240 by #9625.
-  #
-  # The end result is that a `systemctl daemon-reexec` call as root will fail
-  # when upgrading from systemd v239, which means the system will not start
-  # running the new version of systemd after this post install script runs.
-  #
-  # To work around this issue, let's fall back to using a `kill -TERM 1` to
-  # re-execute the daemon when the `systemctl daemon-reexec` call fails.
-  #
-  # In order to prevent issues when the reason why the daemon-reexec failed is
-  # not the aforementioned bug, let's only use this fallback when:
-  #   - we're upgrading this RPM package; and
-  #   - we confirm that systemd is running as PID1 on this system.
-  if [ $1 -gt 1 ] && [ -d /run/systemd/system ] ; then
-    kill -TERM 1 &>/dev/null || :
-  fi
-}
-
 [ $1 -eq 1 ] || exit 0
 
 # create /var/log/journal only on initial installation,
@@ -984,9 +991,12 @@ systemctl preset-all &>/dev/null || :
 systemctl --global preset-all &>/dev/null || :
 
 %postun
-if [ $1 -eq 1 ]; then
-   [ -w %{_localstatedir} ] && journalctl --update-catalog || :
-   systemd-tmpfiles --create &>/dev/null || :
+if [ $1 -ge 1 ]; then
+  [ -w %{_localstatedir} ] && journalctl --update-catalog || :
+
+  systemctl daemon-reexec || :
+
+  systemd-tmpfiles --create &>/dev/null || :
 fi
 
 %systemd_postun_with_restart systemd-timedated.service systemd-hostnamed.service systemd-journald.service systemd-localed.service systemd-userdbd.service
@@ -1000,25 +1010,9 @@ if [ $1 -ge 1 ] && [ -x "/usr/lib/systemd/systemd-update-helper" ]; then
     /usr/lib/systemd/systemd-update-helper user-reexec || :
 fi
 
-%triggerun resolved -- systemd < 246.1-1
-# This is for upgrades from previous versions before systemd-resolved became the default.
-systemctl --no-reload preset systemd-resolved.service &>/dev/null || :
-
-if systemctl -q is-enabled systemd-resolved.service &>/dev/null; then
-  systemctl -q is-enabled NetworkManager.service 2>/dev/null && \
-  ! test -L /etc/resolv.conf 2>/dev/null && \
-  ! mountpoint /etc/resolv.conf &>/dev/null && \
-  grep -q 'Generated by NetworkManager' /etc/resolv.conf 2>/dev/null && \
-  echo -e '/etc/resolv.conf was generated by NetworkManager.\nRemoving it to let systemd-resolved manage this file.' && \
-  mv -v /etc/resolv.conf /etc/resolv.conf.orig-with-nm && \
-  ln -sv ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf 2>/dev/null || :
-
-  systemctl start systemd-resolved.service &>/dev/null || :
-fi
-
-%triggerun -- systemd < 247.3-2
-# This is for upgrades from previous versions before oomd-defaults is available.
-systemctl --no-reload preset systemd-oomd.service &>/dev/null || :
+%triggerun -- systemd < 256
+# This is for upgrades from previous versions before systemd restart was moved to %%postun
+systemctl daemon-reexec || :
 
 %triggerpostun -- systemd < 253~rc1-2
 # This is for upgrades from previous versions where systemd-journald-audit.socket
@@ -1037,7 +1031,7 @@ if [ -L %{_localstatedir}/lib/systemd/timesync ]; then
     rm %{_localstatedir}/lib/systemd/timesync
     mv %{_localstatedir}/lib/private/systemd/timesync %{_localstatedir}/lib/systemd/timesync
 fi
-if [ -f %{_localstatedir}/lib/systemd/clock ] ; then
+if [ -f %{_localstatedir}/lib/systemd/clock ]; then
     mkdir -p %{_localstatedir}/lib/systemd/timesync
     mv %{_localstatedir}/lib/systemd/clock %{_localstatedir}/lib/systemd/timesync/.
 fi
