@@ -205,6 +205,7 @@ BuildRequires:  firewalld-filesystem
 BuildRequires:  libseccomp-devel
 BuildRequires:  meson >= 0.43
 BuildRequires:  gettext
+BuildRequires:  rsync
 # We use RUNNING_ON_VALGRIND in tests, so the headers need to be available
 %ifarch %{valgrind_arches}
 BuildRequires:  valgrind-devel
