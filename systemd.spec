@@ -1,4 +1,4 @@
-#global commit c4b843473a75fb38ed5bf54e9d3cfb1cb3719efa
+#global commit 1781de18ab8ebc3e42a607851d8effb3b0355c87
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
 %if 0%{?facebook}
@@ -38,9 +38,16 @@
 # Build from git main
 %bcond upstream  0
 
+# When bootstrap, libcryptsetup is disabled
+# but auto-features causes many options to be turned on
+# that depend on libcryptsetup (e.g. libcryptsetup-plugins, homed)
+%if %{with bootstrap}
+%global __meson_auto_features disabled
+%endif
+
 Name:           systemd
-Url:            https://pagure.io/centos-sig-hyperscale/systemd
-# Allow users to specify the version and release when building the rpm by
+Url:            https://systemd.io
+# Allow users to specify the version and release when building the rpm by 
 # setting the %%version_override and %%release_override macros.
 Version:        %{?version_override}%{!?version_override:255.5}
 Release:        %{?release_override}%{!?release_override:1.4}%{?dist}
@@ -58,16 +65,17 @@ Source0:        %{url}/archive/%{commit}/%{name}-hs%{?facebook:+fb}-%{version}.t
 Source1:        triggers.systemd
 Source2:        split-files.py
 Source3:        purge-nobody-user
+Source4:        test_sysusers_defined.py
 
 # Prevent accidental removal of the systemd package
-Source4:        yum-protect-systemd.conf
+Source5:        yum-protect-systemd.conf
 
-Source5:        inittab
-Source6:        sysctl.conf.README
-Source7:        systemd-journal-remote.xml
-Source8:        systemd-journal-gatewayd.xml
-Source9:        20-yama-ptrace.conf
-Source10:       systemd-udev-trigger-no-reload.conf
+Source6:        inittab
+Source7:        sysctl.conf.README
+Source8:        systemd-journal-remote.xml
+Source9:        systemd-journal-gatewayd.xml
+Source10:       20-yama-ptrace.conf
+Source11:       systemd-udev-trigger-no-reload.conf
 # https://fedoraproject.org/wiki/How_to_filter_libabigail_reports
 Source13:       .abignore
 
@@ -100,17 +108,24 @@ GIT_DIR=../../src/systemd/.git git diffab -M v233..master@{2017-06-15} -- hwdb/[
 # applying upstream pull requests.
 
 %if %{without upstream}
+# Drop varlink method call until selinux policy is updated,
+# see https://bodhi.fedoraproject.org/updates/FEDORA-2024-d5c99f5063,
+# https://bugzilla.redhat.com/show_bug.cgi?id=2279923.
+# Reverts https://github.com/systemd/systemd/commit/5b44c81ff868a4d1b78a74e4770f7a8b2f1d0f91.
+Patch0001:      0001-Revert-machined-add-varlink-interface-for-registerin.patch
 
+%if 0%{?fedora} < 41
 # Work-around for dracut issue: run generators directly when we are in initrd
 # https://bugzilla.redhat.com/show_bug.cgi?id=2164404
 # Drop when dracut-060 is available.
-Patch0001:      https://github.com/systemd/systemd/pull/26494.patch
+Patch0010:      https://github.com/systemd/systemd/pull/26494.patch
+%endif
 
-
-# Those are downstream-only patches, but we don't want them in packit builds:
 # https://bugzilla.redhat.com/show_bug.cgi?id=2251843
 Patch0491:      https://github.com/systemd/systemd/pull/30846.patch
 
+# Soft-disable tmpfiles --purge until a good use case comes up.
+Patch0492:      0001-tmpfiles-make-purge-hard-to-mis-use.patch
 %endif
 
 # Adjust upstream config to use our shared stack
@@ -205,7 +220,6 @@ BuildRequires:  firewalld-filesystem
 BuildRequires:  libseccomp-devel
 BuildRequires:  meson >= 0.43
 BuildRequires:  gettext
-BuildRequires:  rsync
 # We use RUNNING_ON_VALGRIND in tests, so the headers need to be available
 %ifarch %{valgrind_arches}
 BuildRequires:  valgrind-devel
@@ -253,8 +267,21 @@ Conflicts:      initscripts < 9.56.1
 %if 0%{?fedora}
 Conflicts:      fedora-release < 23-0.12
 %endif
-# Make sure that dracut supports systemd-executor and the renames done for v255
+%if 0%{?fedora} >= 41
+BuildRequires:  setup >= 2.15.0-3
+BuildRequires:  python3
+Conflicts:      setup < 2.15.0-3
+Conflicts:      selinux-policy-any < 41.1
+%endif
+
+%if 0%{?fedora} >= 41
+# Make sure that dracut supports systemd-executor and the renames done for v255,
+# and dlopen libraries and read-only fs in initrd.
+Conflicts:      dracut < 060-2
+%else
+# Make sure that dracut supports systemd-executor and the renames done for v255.
 Conflicts:      dracut < 059-16
+%endif
 
 Obsoletes:      timedatex < 0.6-3
 Provides:       timedatex = 0.6-3
@@ -713,6 +740,7 @@ CONFIGURE_OPTS=(
         -Delfutils=enabled
         -Dlibcryptsetup=%[%{with bootstrap}?"disabled":"enabled"]
         -Delfutils=enabled
+        -Drepart=enabled
         -Dpwquality=enabled
         -Dqrencode=%[%{defined rhel}?"disabled":"enabled"]
         -Dgnutls=%[%{with gnutls}?"enabled":"disabled"]
@@ -849,11 +877,13 @@ touch %{buildroot}/etc/systemd/coredump.conf \
       %{buildroot}/etc/udev/udev.conf \
       %{buildroot}/etc/udev/iocost.conf
 
+install -D -t %{buildroot}/usr/lib/systemd/ %{SOURCE3}
+
 # /etc/initab
-install -Dm0644 -t %{buildroot}/etc/ %{SOURCE5}
+install -Dm0644 -t %{buildroot}/etc/ %{SOURCE6}
 
 # /etc/sysctl.conf compat
-install -Dm0644 %{SOURCE6} %{buildroot}/etc/sysctl.conf
+install -Dm0644 %{SOURCE7} %{buildroot}/etc/sysctl.conf
 ln -s ../sysctl.conf %{buildroot}/etc/sysctl.d/99-sysctl.conf
 
 # Make sure these directories are properly owned
@@ -906,20 +936,18 @@ touch %{buildroot}%{_localstatedir}/lib/systemd/timesync/clock
 touch %{buildroot}%{_localstatedir}/lib/private/systemd/journal-upload/state
 
 # Install yum protection fragment
-install -Dm0644 %{SOURCE4} %{buildroot}/etc/dnf/protected.d/systemd.conf
+install -Dm0644 %{SOURCE5} %{buildroot}/etc/dnf/protected.d/systemd.conf
 
-install -Dm0644 -t %{buildroot}/usr/lib/firewalld/services/ %{SOURCE7} %{SOURCE8}
+install -Dm0644 -t %{buildroot}/usr/lib/firewalld/services/ %{SOURCE8} %{SOURCE9}
 
 # Install additional docs
 # https://bugzilla.redhat.com/show_bug.cgi?id=1234951
-install -Dm0644 -t %{buildroot}%{_pkgdocdir}/ %{SOURCE9}
+install -Dm0644 -t %{buildroot}%{_pkgdocdir}/ %{SOURCE10}
 
 # https://bugzilla.redhat.com/show_bug.cgi?id=1378974
-install -Dm0644 -t %{buildroot}%{system_unit_dir}/systemd-udev-trigger.service.d/ %{SOURCE10}
+install -Dm0644 -t %{buildroot}%{system_unit_dir}/systemd-udev-trigger.service.d/ %{SOURCE11}
 
 install -Dm0644 -t %{buildroot}%{_prefix}/lib/systemd/ %{SOURCE13}
-
-install -D -t %{buildroot}/usr/lib/systemd/ %{SOURCE3}
 
 # systemd-oomd default configuration
 install -Dm0644 -t %{buildroot}%{_prefix}/lib/systemd/oomd.conf.d/ %{SOURCE14}
@@ -947,6 +975,13 @@ install -Dm0644 -t %{buildroot}%{_prefix}/lib/systemd/network/ %{SOURCE25}
 # for alias symlinks. We need to keep split-sbin=true for now, to support
 # unmerged systems. Move the symlinks here instead.
 mv -v %{buildroot}/usr/sbin/* %{buildroot}%{_bindir}/
+%endif
+
+%if 0%{?fedora} >= 41
+# This requires https://pagure.io/setup/pull-request/50
+# and https://src.fedoraproject.org/rpms/setup/pull-request/10.
+%{python3} %{SOURCE4} /usr/lib/sysusers.d/20-setup-{users,groups}.conf %{buildroot}/usr/lib/sysusers.d/basic.conf
+rm %{buildroot}/usr/lib/sysusers.d/basic.conf
 %endif
 
 %find_lang %{name}
@@ -1004,7 +1039,7 @@ fi
 
 # FIXME: systemd-logind.service is excluded (https://github.com/systemd/systemd/pull/17558)
 
-# This is the explanded form of %%systemd_user_daemon_reexec. We
+# This is the expanded form of %%systemd_user_daemon_reexec. We
 # can't use the macro because we define it ourselves.
 if [ $1 -ge 1 ] && [ -x "/usr/lib/systemd/systemd-update-helper" ]; then
     # Package upgrade, not uninstall
