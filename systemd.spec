@@ -378,11 +378,6 @@ Systemd PAM module registers the session with systemd-logind.
 %package rpm-macros
 Summary:        Macros that define paths and scriptlets related to systemd
 BuildArch:      noarch
-# Make sure we obsolete the existing version and any possible future versions
-# of epel-rpm-macros-systemd in c8s and c9s.
-Conflicts:      epel-rpm-macros-systemd < 10-0
-Obsoletes:      epel-rpm-macros-systemd < 10-0
-Provides:       epel-rpm-macros-systemd = 10-0
 
 %description rpm-macros
 Just the definitions of rpm macros.
@@ -421,6 +416,8 @@ Obsoletes:      systemd < 245.6-1
 Provides:       udev = %{version}
 Provides:       udev%{_isa} = %{version}
 Obsoletes:      udev < 183
+Requires:       (grubby > 8.40-72 if grubby)
+Requires:       (sdubby > 1.0-3 if sdubby)
 Conflicts:      systemd-timesyncd < %{version}-%{release}
 Obsoletes:      systemd-timesyncd < %{version}-%{release}
 Provides:       systemd-timesyncd = %{version}-%{release}
@@ -766,8 +763,7 @@ CONFIGURE_OPTS=(
         -Dsplit-bin=true
         -Db_ndebug=false
         -Dman=%[%{with docs}?"enabled":"disabled"]
-        # there is stuff that relies on the "v" prefix
-        -Dversion-tag=v%{version}%[%{without upstream}?"-%{release}":""]
+        -Dversion-tag=%{version}%[%{without upstream}?"-%{release}":""]
         # https://bugzilla.redhat.com/show_bug.cgi?id=1906010
         -Dshared-lib-tag=%{version_no_tilde}%[%{without upstream}?"-%{release}":""]
         -Dlink-executor-shared=false
