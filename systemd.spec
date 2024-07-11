@@ -1,12 +1,6 @@
 #global commit 1781de18ab8ebc3e42a607851d8effb3b0355c87
 %{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
 
-%if 0%{?facebook}
-%define commit e80d440e1bdf6d06f954f93ca973d70b68a136b9
-%else
-%define commit 02be00c8fccd7d75bde846390090d65c88b0b891
-%endif
-
 # We ship a .pc file but don't want to have a dep on pkg-config. We
 # strip the automatically generated dep here and instead co-own the
 # directory.
@@ -49,8 +43,8 @@ Name:           systemd
 Url:            https://systemd.io
 # Allow users to specify the version and release when building the rpm by 
 # setting the %%version_override and %%release_override macros.
-Version:        %{?version_override}%{!?version_override:255.5}
-Release:        %{?release_override}%{!?release_override:1.4}%{?dist}
+Version:        %{?version_override}%{!?version_override:256.1}
+Release:        %{?release_override}%{!?release_override:8.1}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -59,7 +53,11 @@ License:        LGPL-2.1-or-later AND MIT AND GPL-2.0-or-later
 Summary:        System and Service Manager
 
 # download tarballs with "spectool -g systemd.spec"
-Source0:        %{url}/archive/%{commit}/%{name}-hs%{?facebook:+fb}-%{version}.tar.gz
+%if %{defined commit}
+Source0:        https://github.com/systemd/systemd/archive/%{commit}/%{name}-%{shortcommit}.tar.gz
+%else
+Source0:        https://github.com/systemd/systemd/archive/v%{version_no_tilde}/%{name}-%{version_no_tilde}.tar.gz
+%endif
 # This file must be available before %%prep.
 # It is generated during systemd build and can be found in build/src/core/.
 Source1:        triggers.systemd
@@ -90,10 +88,6 @@ Source23:       sysusers.prov
 Source24:       sysusers.generate-pre.sh
 
 Source25:       98-default-mac-none.link
-
-# Needed for selinux subpackage
-Source100:      Makefile.selinux
-Source101:      systemd_hs.te
 
 %if 0
 GIT_DIR=../../src/systemd/.git git format-patch-ab --no-signature -M -N v235..v235-stable
@@ -320,10 +314,6 @@ Recommends:     libqrencode.so.4%{?elf_suffix}
 %endif
 Recommends:     libbpf.so.1%{?elf_suffix}
 Recommends:     libbpf.so.1(LIBBPF_0.4.0)%{?elf_bits}
-
-%if 0%{?facebook} == 0
-Requires:       (%{name}-selinux = %{version}-%{release} if selinux-policy)
-%endif
 
 # used by systemd-coredump and systemd-analyze
 Recommends:     libdw.so.1%{?elf_suffix}
@@ -679,33 +669,8 @@ Standalone systemd-shutdown binary with no dependencies on the systemd-shared li
 other libraries from systemd-libs. This package conflicts with the main systemd
 package and is meant for use in exitrds.
 
-%package selinux
-Summary:        SELinux module for systemd
-BuildArch:      noarch
-BuildRequires:  bzip2
-BuildRequires:  make
-BuildRequires:  selinux-policy
-BuildRequires:  selinux-policy-devel
-%if 0%{?facebook}
-Requires(post): selinux-policy-base
-%else
-Requires(post): selinux-policy-base >= %{_selinux_policy_version}
-%endif
-Requires(post): policycoreutils
-Requires(pre):  libselinux-utils
-Requires(post): libselinux-utils
-
-%description selinux
-This package provides the SELinux policy module to ensure systemd
-runs properly under an environment with SELinux enabled.
-
 %prep
-# pagure strips the '+' from 'hs+fb' for the top directory in the tar archive so
-# the top directory is hsfb-250.3 instead of hs+fb-250.3.
-%autosetup -n %{name}-hs%{?facebook:fb}-%{version} -p1
-
-mkdir -p /tmp/selinux
-cp %SOURCE100 %SOURCE101 /tmp/selinux
+%autosetup -n %{?commit:%{name}-%{commit}}%{!?commit:%{name}-%{version_no_tilde}} -p1
 
 %build
 %global ntpvendor %(source /etc/os-release; echo ${ID})
@@ -872,9 +837,6 @@ fi
 
 sed -r 's|/system/|/user/|g' %{SOURCE16} >10-timeout-abort.conf.user
 
-cd /tmp/selinux
-%{__make} -f Makefile.selinux SHARE="%{_datadir}" TARGETS="systemd_hs"
-
 %install
 %meson_install
 
@@ -1018,11 +980,6 @@ rm %{buildroot}/usr/lib/sysusers.d/basic.conf
 
 # Split files in build root into rpms
 python3 %{SOURCE2} %buildroot %{!?want_bootloader:--no-bootloader}
-
-install -d -p %{buildroot}%{_datadir}/selinux/devel/include/contrib
-install -p -m 0644 /tmp/selinux/systemd_hs.if %{buildroot}%{_datadir}/selinux/devel/include/contrib
-install -d -p %{buildroot}%{_datadir}/selinux/packages
-install -p -m 0644 /tmp/selinux/systemd_hs.pp.bz2 %{buildroot}%{_datadir}/selinux/packages
 
 %check
 %if %{with tests}
@@ -1233,23 +1190,6 @@ if systemctl -q is-enabled systemd-resolved.service &>/dev/null &&
   fi
 fi
 
-%pre selinux
-%selinux_relabel_pre
-
-%post selinux
-%selinux_modules_install %{_datadir}/selinux/packages/systemd_hs.pp.bz2
-%selinux_relabel_post
-
-%posttrans selinux
-%selinux_relabel_post
-
-%postun selinux
-%selinux_modules_uninstall systemd_hs
-
-if [ $1 -eq 0 ]; then
-    %selinux_relabel_post
-fi
-
 %global _docdir_fmt %{name}
 
 %files -f %{name}.lang -f .file-list-main
@@ -1314,10 +1254,6 @@ fi
 %files standalone-sysusers -f .file-list-standalone-sysusers
 
 %files standalone-shutdown -f .file-list-standalone-shutdown
-
-%files selinux
-%{_datadir}/selinux/devel/include/contrib/systemd_hs.if
-%{_datadir}/selinux/packages/systemd_hs.pp.bz2
 
 %clean
 rm -rf $RPM_BUILD_ROOT
