@@ -675,9 +675,9 @@ package and is meant for use in exitrds.
 
 %prep
 %if %{defined branch}
-%autosetup -n %{name}-%{branch}
+%autosetup -n %{name}-%{branch} -p1
 %elif %{defined commit}
-%autosetup -n %{name}-%{commit}
+%autosetup -n %{name}-%{commit} -p1
 %else
 %autosetup -n %{name}-%{version_no_tilde} -p1
 %endif
