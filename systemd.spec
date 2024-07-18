@@ -114,6 +114,8 @@ Patch0010:      https://github.com/systemd/systemd/pull/26494.patch
 Patch0020:      0001-meson-rename-libbasic-to-libbasic_static.patch
 Patch0021:      0002-meson-build-libsystemd-core-via-an-intermediate-stat.patch
 Patch0022:      0003-meson-add-option-to-build-systemd-executor-staticall.patch
+
+# Those are downstream-only patches, but we don't want them in packit builds:
 # https://bugzilla.redhat.com/show_bug.cgi?id=2251843
 Patch0491:      https://github.com/systemd/systemd/pull/30846.patch
 
