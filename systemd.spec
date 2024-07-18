@@ -104,12 +104,15 @@ GIT_DIR=../../src/systemd/.git git diffab -M v233..master@{2017-06-15} -- hwdb/[
 # applying upstream pull requests.
 
 %if %{without upstream}
-%if ! (0%{?fedora} >= 40 || 0%{?rhel} >= 10)
+%if 0%{?fedora} < 40 && 0%{?rhel} < 10
 # Work-around for dracut issue: run generators directly when we are in initrd
 # https://bugzilla.redhat.com/show_bug.cgi?id=2164404
 # Drop when dracut-060 is available.
 Patch0010:      https://github.com/systemd/systemd/pull/26494.patch
 %endif
+
+# Requested in https://bugzilla.redhat.com/show_bug.cgi?id=2298422
+Patch0011:      https://github.com/systemd/systemd/pull/33738.patch
 
 Patch0020:      0001-meson-rename-libbasic-to-libbasic_static.patch
 Patch0021:      0002-meson-build-libsystemd-core-via-an-intermediate-stat.patch
@@ -177,7 +180,7 @@ BuildRequires:  openssl-devel-engine
 %if %{with gnutls}
 BuildRequires:  gnutls-devel
 %endif
-%if %{undefined rhel}
+%if 0%{?fedora}
 BuildRequires:  qrencode-devel
 %endif
 BuildRequires:  libmicrohttpd-devel
@@ -205,7 +208,7 @@ BuildRequires:  python3-devel
 BuildRequires:  python3dist(jinja2)
 BuildRequires:  python3dist(lxml)
 BuildRequires:  python3dist(pefile)
-%if %{undefined rhel}
+%if 0%{?fedora}
 BuildRequires:  python3dist(pillow)
 BuildRequires:  python3dist(pytest-flakes)
 %endif
@@ -313,7 +316,7 @@ Recommends:     libidn2.so.0(IDN2_0.0.0)%{?elf_bits}
 Recommends:     libpcre2-8.so.0%{?elf_suffix}
 Recommends:     libpwquality.so.1%{?elf_suffix}
 Recommends:     libpwquality.so.1(LIBPWQUALITY_1.0)%{?elf_bits}
-%if %{undefined rhel}
+%if 0%{?fedora}
 Recommends:     libqrencode.so.4%{?elf_suffix}
 %endif
 Recommends:     libbpf.so.1%{?elf_suffix}
@@ -485,7 +488,7 @@ Requires:       %{name} = %{version}-%{release}
 
 Requires:       systemd-boot
 Requires:       python3dist(pefile)
-%if %{undefined rhel}
+%if 0%{?fedora}
 Requires:       python3dist(zstd)
 %endif
 Requires:       python3dist(cryptography)
