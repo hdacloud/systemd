@@ -179,6 +179,7 @@ for file in files(buildroot):
                        boot-system-token|
                        bsod|
                        kernel-install|
+                       installkernel|
                        vconsole|
                        backlight|
                        rfkill|
