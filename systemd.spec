@@ -119,6 +119,10 @@ Patch0021:      0002-meson-build-libsystemd-core-via-an-intermediate-stat.patch
 Patch0022:      0003-meson-add-option-to-build-systemd-executor-staticall.patch
 
 # Those are downstream-only patches, but we don't want them in packit builds:
+%if %{undefined facebook}
+# https://bugzilla.redhat.com/show_bug.cgi?id=1738828
+Patch0490:      use-bfq-scheduler.patch
+%endif
 # https://bugzilla.redhat.com/show_bug.cgi?id=2251843
 Patch0491:      https://github.com/systemd/systemd/pull/30846.patch
 
@@ -1133,7 +1137,11 @@ fi
 %systemd_preun systemd-networkd.service systemd-networkd-wait-online.service
 
 %postun networkd
+%if %{undefined facebook}
+%systemd_postun_with_restart systemd-networkd.service
+%else
 %systemd_postun systemd-networkd.service
+%endif
 %systemd_postun systemd-networkd-wait-online.service
 
 %post resolved
