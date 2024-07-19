@@ -424,9 +424,13 @@ Provides:       udev%{_isa} = %{version}
 Obsoletes:      udev < 183
 Requires:       (grubby > 8.40-72 if grubby)
 Requires:       (sdubby > 1.0-3 if sdubby)
+# A backport of systemd-timesyncd is shipped as a separate package in EPEL so
+# let's make sure we properly handle that.
+%if 0%{?rhel}
 Conflicts:      systemd-timesyncd < %{version}-%{release}
 Obsoletes:      systemd-timesyncd < %{version}-%{release}
 Provides:       systemd-timesyncd = %{version}-%{release}
+%endif
 
 # Libkmod is used to load modules. Assume that if we need udevd, we certainly
 # want to load modules, so make this into a hard dependency here.
@@ -791,6 +795,11 @@ CONFIGURE_OPTS=(
         -Ddefault-llmnr=resolve
         # https://bugzilla.redhat.com/show_bug.cgi?id=2028169
         -Dstatus-unit-format-default=combined
+%if 0%{?fedora}
+        # https://fedoraproject.org/wiki/Changes/Shorter_Shutdown_Timer
+        -Ddefault-timeout-sec=45
+        -Ddefault-user-timeout-sec=45
+%endif
         -Dconfigfiledir=/usr/lib
         -Doomd=true
 
@@ -961,6 +970,11 @@ install -Dm0644 -t %{buildroot}%{_prefix}/lib/systemd/ %{SOURCE13}
 install -Dm0644 -t %{buildroot}%{_prefix}/lib/systemd/oomd.conf.d/ %{SOURCE14}
 install -Dm0644 -t %{buildroot}%{system_unit_dir}/system.slice.d/ %{SOURCE15}
 install -Dm0644 -t %{buildroot}%{user_unit_dir}/slice.d/ %{SOURCE15}
+%if 0%{?fedora}
+# https://fedoraproject.org/wiki/Changes/Shorter_Shutdown_Timer
+install -Dm0644 -t %{buildroot}%{system_unit_dir}/service.d/ %{SOURCE16}
+install -Dm0644 10-timeout-abort.conf.user %{buildroot}%{user_unit_dir}/service.d/10-timeout-abort.conf
+%endif
 
 # https://fedoraproject.org/wiki/Changes/IncreaseVmMaxMapCount
 install -Dm0644 -t %{buildroot}%{_prefix}/lib/sysctl.d/ %{SOURCE17}
@@ -977,6 +991,10 @@ install -m 0755 -D -t %{buildroot}%{_rpmconfigdir}/ %{SOURCE24}
 
 # https://bugzilla.redhat.com/show_bug.cgi?id=2107754
 install -Dm0644 -t %{buildroot}%{_prefix}/lib/systemd/network/ %{SOURCE25}
+
+%if 0%{?fedora} || 0%{?rhel} >= 10
+ln -s --relative %{buildroot}%{_bindir}/kernel-install %{buildroot}%{_sbindir}/installkernel
+%endif
 
 %if "%{_sbindir}" == "%{_bindir}"
 # Systemd has the split-sbin option which is also used to select the directory
