@@ -847,8 +847,6 @@ CONFIGURE_OPTS+=(
 %global _lto_cflags %nil
 %endif
 
-%global build_cflags %{build_cflags} -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
-
 { %meson "${CONFIGURE_OPTS[@]}" %{?meson_extra_configure_options} ; }
 
 %meson_build
