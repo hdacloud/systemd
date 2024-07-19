@@ -413,10 +413,8 @@ Requires(preun):  systemd%{_isa} = %{version}-%{release}
 Requires(postun): systemd%{_isa} = %{version}-%{release}
 Requires(post): grep
 Requires:       kmod >= 18-4
-%if 0%{?facebook} == 0
 # https://bodhi.fedoraproject.org/updates/FEDORA-2020-dd43dd05b1
 Obsoletes:      systemd < 245.6-1
-%endif
 Provides:       udev = %{version}
 Provides:       udev%{_isa} = %{version}
 Obsoletes:      udev < 183
@@ -573,10 +571,8 @@ Summary:        System daemon that manages network configurations
 Requires:       %{name}%{_isa} = %{version}-%{release}
 %{?fedora:Recommends:     %{name}-udev = %{version}-%{release}}
 License:        LGPL-2.1-or-later
-%if 0%{?facebook} == 0
 # https://src.fedoraproject.org/rpms/systemd/pull-request/34
 Obsoletes:      systemd < 246.6-2
-%endif
 
 %description networkd
 systemd-networkd is a system service that manages networks. It detects and
@@ -597,9 +593,7 @@ enabled for this to have any effect.
 %package resolved
 Summary:        Network Name Resolution manager
 Requires:       %{name}%{_isa} = %{version}-%{release}
-%if 0%{?facebook} == 0
 Obsoletes:      %{name} < 249~~
-%endif
 Requires:       libidn2.so.0%{?elf_suffix}
 Requires:       libidn2.so.0(IDN2_0.0.0)%{?elf_bits}
 Requires(posttrans): grep
