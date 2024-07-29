@@ -1,4 +1,4 @@
-From c8f460d77af6a530d226dae06cce0e462f13c82b Mon Sep 17 00:00:00 2001
+From 987e1808034baac4fc2395c1c1f9cc0a510e0987 Mon Sep 17 00:00:00 2001
 From: Daan De Meyer <daan.j.demeyer@gmail.com>
 Date: Mon, 29 Jul 2024 15:41:51 +0200
 Subject: [PATCH] kernel-install: Try some more initrd variants in
@@ -8,14 +8,14 @@ On CentOS/Fedora, dracut is configured to write the initrd to
 /boot/initramfs-$KERNEL_VERSION...img so let's check for that as well
 if no initrds were supplied.
 ---
- src/kernel-install/90-loaderentry.install.in | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
+ src/kernel-install/90-loaderentry.install.in | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
 diff --git a/src/kernel-install/90-loaderentry.install.in b/src/kernel-install/90-loaderentry.install.in
-index 4ef6aca169c1a..57aac6aae4757 100755
+index 4ef6aca169c1a..1470f6f78a97c 100755
 --- a/src/kernel-install/90-loaderentry.install.in
 +++ b/src/kernel-install/90-loaderentry.install.in
-@@ -205,8 +205,21 @@ mkdir -p "${LOADER_ENTRY%/*}" || {
+@@ -205,8 +205,18 @@ mkdir -p "${LOADER_ENTRY%/*}" || {
          have_initrd=yes
      done
  
@@ -29,12 +29,9 @@ index 4ef6aca169c1a..57aac6aae4757 100755
 +        have_initrd=yes
 +    fi
 +
-+    if [ -z "$have_initrd" ]; then
-+        for initrd in "$BOOT_ROOT"/initramfs-"$KERNEL_VERSION"*.img; do
-+            [ -f "$initrd" ] || continue
-+            echo "initrd     /${initrd##*/}"
-+            have_initrd=yes
-+        done
++    if [ -z "$have_initrd" ] && [ -f "$BOOT_ROOT/initramfs-$KERNEL_VERSION.img" ]; then
++        echo "initrd     /${initrd##*/}"
++        have_initrd=yes
 +    fi
      :
  } >"$LOADER_ENTRY" || {
