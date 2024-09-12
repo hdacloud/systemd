@@ -43,7 +43,7 @@ Name:           systemd
 Url:            https://systemd.io
 # Allow users to specify the version and release when building the rpm by 
 # setting the %%version_override and %%release_override macros.
-Version:        %{?version_override}%{!?version_override:256.4}
+Version:        %{?version_override}%{!?version_override:256.6}
 Release:        %{?release_override}%{!?release_override:1.1}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
@@ -92,6 +92,8 @@ Source24:       sysusers.generate-pre.sh
 
 Source25:       98-default-mac-none.link
 
+Source26:       systemd-user
+
 %if 0
 GIT_DIR=../../src/systemd/.git git format-patch-ab --no-signature -M -N v235..v235-stable
 i=1; for j in 00*patch; do printf "Patch%04d:      %s\n" $i $j; i=$((i+1));done|xclip
@@ -104,7 +106,6 @@ GIT_DIR=../../src/systemd/.git git diffab -M v233..master@{2017-06-15} -- hwdb/[
 # than in the next section. Packit CI will drop any patches in this range before
 # applying upstream pull requests.
 
-%if %{without upstream}
 %if 0%{?fedora} < 40 && 0%{?rhel} < 10
 # Work-around for dracut issue: run generators directly when we are in initrd
 # https://bugzilla.redhat.com/show_bug.cgi?id=2164404
@@ -115,19 +116,12 @@ Patch0010:      https://github.com/systemd/systemd/pull/26494.patch
 # Requested in https://bugzilla.redhat.com/show_bug.cgi?id=2298422
 Patch0011:      https://github.com/systemd/systemd/pull/33738.patch
 
-Patch0012:      https://github.com/systemd/systemd/pull/33861.patch
-Patch0013:      https://github.com/systemd/systemd/pull/33864.patch
-
 # Those are downstream-only patches, but we don't want them in packit builds:
 # https://bugzilla.redhat.com/show_bug.cgi?id=2251843
 Patch0491:      https://github.com/systemd/systemd/pull/30846.patch
 
 # Soft-disable tmpfiles --purge until a good use case comes up.
 Patch0492:      0001-tmpfiles-make-purge-hard-to-mis-use.patch
-%endif
-
-# Adjust upstream config to use our shared stack
-Patch0499:      fedora-use-system-auth-in-pam-systemd-user.patch
 
 %ifarch %{ix86} x86_64 aarch64 riscv64
 %global want_bootloader 1
@@ -418,8 +412,10 @@ Obsoletes:      systemd < 245.6-1
 Provides:       udev = %{version}
 Provides:       udev%{_isa} = %{version}
 Obsoletes:      udev < 183
+%if 0%{?fedora} || 0%{?rhel} >= 10
 Requires:       (grubby > 8.40-72 if grubby)
 Requires:       (sdubby > 1.0-3 if sdubby)
+%endif
 # A backport of systemd-timesyncd is shipped as a separate package in EPEL so
 # let's make sure we properly handle that.
 %if 0%{?rhel}
@@ -483,18 +479,24 @@ This package also provides systemd-timesyncd, a network time protocol daemon.
 It also contains tools to manage encrypted home areas and secrets bound to the
 machine, and to create or grow partitions and make file systems automatically.
 
-%if 0%{?want_bootloader}
 %package ukify
 Summary:        Tool to build Unified Kernel Images
 Requires:       %{name} = %{version}-%{release}
 
-Requires:       systemd-boot
+Requires:       (systemd-boot if %{shrink:(
+        filesystem(x86-32) or
+        filesystem(x86-64) or
+        filesystem(aarch64) or
+        filesystem(riscv64)
+)})
 Requires:       python3dist(pefile)
 %if 0%{?fedora}
 Requires:       python3dist(zstd)
 %endif
 Requires:       python3dist(cryptography)
+%if 0%{?fedora}
 Recommends:     python3dist(pillow)
+%endif
 
 # for tests
 %ifarch riscv64
@@ -510,6 +512,7 @@ This package provides ukify, a script that combines a kernel image, an initrd,
 with a command line, and possibly PCR measurements and other metadata, into a
 Unified Kernel Image (UKI).
 
+%if 0%{?want_bootloader}
 %package boot-unsigned
 Summary: UEFI boot manager (unsigned version)
 
@@ -824,10 +827,8 @@ CONFIGURE_OPTS=(
         # For now, let's build the bootloader in the same places where we
         # built with gnu-efi. Later on, we might want to extend coverage, but
         # considering that that support is untested, let's not do this now.
-        # Note, ukify requires bootloader, let's also explicitly enable/disable it
-        # here for https://github.com/systemd/systemd/pull/24175.
         -Dbootloader=%[%{?want_bootloader}?"enabled":"disabled"]
-        -Dukify=%[%{?want_bootloader}?"enabled":"disabled"]
+        -Dukify=enabled
 )
 
 %if 0%{?facebook}
@@ -1011,6 +1012,15 @@ mv -v %{buildroot}/usr/sbin/* %{buildroot}%{_bindir}/
 %{python3} %{SOURCE4} /usr/lib/sysusers.d/20-setup-{users,groups}.conf %{buildroot}/usr/lib/sysusers.d/basic.conf
 rm %{buildroot}/usr/lib/sysusers.d/basic.conf
 %endif
+
+# Disable sshd_config.d/20-systemd-userdb.conf for now.
+# This option may override an existing AuthorizedKeysCommand setting
+# (or be ineffective, depending on the order of configuration).
+# See https://github.com/systemd/systemd/issues/33648.
+rm %{buildroot}/etc/ssh/sshd_config.d/20-systemd-userdb.conf
+mv %{buildroot}/usr/lib/tmpfiles.d/20-systemd-userdb.conf{,.example}
+
+install -m 0644 -t %{buildroot}%{_prefix}/lib/pam.d/ %{SOURCE26}
 
 %find_lang %{name}
 
@@ -1269,8 +1279,8 @@ fi
 
 %files udev -f .file-list-udev
 
-%if 0%{?want_bootloader}
 %files ukify -f .file-list-ukify
+%if 0%{?want_bootloader}
 %files boot-unsigned -f .file-list-boot
 %endif
 
