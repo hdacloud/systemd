@@ -1,0 +1,373 @@
+From 3f14557ce01cc9012991a602851b03f0a4205fc2 Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Wed, 4 Sep 2024 12:19:49 +0200
+Subject: [PATCH 1/2] network: Add support for multiq qdisc
+
+---
+ man/systemd.network.xml                       | 10 ++++++++++
+ src/network/meson.build                       |  1 +
+ src/network/networkd-network-gperf.gperf      |  2 ++
+ src/network/networkd-network.c                |  1 +
+ src/network/tc/multiq.c                       | 19 +++++++++++++++++++
+ src/network/tc/multiq.h                       | 11 +++++++++++
+ src/network/tc/qdisc.c                        |  1 +
+ src/network/tc/qdisc.h                        |  2 ++
+ .../test-network/conf/25-qdisc-multiq.network | 12 ++++++++++++
+ test/test-network/systemd-networkd-tests.py   | 10 ++++++++++
+ 10 files changed, 69 insertions(+)
+ create mode 100644 src/network/tc/multiq.c
+ create mode 100644 src/network/tc/multiq.h
+ create mode 100644 test/test-network/conf/25-qdisc-multiq.network
+
+diff --git a/man/systemd.network.xml b/man/systemd.network.xml
+index 734a4f7c0b21b..cc6a31484f20c 100644
+--- a/man/systemd.network.xml
++++ b/man/systemd.network.xml
+@@ -6064,6 +6064,16 @@ ServerAddress=192.168.0.1/24</programlisting>
+     </variablelist>
+   </refsect1>
+ 
++  <refsect1>
++    <title>[BandMultiQueueing] Section Options</title>
++    <para>The [BandMultiQueueing] section manages the queueing discipline (qdisc) of Band Multi Queueing (multiq).</para>
++
++    <variablelist class='network-directives'>
++      <xi:include href="tc.xml" xpointer="qdisc-parent" />
++      <xi:include href="tc.xml" xpointer="qdisc-handle" />
++    </variablelist>
++  </refsect1>
++
+   <refsect1>
+     <title>[HeavyHitterFilter] Section Options</title>
+     <para>The [HeavyHitterFilter] section manages the queueing discipline (qdisc) of Heavy Hitter Filter
+diff --git a/src/network/meson.build b/src/network/meson.build
+index 275542daa27f5..3edcd48c83e63 100644
+--- a/src/network/meson.build
++++ b/src/network/meson.build
+@@ -93,6 +93,7 @@ sources = files(
+         'tc/gred.c',
+         'tc/hhf.c',
+         'tc/htb.c',
++        'tc/multiq.c',
+         'tc/netem.c',
+         'tc/pie.c',
+         'tc/qdisc.c',
+diff --git a/src/network/networkd-network-gperf.gperf b/src/network/networkd-network-gperf.gperf
+index 0957eeef6ed8b..95fe0275a9be4 100644
+--- a/src/network/networkd-network-gperf.gperf
++++ b/src/network/networkd-network-gperf.gperf
+@@ -552,6 +552,8 @@ HierarchyTokenBucketClass.Rate,              config_parse_hierarchy_token_bucket
+ HierarchyTokenBucketClass.CeilRate,          config_parse_hierarchy_token_bucket_class_rate,           TCLASS_KIND_HTB,               0
+ HierarchyTokenBucketClass.BufferBytes,       config_parse_hierarchy_token_bucket_class_size,           TCLASS_KIND_HTB,               0
+ HierarchyTokenBucketClass.CeilBufferBytes,   config_parse_hierarchy_token_bucket_class_size,           TCLASS_KIND_HTB,               0
++BandMultiQueueing.Parent,                    config_parse_qdisc_parent,                                QDISC_KIND_MULTIQ,             0
++BandMultiQueueing.Handle,                    config_parse_qdisc_handle,                                QDISC_KIND_MULTIQ,             0
+ NetworkEmulator.Parent,                      config_parse_qdisc_parent,                                QDISC_KIND_NETEM,              0
+ NetworkEmulator.Handle,                      config_parse_qdisc_handle,                                QDISC_KIND_NETEM,              0
+ NetworkEmulator.DelaySec,                    config_parse_network_emulator_delay,                      QDISC_KIND_NETEM,              0
+diff --git a/src/network/networkd-network.c b/src/network/networkd-network.c
+index ecd54a3829d49..2c2f8ad939064 100644
+--- a/src/network/networkd-network.c
++++ b/src/network/networkd-network.c
+@@ -551,6 +551,7 @@ int network_load_one(Manager *manager, OrderedHashmap **networks, const char *fi
+                         "HeavyHitterFilter\0"
+                         "HierarchyTokenBucket\0"
+                         "HierarchyTokenBucketClass\0"
++                        "BandMultiQueueing\0"
+                         "NetworkEmulator\0"
+                         "PFIFO\0"
+                         "PFIFOFast\0"
+diff --git a/src/network/tc/multiq.c b/src/network/tc/multiq.c
+new file mode 100644
+index 0000000000000..c70d8c59061e3
+--- /dev/null
++++ b/src/network/tc/multiq.c
+@@ -0,0 +1,19 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++
++#include "multiq.h"
++
++static int multi_queueing_fill_message(Link *link, QDisc *qdisc, sd_netlink_message *req) {
++        struct tc_multiq_qopt opt = {};
++
++        assert(req);
++
++        /* It looks weird, but the multiq qdisc initialization wants to receive a tc_multiq_qopt attr even
++         * though it doesn't do anything with it. */
++        return sd_netlink_message_append_data(req, TCA_OPTIONS, &opt, sizeof(opt));
++}
++
++const QDiscVTable multiq_vtable = {
++        .object_size = sizeof(BandMultiQueueing),
++        .tca_kind = "multiq",
++        .fill_message = multi_queueing_fill_message,
++};
+diff --git a/src/network/tc/multiq.h b/src/network/tc/multiq.h
+new file mode 100644
+index 0000000000000..e53ed57c716ab
+--- /dev/null
++++ b/src/network/tc/multiq.h
+@@ -0,0 +1,11 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#pragma once
++
++#include "qdisc.h"
++
++typedef struct BandMultiQueueing {
++        QDisc meta;
++} BandMultiQueueing;
++
++DEFINE_QDISC_CAST(MULTIQ, BandMultiQueueing);
++extern const QDiscVTable multiq_vtable;
+diff --git a/src/network/tc/qdisc.c b/src/network/tc/qdisc.c
+index 0f89d844f585a..5e8f97a785100 100644
+--- a/src/network/tc/qdisc.c
++++ b/src/network/tc/qdisc.c
+@@ -30,6 +30,7 @@ const QDiscVTable * const qdisc_vtable[_QDISC_KIND_MAX] = {
+         [QDISC_KIND_GRED]            = &gred_vtable,
+         [QDISC_KIND_HHF]             = &hhf_vtable,
+         [QDISC_KIND_HTB]             = &htb_vtable,
++        [QDISC_KIND_MULTIQ]          = &multiq_vtable,
+         [QDISC_KIND_NETEM]           = &netem_vtable,
+         [QDISC_KIND_PIE]             = &pie_vtable,
+         [QDISC_KIND_QFQ]             = &qfq_vtable,
+diff --git a/src/network/tc/qdisc.h b/src/network/tc/qdisc.h
+index 50a8f4ead1951..83853dcaa742c 100644
+--- a/src/network/tc/qdisc.h
++++ b/src/network/tc/qdisc.h
+@@ -21,6 +21,7 @@ typedef enum QDiscKind {
+         QDISC_KIND_GRED,
+         QDISC_KIND_HHF,
+         QDISC_KIND_HTB,
++        QDISC_KIND_MULTIQ,
+         QDISC_KIND_NETEM,
+         QDISC_KIND_PFIFO,
+         QDISC_KIND_PFIFO_FAST,
+@@ -106,6 +107,7 @@ CONFIG_PARSER_PROTOTYPE(config_parse_qdisc_handle);
+ #include "gred.h"
+ #include "hhf.h"
+ #include "htb.h"
++#include "multiq.h"
+ #include "pie.h"
+ #include "qfq.h"
+ #include "netem.h"
+diff --git a/test/test-network/conf/25-qdisc-multiq.network b/test/test-network/conf/25-qdisc-multiq.network
+new file mode 100644
+index 0000000000000..a805c77124d0c
+--- /dev/null
++++ b/test/test-network/conf/25-qdisc-multiq.network
+@@ -0,0 +1,12 @@
++# SPDX-License-Identifier: LGPL-2.1-or-later
++[Match]
++Name=testtun99
++Name=testtap99
++
++[Network]
++LinkLocalAddressing=yes
++IPv6AcceptRA=no
++
++[BandMultiQueueing]
++Parent=root
++Handle=0002
+diff --git a/test/test-network/systemd-networkd-tests.py b/test/test-network/systemd-networkd-tests.py
+index 1b61038d09e08..a2b4eb40b239d 100755
+--- a/test/test-network/systemd-networkd-tests.py
++++ b/test/test-network/systemd-networkd-tests.py
+@@ -4648,6 +4648,16 @@ def test_qdisc_ingress(self):
+         print(output)
+         self.assertRegex(output, 'qdisc ingress')
+ 
++    @expectedFailureIfModuleIsNotAvailable('sch_multiq')
++    def test_qdisc_multiq(self):
++        copy_network_unit('25-tun.netdev', '25-tap.netdev', '25-qdisc-multiq.network')
++        start_networkd()
++        self.wait_online('testtun99:degraded', 'testtap99:degraded')
++
++        output = check_output('tc qdisc show dev testtun99')
++        print(output)
++        self.assertIn('qdisc multiq 2: root', output)
++
+     @expectedFailureIfModuleIsNotAvailable('sch_netem')
+     def test_qdisc_netem(self):
+         copy_network_unit('25-qdisc-netem.network', '12-dummy.netdev',
+
+From 2b9ced9072a280a2cb0c2c7783a288788a3a6771 Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Wed, 4 Sep 2024 13:32:32 +0200
+Subject: [PATCH 2/2] network: Add support for mq qdisc
+
+---
+ man/systemd.network.xml                     | 10 ++++++++++
+ src/network/meson.build                     |  1 +
+ src/network/networkd-network-gperf.gperf    |  2 ++
+ src/network/networkd-network.c              |  1 +
+ src/network/tc/mq.c                         |  8 ++++++++
+ src/network/tc/mq.h                         | 11 +++++++++++
+ src/network/tc/qdisc.c                      |  1 +
+ src/network/tc/qdisc.h                      |  2 ++
+ test/test-network/conf/25-qdisc-mq.network  | 12 ++++++++++++
+ test/test-network/systemd-networkd-tests.py |  9 +++++++++
+ 10 files changed, 57 insertions(+)
+ create mode 100644 src/network/tc/mq.c
+ create mode 100644 src/network/tc/mq.h
+ create mode 100644 test/test-network/conf/25-qdisc-mq.network
+
+diff --git a/man/systemd.network.xml b/man/systemd.network.xml
+index cc6a31484f20c..89484c449f31d 100644
+--- a/man/systemd.network.xml
++++ b/man/systemd.network.xml
+@@ -6064,6 +6064,16 @@ ServerAddress=192.168.0.1/24</programlisting>
+     </variablelist>
+   </refsect1>
+ 
++  <refsect1>
++    <title>[ClassfulMultiQueueing] Section Options</title>
++    <para>The [ClassfulMultiQueueing] section manages the queueing discipline (qdisc) of Classful Multi Queueing (mq).</para>
++
++    <variablelist class='network-directives'>
++      <xi:include href="tc.xml" xpointer="qdisc-parent" />
++      <xi:include href="tc.xml" xpointer="qdisc-handle" />
++    </variablelist>
++  </refsect1>
++
+   <refsect1>
+     <title>[BandMultiQueueing] Section Options</title>
+     <para>The [BandMultiQueueing] section manages the queueing discipline (qdisc) of Band Multi Queueing (multiq).</para>
+diff --git a/src/network/meson.build b/src/network/meson.build
+index 3edcd48c83e63..54cf694aeb47e 100644
+--- a/src/network/meson.build
++++ b/src/network/meson.build
+@@ -93,6 +93,7 @@ sources = files(
+         'tc/gred.c',
+         'tc/hhf.c',
+         'tc/htb.c',
++        'tc/mq.c',
+         'tc/multiq.c',
+         'tc/netem.c',
+         'tc/pie.c',
+diff --git a/src/network/networkd-network-gperf.gperf b/src/network/networkd-network-gperf.gperf
+index 95fe0275a9be4..a84de4ca7fca9 100644
+--- a/src/network/networkd-network-gperf.gperf
++++ b/src/network/networkd-network-gperf.gperf
+@@ -552,6 +552,8 @@ HierarchyTokenBucketClass.Rate,              config_parse_hierarchy_token_bucket
+ HierarchyTokenBucketClass.CeilRate,          config_parse_hierarchy_token_bucket_class_rate,           TCLASS_KIND_HTB,               0
+ HierarchyTokenBucketClass.BufferBytes,       config_parse_hierarchy_token_bucket_class_size,           TCLASS_KIND_HTB,               0
+ HierarchyTokenBucketClass.CeilBufferBytes,   config_parse_hierarchy_token_bucket_class_size,           TCLASS_KIND_HTB,               0
++ClassfulMultiQueueing.Parent,                config_parse_qdisc_parent,                                QDISC_KIND_MQ,                 0
++ClassfulMultiQueueing.Handle,                config_parse_qdisc_handle,                                QDISC_KIND_MQ,                 0
+ BandMultiQueueing.Parent,                    config_parse_qdisc_parent,                                QDISC_KIND_MULTIQ,             0
+ BandMultiQueueing.Handle,                    config_parse_qdisc_handle,                                QDISC_KIND_MULTIQ,             0
+ NetworkEmulator.Parent,                      config_parse_qdisc_parent,                                QDISC_KIND_NETEM,              0
+diff --git a/src/network/networkd-network.c b/src/network/networkd-network.c
+index 2c2f8ad939064..8ccf215a71e84 100644
+--- a/src/network/networkd-network.c
++++ b/src/network/networkd-network.c
+@@ -551,6 +551,7 @@ int network_load_one(Manager *manager, OrderedHashmap **networks, const char *fi
+                         "HeavyHitterFilter\0"
+                         "HierarchyTokenBucket\0"
+                         "HierarchyTokenBucketClass\0"
++                        "ClassfulMultiQueueing\0"
+                         "BandMultiQueueing\0"
+                         "NetworkEmulator\0"
+                         "PFIFO\0"
+diff --git a/src/network/tc/mq.c b/src/network/tc/mq.c
+new file mode 100644
+index 0000000000000..1435ed1fda0fa
+--- /dev/null
++++ b/src/network/tc/mq.c
+@@ -0,0 +1,8 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++
++#include "mq.h"
++
++const QDiscVTable mq_vtable = {
++        .object_size = sizeof(ClassfulMultiQueueing),
++        .tca_kind = "mq",
++};
+diff --git a/src/network/tc/mq.h b/src/network/tc/mq.h
+new file mode 100644
+index 0000000000000..88f0049670cf1
+--- /dev/null
++++ b/src/network/tc/mq.h
+@@ -0,0 +1,11 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#pragma once
++
++#include "qdisc.h"
++
++typedef struct ClassfulMultiQueueing {
++        QDisc meta;
++} ClassfulMultiQueueing;
++
++DEFINE_QDISC_CAST(MQ, ClassfulMultiQueueing);
++extern const QDiscVTable mq_vtable;
+diff --git a/src/network/tc/qdisc.c b/src/network/tc/qdisc.c
+index 5e8f97a785100..3bcc3930662f4 100644
+--- a/src/network/tc/qdisc.c
++++ b/src/network/tc/qdisc.c
+@@ -30,6 +30,7 @@ const QDiscVTable * const qdisc_vtable[_QDISC_KIND_MAX] = {
+         [QDISC_KIND_GRED]            = &gred_vtable,
+         [QDISC_KIND_HHF]             = &hhf_vtable,
+         [QDISC_KIND_HTB]             = &htb_vtable,
++        [QDISC_KIND_MQ]              = &mq_vtable,
+         [QDISC_KIND_MULTIQ]          = &multiq_vtable,
+         [QDISC_KIND_NETEM]           = &netem_vtable,
+         [QDISC_KIND_PIE]             = &pie_vtable,
+diff --git a/src/network/tc/qdisc.h b/src/network/tc/qdisc.h
+index 83853dcaa742c..80b95c2aab4fc 100644
+--- a/src/network/tc/qdisc.h
++++ b/src/network/tc/qdisc.h
+@@ -21,6 +21,7 @@ typedef enum QDiscKind {
+         QDISC_KIND_GRED,
+         QDISC_KIND_HHF,
+         QDISC_KIND_HTB,
++        QDISC_KIND_MQ,
+         QDISC_KIND_MULTIQ,
+         QDISC_KIND_NETEM,
+         QDISC_KIND_PFIFO,
+@@ -107,6 +108,7 @@ CONFIG_PARSER_PROTOTYPE(config_parse_qdisc_handle);
+ #include "gred.h"
+ #include "hhf.h"
+ #include "htb.h"
++#include "mq.h"
+ #include "multiq.h"
+ #include "pie.h"
+ #include "qfq.h"
+diff --git a/test/test-network/conf/25-qdisc-mq.network b/test/test-network/conf/25-qdisc-mq.network
+new file mode 100644
+index 0000000000000..32366d05dabed
+--- /dev/null
++++ b/test/test-network/conf/25-qdisc-mq.network
+@@ -0,0 +1,12 @@
++# SPDX-License-Identifier: LGPL-2.1-or-later
++[Match]
++Name=testtun99
++Name=testtap99
++
++[Network]
++LinkLocalAddressing=yes
++IPv6AcceptRA=no
++
++[ClassfulMultiQueueing]
++Parent=root
++Handle=0002
+diff --git a/test/test-network/systemd-networkd-tests.py b/test/test-network/systemd-networkd-tests.py
+index a2b4eb40b239d..3989fc04014d1 100755
+--- a/test/test-network/systemd-networkd-tests.py
++++ b/test/test-network/systemd-networkd-tests.py
+@@ -4648,6 +4648,15 @@ def test_qdisc_ingress(self):
+         print(output)
+         self.assertRegex(output, 'qdisc ingress')
+ 
++    def test_qdisc_mq(self):
++        copy_network_unit('25-tun.netdev', '25-tap.netdev', '25-qdisc-mq.network')
++        start_networkd()
++        self.wait_online('testtun99:degraded', 'testtap99:degraded')
++
++        output = check_output('tc qdisc show dev testtun99')
++        print(output)
++        self.assertIn('qdisc mq 2: root', output)
++
+     @expectedFailureIfModuleIsNotAvailable('sch_multiq')
+     def test_qdisc_multiq(self):
+         copy_network_unit('25-tun.netdev', '25-tap.netdev', '25-qdisc-multiq.network')
