@@ -1,0 +1,1937 @@
+From 9b294afa2dbdb05695925ded55a8f1bfa70bb087 Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Mon, 2 Sep 2024 11:41:57 +0900
+Subject: [PATCH 01/10] network/qdisc: introduce qdisc_ref() and qdisc_unref()
+
+No functional change, just refactoring and preparation for later change.
+---
+ src/network/networkd-network.c |   2 +-
+ src/network/tc/cake.c          |  20 +++----
+ src/network/tc/codel.c         |   6 +-
+ src/network/tc/ets.c           |   6 +-
+ src/network/tc/fifo.c          |   4 +-
+ src/network/tc/fq-codel.c      |   8 +--
+ src/network/tc/fq-pie.c        |   2 +-
+ src/network/tc/fq.c            |  10 ++--
+ src/network/tc/gred.c          |   4 +-
+ src/network/tc/hhf.c           |   2 +-
+ src/network/tc/htb.c           |   4 +-
+ src/network/tc/netem.c         |   6 +-
+ src/network/tc/pie.c           |   2 +-
+ src/network/tc/qdisc.c         | 103 +++++++++++++++++++++++----------
+ src/network/tc/qdisc.h         |   7 ++-
+ src/network/tc/sfb.c           |   2 +-
+ src/network/tc/sfq.c           |   2 +-
+ src/network/tc/tbf.c           |   6 +-
+ src/network/tc/teql.c          |   2 +-
+ 19 files changed, 122 insertions(+), 76 deletions(-)
+
+diff --git a/src/network/networkd-network.c b/src/network/networkd-network.c
+index 94666c2bdd03e..fafa0e570ee36 100644
+--- a/src/network/networkd-network.c
++++ b/src/network/networkd-network.c
+@@ -801,7 +801,7 @@ static Network *network_free(Network *network) {
+         hashmap_free(network->rules_by_section);
+         hashmap_free_with_destructor(network->dhcp_static_leases_by_section, dhcp_static_lease_free);
+         ordered_hashmap_free_with_destructor(network->sr_iov_by_section, sr_iov_free);
+-        hashmap_free_with_destructor(network->qdiscs_by_section, qdisc_free);
++        hashmap_free(network->qdiscs_by_section);
+         hashmap_free_with_destructor(network->tclasses_by_section, tclass_free);
+ 
+         return mfree(network);
+diff --git a/src/network/tc/cake.c b/src/network/tc/cake.c
+index c495fafda4cc8..704e527b46a1f 100644
+--- a/src/network/tc/cake.c
++++ b/src/network/tc/cake.c
+@@ -150,7 +150,7 @@ int config_parse_cake_bandwidth(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         CommonApplicationsKeptEnhanced *c;
+         Network *network = ASSERT_PTR(data);
+         uint64_t k;
+@@ -204,7 +204,7 @@ int config_parse_cake_overhead(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         CommonApplicationsKeptEnhanced *c;
+         Network *network = ASSERT_PTR(data);
+         int32_t v;
+@@ -263,7 +263,7 @@ int config_parse_cake_mpu(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         CommonApplicationsKeptEnhanced *c;
+         Network *network = ASSERT_PTR(data);
+         uint32_t v;
+@@ -321,7 +321,7 @@ int config_parse_cake_tristate(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         CommonApplicationsKeptEnhanced *c;
+         Network *network = ASSERT_PTR(data);
+         int *dest, r;
+@@ -386,7 +386,7 @@ int config_parse_cake_compensation_mode(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         CommonApplicationsKeptEnhanced *c;
+         Network *network = ASSERT_PTR(data);
+         CakeCompensationMode mode;
+@@ -451,7 +451,7 @@ int config_parse_cake_flow_isolation_mode(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         CommonApplicationsKeptEnhanced *c;
+         Network *network = ASSERT_PTR(data);
+         CakeFlowIsolationMode mode;
+@@ -513,7 +513,7 @@ int config_parse_cake_priority_queueing_preset(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         CommonApplicationsKeptEnhanced *c;
+         CakePriorityQueueingPreset preset;
+         Network *network = ASSERT_PTR(data);
+@@ -565,7 +565,7 @@ int config_parse_cake_fwmark(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         CommonApplicationsKeptEnhanced *c;
+         Network *network = ASSERT_PTR(data);
+         uint32_t fwmark;
+@@ -623,7 +623,7 @@ int config_parse_cake_rtt(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         CommonApplicationsKeptEnhanced *c;
+         Network *network = ASSERT_PTR(data);
+         usec_t t;
+@@ -689,7 +689,7 @@ int config_parse_cake_ack_filter(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         CommonApplicationsKeptEnhanced *c;
+         CakeAckFilter ack_filter;
+         Network *network = ASSERT_PTR(data);
+diff --git a/src/network/tc/codel.c b/src/network/tc/codel.c
+index e21252394c03e..53ccf66e419e6 100644
+--- a/src/network/tc/codel.c
++++ b/src/network/tc/codel.c
+@@ -86,7 +86,7 @@ int config_parse_controlled_delay_u32(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         ControlledDelay *cd;
+         Network *network = ASSERT_PTR(data);
+         int r;
+@@ -138,7 +138,7 @@ int config_parse_controlled_delay_usec(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         ControlledDelay *cd;
+         Network *network = ASSERT_PTR(data);
+         usec_t *p;
+@@ -203,7 +203,7 @@ int config_parse_controlled_delay_bool(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         ControlledDelay *cd;
+         Network *network = ASSERT_PTR(data);
+         int r;
+diff --git a/src/network/tc/ets.c b/src/network/tc/ets.c
+index 730b0a10c3cfb..4af750834cb30 100644
+--- a/src/network/tc/ets.c
++++ b/src/network/tc/ets.c
+@@ -88,7 +88,7 @@ int config_parse_ets_u8(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         EnhancedTransmissionSelection *ets;
+         Network *network = ASSERT_PTR(data);
+         uint8_t v, *p;
+@@ -154,7 +154,7 @@ int config_parse_ets_quanta(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         EnhancedTransmissionSelection *ets;
+         Network *network = ASSERT_PTR(data);
+         int r;
+@@ -237,7 +237,7 @@ int config_parse_ets_prio(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         EnhancedTransmissionSelection *ets;
+         Network *network = ASSERT_PTR(data);
+         int r;
+diff --git a/src/network/tc/fifo.c b/src/network/tc/fifo.c
+index 940fa0062f001..9638be8ff9caa 100644
+--- a/src/network/tc/fifo.c
++++ b/src/network/tc/fifo.c
+@@ -52,7 +52,7 @@ int config_parse_pfifo_size(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         Network *network = ASSERT_PTR(data);
+         FirstInFirstOut *fifo;
+         int r;
+@@ -112,7 +112,7 @@ int config_parse_bfifo_size(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         Network *network = ASSERT_PTR(data);
+         FirstInFirstOut *fifo;
+         uint64_t u;
+diff --git a/src/network/tc/fq-codel.c b/src/network/tc/fq-codel.c
+index 124faf73e72a4..9255cde4650d9 100644
+--- a/src/network/tc/fq-codel.c
++++ b/src/network/tc/fq-codel.c
+@@ -106,7 +106,7 @@ int config_parse_fair_queueing_controlled_delay_u32(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         FairQueueingControlledDelay *fqcd;
+         Network *network = ASSERT_PTR(data);
+         uint32_t *p;
+@@ -166,7 +166,7 @@ int config_parse_fair_queueing_controlled_delay_usec(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         FairQueueingControlledDelay *fqcd;
+         Network *network = ASSERT_PTR(data);
+         usec_t *p;
+@@ -231,7 +231,7 @@ int config_parse_fair_queueing_controlled_delay_bool(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         FairQueueingControlledDelay *fqcd;
+         Network *network = ASSERT_PTR(data);
+         int r;
+@@ -276,7 +276,7 @@ int config_parse_fair_queueing_controlled_delay_size(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         FairQueueingControlledDelay *fqcd;
+         Network *network = ASSERT_PTR(data);
+         uint64_t sz;
+diff --git a/src/network/tc/fq-pie.c b/src/network/tc/fq-pie.c
+index c8b2e7b7ee908..8f4f7c431c441 100644
+--- a/src/network/tc/fq-pie.c
++++ b/src/network/tc/fq-pie.c
+@@ -49,7 +49,7 @@ int config_parse_fq_pie_packet_limit(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         FlowQueuePIE *fq_pie;
+         Network *network = ASSERT_PTR(data);
+         uint32_t val;
+diff --git a/src/network/tc/fq.c b/src/network/tc/fq.c
+index 74785c980ae4b..ea55e5cb0a122 100644
+--- a/src/network/tc/fq.c
++++ b/src/network/tc/fq.c
+@@ -115,7 +115,7 @@ int config_parse_fair_queueing_u32(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         FairQueueing *fq;
+         Network *network = ASSERT_PTR(data);
+         uint32_t *p;
+@@ -179,7 +179,7 @@ int config_parse_fair_queueing_size(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         FairQueueing *fq;
+         Network *network = ASSERT_PTR(data);
+         uint64_t sz;
+@@ -247,7 +247,7 @@ int config_parse_fair_queueing_bool(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         FairQueueing *fq;
+         Network *network = ASSERT_PTR(data);
+         int r;
+@@ -293,7 +293,7 @@ int config_parse_fair_queueing_usec(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         FairQueueing *fq;
+         Network *network = ASSERT_PTR(data);
+         usec_t sec;
+@@ -353,7 +353,7 @@ int config_parse_fair_queueing_max_rate(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         FairQueueing *fq;
+         Network *network = ASSERT_PTR(data);
+         uint64_t sz;
+diff --git a/src/network/tc/gred.c b/src/network/tc/gred.c
+index 2efb02c345f04..198905a1521ff 100644
+--- a/src/network/tc/gred.c
++++ b/src/network/tc/gred.c
+@@ -77,7 +77,7 @@ int config_parse_generic_random_early_detection_u32(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         GenericRandomEarlyDetection *gred;
+         Network *network = ASSERT_PTR(data);
+         uint32_t *p;
+@@ -143,7 +143,7 @@ int config_parse_generic_random_early_detection_bool(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         GenericRandomEarlyDetection *gred;
+         Network *network = ASSERT_PTR(data);
+         int r;
+diff --git a/src/network/tc/hhf.c b/src/network/tc/hhf.c
+index d44522f98cc92..9ddb7ef9063d5 100644
+--- a/src/network/tc/hhf.c
++++ b/src/network/tc/hhf.c
+@@ -49,7 +49,7 @@ int config_parse_heavy_hitter_filter_packet_limit(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         HeavyHitterFilter *hhf;
+         Network *network = ASSERT_PTR(data);
+         int r;
+diff --git a/src/network/tc/htb.c b/src/network/tc/htb.c
+index eb2c8cfff4cd1..8f1faa1dc5d45 100644
+--- a/src/network/tc/htb.c
++++ b/src/network/tc/htb.c
+@@ -57,7 +57,7 @@ int config_parse_hierarchy_token_bucket_default_class(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         HierarchyTokenBucket *htb;
+         Network *network = ASSERT_PTR(data);
+         int r;
+@@ -109,7 +109,7 @@ int config_parse_hierarchy_token_bucket_u32(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         HierarchyTokenBucket *htb;
+         Network *network = ASSERT_PTR(data);
+         int r;
+diff --git a/src/network/tc/netem.c b/src/network/tc/netem.c
+index 6a63221c3ac30..51039de1f4e7b 100644
+--- a/src/network/tc/netem.c
++++ b/src/network/tc/netem.c
+@@ -60,7 +60,7 @@ int config_parse_network_emulator_delay(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         Network *network = ASSERT_PTR(data);
+         NetworkEmulator *ne;
+         usec_t u;
+@@ -121,7 +121,7 @@ int config_parse_network_emulator_rate(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         Network *network = ASSERT_PTR(data);
+         NetworkEmulator *ne;
+         uint32_t rate;
+@@ -181,7 +181,7 @@ int config_parse_network_emulator_packet_limit(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         Network *network = ASSERT_PTR(data);
+         NetworkEmulator *ne;
+         int r;
+diff --git a/src/network/tc/pie.c b/src/network/tc/pie.c
+index c9b171baf11d7..c482f19787abc 100644
+--- a/src/network/tc/pie.c
++++ b/src/network/tc/pie.c
+@@ -49,7 +49,7 @@ int config_parse_pie_packet_limit(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         ProportionalIntegralControllerEnhanced *pie;
+         Network *network = ASSERT_PTR(data);
+         int r;
+diff --git a/src/network/tc/qdisc.c b/src/network/tc/qdisc.c
+index 38dee2c00157f..d372481d6280b 100644
+--- a/src/network/tc/qdisc.c
++++ b/src/network/tc/qdisc.c
+@@ -42,8 +42,54 @@ const QDiscVTable * const qdisc_vtable[_QDISC_KIND_MAX] = {
+         [QDISC_KIND_TEQL]            = &teql_vtable,
+ };
+ 
++static QDisc* qdisc_detach_impl(QDisc *qdisc) {
++        assert(qdisc);
++        assert(!qdisc->link || !qdisc->network);
++
++        if (qdisc->network) {
++                assert(qdisc->section);
++                hashmap_remove(qdisc->network->qdiscs_by_section, qdisc->section);
++
++                qdisc->network = NULL;
++                return qdisc;
++        }
++
++        if (qdisc->link) {
++                set_remove(qdisc->link->qdiscs, qdisc);
++
++                qdisc->link = NULL;
++                return qdisc;
++        }
++
++        return NULL;
++}
++
++static void qdisc_detach(QDisc *qdisc) {
++        assert(qdisc);
++
++        qdisc_unref(qdisc_detach_impl(qdisc));
++}
++
++static void qdisc_hash_func(const QDisc *qdisc, struct siphash *state);
++static int qdisc_compare_func(const QDisc *a, const QDisc *b);
++
++DEFINE_PRIVATE_HASH_OPS_WITH_KEY_DESTRUCTOR(
++        qdisc_hash_ops,
++        QDisc,
++        qdisc_hash_func,
++        qdisc_compare_func,
++        qdisc_detach);
++
++DEFINE_PRIVATE_HASH_OPS_WITH_VALUE_DESTRUCTOR(
++        qdisc_section_hash_ops,
++        ConfigSection,
++        config_section_hash_func,
++        config_section_compare_func,
++        QDisc,
++        qdisc_detach);
++
+ static int qdisc_new(QDiscKind kind, QDisc **ret) {
+-        _cleanup_(qdisc_freep) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unrefp) QDisc *qdisc = NULL;
+         int r;
+ 
+         if (kind == _QDISC_KIND_INVALID) {
+@@ -52,6 +98,7 @@ static int qdisc_new(QDiscKind kind, QDisc **ret) {
+                         return -ENOMEM;
+ 
+                 *qdisc = (QDisc) {
++                        .n_ref = 1,
+                         .parent = TC_H_ROOT,
+                         .kind = kind,
+                 };
+@@ -61,6 +108,7 @@ static int qdisc_new(QDiscKind kind, QDisc **ret) {
+                 if (!qdisc)
+                         return -ENOMEM;
+ 
++                qdisc->n_ref = 1;
+                 qdisc->parent = TC_H_ROOT;
+                 qdisc->kind = kind;
+ 
+@@ -78,7 +126,7 @@ static int qdisc_new(QDiscKind kind, QDisc **ret) {
+ 
+ int qdisc_new_static(QDiscKind kind, Network *network, const char *filename, unsigned section_line, QDisc **ret) {
+         _cleanup_(config_section_freep) ConfigSection *n = NULL;
+-        _cleanup_(qdisc_freep) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unrefp) QDisc *qdisc = NULL;
+         QDisc *existing;
+         int r;
+ 
+@@ -113,14 +161,14 @@ int qdisc_new_static(QDiscKind kind, Network *network, const char *filename, uns
+                 qdisc->parent = existing->parent;
+                 qdisc->tca_kind = TAKE_PTR(existing->tca_kind);
+ 
+-                qdisc_free(existing);
++                qdisc_detach(existing);
+         }
+ 
+         qdisc->network = network;
+         qdisc->section = TAKE_PTR(n);
+         qdisc->source = NETWORK_CONFIG_SOURCE_STATIC;
+ 
+-        r = hashmap_ensure_put(&network->qdiscs_by_section, &config_section_hash_ops, qdisc->section, qdisc);
++        r = hashmap_ensure_put(&network->qdiscs_by_section, &qdisc_section_hash_ops, qdisc->section, qdisc);
+         if (r < 0)
+                 return r;
+ 
+@@ -128,22 +176,20 @@ int qdisc_new_static(QDiscKind kind, Network *network, const char *filename, uns
+         return 0;
+ }
+ 
+-QDisc* qdisc_free(QDisc *qdisc) {
++static QDisc* qdisc_free(QDisc *qdisc) {
+         if (!qdisc)
+                 return NULL;
+ 
+-        if (qdisc->network && qdisc->section)
+-                hashmap_remove(qdisc->network->qdiscs_by_section, qdisc->section);
++        qdisc_detach_impl(qdisc);
+ 
+         config_section_free(qdisc->section);
+ 
+-        if (qdisc->link)
+-                set_remove(qdisc->link->qdiscs, qdisc);
+-
+         free(qdisc->tca_kind);
+         return mfree(qdisc);
+ }
+ 
++DEFINE_TRIVIAL_REF_UNREF_FUNC(QDisc, qdisc, qdisc_free);
++
+ static const char *qdisc_get_tca_kind(const QDisc *qdisc) {
+         assert(qdisc);
+ 
+@@ -177,13 +223,6 @@ static int qdisc_compare_func(const QDisc *a, const QDisc *b) {
+         return strcmp_ptr(qdisc_get_tca_kind(a), qdisc_get_tca_kind(b));
+ }
+ 
+-DEFINE_PRIVATE_HASH_OPS_WITH_KEY_DESTRUCTOR(
+-        qdisc_hash_ops,
+-        QDisc,
+-        qdisc_hash_func,
+-        qdisc_compare_func,
+-        qdisc_free);
+-
+ static int qdisc_get(Link *link, const QDisc *in, QDisc **ret) {
+         QDisc *existing;
+ 
+@@ -199,11 +238,13 @@ static int qdisc_get(Link *link, const QDisc *in, QDisc **ret) {
+         return 0;
+ }
+ 
+-static int qdisc_add(Link *link, QDisc *qdisc) {
++static int qdisc_attach(Link *link, QDisc *qdisc) {
+         int r;
+ 
+         assert(link);
+         assert(qdisc);
++        assert(!qdisc->link);
++        assert(!qdisc->network);
+ 
+         r = set_ensure_put(&link->qdiscs, &qdisc_hash_ops, qdisc);
+         if (r < 0)
+@@ -212,11 +253,12 @@ static int qdisc_add(Link *link, QDisc *qdisc) {
+                 return -EEXIST;
+ 
+         qdisc->link = link;
++        qdisc_ref(qdisc);
+         return 0;
+ }
+ 
+ static int qdisc_dup(const QDisc *src, QDisc **ret) {
+-        _cleanup_(qdisc_freep) QDisc *dst = NULL;
++        _cleanup_(qdisc_unrefp) QDisc *dst = NULL;
+ 
+         assert(src);
+         assert(ret);
+@@ -228,7 +270,8 @@ static int qdisc_dup(const QDisc *src, QDisc **ret) {
+         if (!dst)
+                 return -ENOMEM;
+ 
+-        /* clear all pointers */
++        /* clear the reference counter and all pointers */
++        dst->n_ref = 1;
+         dst->network = NULL;
+         dst->section = NULL;
+         dst->link = NULL;
+@@ -319,7 +362,7 @@ void link_qdisc_drop_marked(Link *link) {
+ 
+                 if (qdisc->state == 0) {
+                         log_qdisc_debug(qdisc, link, "Forgetting");
+-                        qdisc_free(qdisc);
++                        qdisc_detach(qdisc);
+                 } else
+                         log_qdisc_debug(qdisc, link, "Removed");
+         }
+@@ -443,17 +486,17 @@ int link_request_qdisc(Link *link, QDisc *qdisc) {
+         assert(qdisc);
+ 
+         if (qdisc_get(link, qdisc, &existing) < 0) {
+-                _cleanup_(qdisc_freep) QDisc *tmp = NULL;
++                _cleanup_(qdisc_unrefp) QDisc *tmp = NULL;
+ 
+                 r = qdisc_dup(qdisc, &tmp);
+                 if (r < 0)
+                         return log_oom();
+ 
+-                r = qdisc_add(link, tmp);
++                r = qdisc_attach(link, tmp);
+                 if (r < 0)
+                         return log_link_warning_errno(link, r, "Failed to store QDisc: %m");
+ 
+-                existing = TAKE_PTR(tmp);
++                existing = tmp;
+         } else
+                 existing->source = qdisc->source;
+ 
+@@ -476,7 +519,7 @@ int link_request_qdisc(Link *link, QDisc *qdisc) {
+ }
+ 
+ int manager_rtnl_process_qdisc(sd_netlink *rtnl, sd_netlink_message *message, Manager *m) {
+-        _cleanup_(qdisc_freep) QDisc *tmp = NULL;
++        _cleanup_(qdisc_unrefp) QDisc *tmp = NULL;
+         QDisc *qdisc = NULL;
+         Link *link;
+         uint16_t type;
+@@ -551,13 +594,13 @@ int manager_rtnl_process_qdisc(sd_netlink *rtnl, sd_netlink_message *message, Ma
+                         qdisc_enter_configured(tmp);
+                         log_qdisc_debug(tmp, link, "Received new");
+ 
+-                        r = qdisc_add(link, tmp);
++                        r = qdisc_attach(link, tmp);
+                         if (r < 0) {
+                                 log_link_warning_errno(link, r, "Failed to remember QDisc, ignoring: %m");
+                                 return 0;
+                         }
+ 
+-                        qdisc = TAKE_PTR(tmp);
++                        qdisc = tmp;
+                 }
+ 
+                 if (!m->enumerating) {
+@@ -628,7 +671,7 @@ void network_drop_invalid_qdisc(Network *network) {
+ 
+         HASHMAP_FOREACH(qdisc, network->qdiscs_by_section)
+                 if (qdisc_section_verify(qdisc, &has_root, &has_clsact) < 0)
+-                        qdisc_free(qdisc);
++                        qdisc_detach(qdisc);
+ }
+ 
+ int config_parse_qdisc_parent(
+@@ -643,7 +686,7 @@ int config_parse_qdisc_parent(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         Network *network = ASSERT_PTR(data);
+         int r;
+ 
+@@ -702,7 +745,7 @@ int config_parse_qdisc_handle(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         Network *network = ASSERT_PTR(data);
+         uint16_t n;
+         int r;
+diff --git a/src/network/tc/qdisc.h b/src/network/tc/qdisc.h
+index cbba1bef71199..3989ad7651531 100644
+--- a/src/network/tc/qdisc.h
++++ b/src/network/tc/qdisc.h
+@@ -42,6 +42,8 @@ typedef struct QDisc {
+         NetworkConfigSource source;
+         NetworkConfigState state;
+ 
++        unsigned n_ref;
++
+         uint32_t handle;
+         uint32_t parent;
+ 
+@@ -74,7 +76,8 @@ extern const QDiscVTable * const qdisc_vtable[_QDISC_KIND_MAX];
+ 
+ DEFINE_NETWORK_CONFIG_STATE_FUNCTIONS(QDisc, qdisc);
+ 
+-QDisc* qdisc_free(QDisc *qdisc);
++QDisc* qdisc_ref(QDisc *qdisc);
++QDisc* qdisc_unref(QDisc *qdisc);
+ int qdisc_new_static(QDiscKind kind, Network *network, const char *filename, unsigned section_line, QDisc **ret);
+ 
+ void qdisc_mark_recursive(QDisc *qdisc);
+@@ -89,7 +92,7 @@ void network_drop_invalid_qdisc(Network *network);
+ 
+ int manager_rtnl_process_qdisc(sd_netlink *rtnl, sd_netlink_message *message, Manager *m);
+ 
+-DEFINE_SECTION_CLEANUP_FUNCTIONS(QDisc, qdisc_free);
++DEFINE_SECTION_CLEANUP_FUNCTIONS(QDisc, qdisc_unref);
+ 
+ CONFIG_PARSER_PROTOTYPE(config_parse_qdisc_parent);
+ CONFIG_PARSER_PROTOTYPE(config_parse_qdisc_handle);
+diff --git a/src/network/tc/sfb.c b/src/network/tc/sfb.c
+index 861c5fe2a0c0b..07fac6700f693 100644
+--- a/src/network/tc/sfb.c
++++ b/src/network/tc/sfb.c
+@@ -60,7 +60,7 @@ int config_parse_stochastic_fair_blue_u32(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         StochasticFairBlue *sfb;
+         Network *network = ASSERT_PTR(data);
+         int r;
+diff --git a/src/network/tc/sfq.c b/src/network/tc/sfq.c
+index 92dbae1166a66..78778653439cb 100644
+--- a/src/network/tc/sfq.c
++++ b/src/network/tc/sfq.c
+@@ -44,7 +44,7 @@ int config_parse_stochastic_fairness_queueing_perturb_period(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         StochasticFairnessQueueing *sfq;
+         Network *network = ASSERT_PTR(data);
+         int r;
+diff --git a/src/network/tc/tbf.c b/src/network/tc/tbf.c
+index 647fc8cb1eb8a..3e7a3098dab3f 100644
+--- a/src/network/tc/tbf.c
++++ b/src/network/tc/tbf.c
+@@ -122,7 +122,7 @@ int config_parse_token_bucket_filter_size(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         Network *network = ASSERT_PTR(data);
+         TokenBucketFilter *tbf;
+         uint64_t k;
+@@ -195,7 +195,7 @@ int config_parse_token_bucket_filter_rate(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         Network *network = ASSERT_PTR(data);
+         TokenBucketFilter *tbf;
+         uint64_t k, *p;
+@@ -256,7 +256,7 @@ int config_parse_token_bucket_filter_latency(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         Network *network = ASSERT_PTR(data);
+         TokenBucketFilter *tbf;
+         usec_t u;
+diff --git a/src/network/tc/teql.c b/src/network/tc/teql.c
+index dcb149dbe2a5b..f4fa331f523c2 100644
+--- a/src/network/tc/teql.c
++++ b/src/network/tc/teql.c
+@@ -50,7 +50,7 @@ int config_parse_trivial_link_equalizer_id(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(qdisc_free_or_set_invalidp) QDisc *qdisc = NULL;
++        _cleanup_(qdisc_unref_or_set_invalidp) QDisc *qdisc = NULL;
+         TrivialLinkEqualizer *teql;
+         Network *network = ASSERT_PTR(data);
+         unsigned id;
+
+From 541d0ed20a4e8572536d3f5268e6ffa84c9faa04 Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Mon, 2 Sep 2024 11:59:51 +0900
+Subject: [PATCH 02/10] network/tclass: introduce tclass_ref() and
+ tclass_unref()
+
+No functional change, just refactoring and preparation for later change.
+---
+ src/network/networkd-network.c |   2 +-
+ src/network/tc/drr.c           |   2 +-
+ src/network/tc/htb.c           |   6 +-
+ src/network/tc/qfq.c           |   4 +-
+ src/network/tc/tclass.c        | 101 +++++++++++++++++++++++----------
+ src/network/tc/tclass.h        |   7 ++-
+ 6 files changed, 84 insertions(+), 38 deletions(-)
+
+diff --git a/src/network/networkd-network.c b/src/network/networkd-network.c
+index fafa0e570ee36..a5bb6dd529822 100644
+--- a/src/network/networkd-network.c
++++ b/src/network/networkd-network.c
+@@ -802,7 +802,7 @@ static Network *network_free(Network *network) {
+         hashmap_free_with_destructor(network->dhcp_static_leases_by_section, dhcp_static_lease_free);
+         ordered_hashmap_free_with_destructor(network->sr_iov_by_section, sr_iov_free);
+         hashmap_free(network->qdiscs_by_section);
+-        hashmap_free_with_destructor(network->tclasses_by_section, tclass_free);
++        hashmap_free(network->tclasses_by_section);
+ 
+         return mfree(network);
+ }
+diff --git a/src/network/tc/drr.c b/src/network/tc/drr.c
+index 373911bc70f31..5d754101de2af 100644
+--- a/src/network/tc/drr.c
++++ b/src/network/tc/drr.c
+@@ -54,7 +54,7 @@ int config_parse_drr_size(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(tclass_free_or_set_invalidp) TClass *tclass = NULL;
++        _cleanup_(tclass_unref_or_set_invalidp) TClass *tclass = NULL;
+         DeficitRoundRobinSchedulerClass *drr;
+         Network *network = ASSERT_PTR(data);
+         uint64_t u;
+diff --git a/src/network/tc/htb.c b/src/network/tc/htb.c
+index 8f1faa1dc5d45..39f436a804d2a 100644
+--- a/src/network/tc/htb.c
++++ b/src/network/tc/htb.c
+@@ -251,7 +251,7 @@ int config_parse_hierarchy_token_bucket_class_u32(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(tclass_free_or_set_invalidp) TClass *tclass = NULL;
++        _cleanup_(tclass_unref_or_set_invalidp) TClass *tclass = NULL;
+         HierarchyTokenBucketClass *htb;
+         Network *network = ASSERT_PTR(data);
+         uint32_t v;
+@@ -304,7 +304,7 @@ int config_parse_hierarchy_token_bucket_class_size(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(tclass_free_or_set_invalidp) TClass *tclass = NULL;
++        _cleanup_(tclass_unref_or_set_invalidp) TClass *tclass = NULL;
+         HierarchyTokenBucketClass *htb;
+         Network *network = ASSERT_PTR(data);
+         uint64_t v;
+@@ -387,7 +387,7 @@ int config_parse_hierarchy_token_bucket_class_rate(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(tclass_free_or_set_invalidp) TClass *tclass = NULL;
++        _cleanup_(tclass_unref_or_set_invalidp) TClass *tclass = NULL;
+         HierarchyTokenBucketClass *htb;
+         Network *network = ASSERT_PTR(data);
+         uint64_t *v;
+diff --git a/src/network/tc/qfq.c b/src/network/tc/qfq.c
+index 7702e6ff6e733..0da53a89e432e 100644
+--- a/src/network/tc/qfq.c
++++ b/src/network/tc/qfq.c
+@@ -62,7 +62,7 @@ int config_parse_quick_fair_queueing_weight(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(tclass_free_or_set_invalidp) TClass *tclass = NULL;
++        _cleanup_(tclass_unref_or_set_invalidp) TClass *tclass = NULL;
+         QuickFairQueueingClass *qfq;
+         Network *network = ASSERT_PTR(data);
+         uint32_t v;
+@@ -122,7 +122,7 @@ int config_parse_quick_fair_queueing_max_packet(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(tclass_free_or_set_invalidp) TClass *tclass = NULL;
++        _cleanup_(tclass_unref_or_set_invalidp) TClass *tclass = NULL;
+         QuickFairQueueingClass *qfq;
+         Network *network = ASSERT_PTR(data);
+         uint64_t v;
+diff --git a/src/network/tc/tclass.c b/src/network/tc/tclass.c
+index fcbe8cbcf46bd..168d93e1c521f 100644
+--- a/src/network/tc/tclass.c
++++ b/src/network/tc/tclass.c
+@@ -24,8 +24,54 @@ const TClassVTable * const tclass_vtable[_TCLASS_KIND_MAX] = {
+         [TCLASS_KIND_QFQ] = &qfq_tclass_vtable,
+ };
+ 
++static TClass* tclass_detach_impl(TClass *tclass) {
++        assert(tclass);
++        assert(!tclass->link || !tclass->network);
++
++        if (tclass->network) {
++                assert(tclass->section);
++                hashmap_remove(tclass->network->tclasses_by_section, tclass->section);
++
++                tclass->network = NULL;
++                return tclass;
++        }
++
++        if (tclass->link) {
++                set_remove(tclass->link->tclasses, tclass);
++
++                tclass->link = NULL;
++                return tclass;
++        }
++
++        return NULL;
++}
++
++static void tclass_detach(TClass *tclass) {
++        assert(tclass);
++
++        tclass_unref(tclass_detach_impl(tclass));
++}
++
++static void tclass_hash_func(const TClass *tclass, struct siphash *state);
++static int tclass_compare_func(const TClass *a, const TClass *b);
++
++DEFINE_PRIVATE_HASH_OPS_WITH_KEY_DESTRUCTOR(
++        tclass_hash_ops,
++        TClass,
++        tclass_hash_func,
++        tclass_compare_func,
++        tclass_detach);
++
++DEFINE_PRIVATE_HASH_OPS_WITH_VALUE_DESTRUCTOR(
++        tclass_section_hash_ops,
++        ConfigSection,
++        config_section_hash_func,
++        config_section_compare_func,
++        TClass,
++        tclass_detach);
++
+ static int tclass_new(TClassKind kind, TClass **ret) {
+-        _cleanup_(tclass_freep) TClass *tclass = NULL;
++        _cleanup_(tclass_unrefp) TClass *tclass = NULL;
+         int r;
+ 
+         if (kind == _TCLASS_KIND_INVALID) {
+@@ -34,6 +80,7 @@ static int tclass_new(TClassKind kind, TClass **ret) {
+                         return -ENOMEM;
+ 
+                 *tclass = (TClass) {
++                        .n_ref = 1,
+                         .parent = TC_H_ROOT,
+                         .kind = kind,
+                 };
+@@ -43,6 +90,7 @@ static int tclass_new(TClassKind kind, TClass **ret) {
+                 if (!tclass)
+                         return -ENOMEM;
+ 
++                tclass->n_ref = 1;
+                 tclass->parent = TC_H_ROOT;
+                 tclass->kind = kind;
+ 
+@@ -60,7 +108,7 @@ static int tclass_new(TClassKind kind, TClass **ret) {
+ 
+ int tclass_new_static(TClassKind kind, Network *network, const char *filename, unsigned section_line, TClass **ret) {
+         _cleanup_(config_section_freep) ConfigSection *n = NULL;
+-        _cleanup_(tclass_freep) TClass *tclass = NULL;
++        _cleanup_(tclass_unrefp) TClass *tclass = NULL;
+         TClass *existing;
+         int r;
+ 
+@@ -90,7 +138,7 @@ int tclass_new_static(TClassKind kind, Network *network, const char *filename, u
+         tclass->section = TAKE_PTR(n);
+         tclass->source = NETWORK_CONFIG_SOURCE_STATIC;
+ 
+-        r = hashmap_ensure_put(&network->tclasses_by_section, &config_section_hash_ops, tclass->section, tclass);
++        r = hashmap_ensure_put(&network->tclasses_by_section, &tclass_section_hash_ops, tclass->section, tclass);
+         if (r < 0)
+                 return r;
+ 
+@@ -98,22 +146,20 @@ int tclass_new_static(TClassKind kind, Network *network, const char *filename, u
+         return 0;
+ }
+ 
+-TClass* tclass_free(TClass *tclass) {
++static TClass* tclass_free(TClass *tclass) {
+         if (!tclass)
+                 return NULL;
+ 
+-        if (tclass->network && tclass->section)
+-                hashmap_remove(tclass->network->tclasses_by_section, tclass->section);
++        tclass_detach_impl(tclass);
+ 
+         config_section_free(tclass->section);
+ 
+-        if (tclass->link)
+-                set_remove(tclass->link->tclasses, tclass);
+-
+         free(tclass->tca_kind);
+         return mfree(tclass);
+ }
+ 
++DEFINE_TRIVIAL_REF_UNREF_FUNC(TClass, tclass, tclass_free);
++
+ static const char *tclass_get_tca_kind(const TClass *tclass) {
+         assert(tclass);
+ 
+@@ -147,13 +193,6 @@ static int tclass_compare_func(const TClass *a, const TClass *b) {
+         return strcmp_ptr(tclass_get_tca_kind(a), tclass_get_tca_kind(b));
+ }
+ 
+-DEFINE_PRIVATE_HASH_OPS_WITH_KEY_DESTRUCTOR(
+-        tclass_hash_ops,
+-        TClass,
+-        tclass_hash_func,
+-        tclass_compare_func,
+-        tclass_free);
+-
+ static int tclass_get(Link *link, const TClass *in, TClass **ret) {
+         TClass *existing;
+ 
+@@ -169,11 +208,13 @@ static int tclass_get(Link *link, const TClass *in, TClass **ret) {
+         return 0;
+ }
+ 
+-static int tclass_add(Link *link, TClass *tclass) {
++static int tclass_attach(Link *link, TClass *tclass) {
+         int r;
+ 
+         assert(link);
+         assert(tclass);
++        assert(!tclass->link);
++        assert(!tclass->network);
+ 
+         r = set_ensure_put(&link->tclasses, &tclass_hash_ops, tclass);
+         if (r < 0)
+@@ -182,11 +223,12 @@ static int tclass_add(Link *link, TClass *tclass) {
+                 return -EEXIST;
+ 
+         tclass->link = link;
++        tclass_ref(tclass);
+         return 0;
+ }
+ 
+ static int tclass_dup(const TClass *src, TClass **ret) {
+-        _cleanup_(tclass_freep) TClass *dst = NULL;
++        _cleanup_(tclass_unrefp) TClass *dst = NULL;
+ 
+         assert(src);
+         assert(ret);
+@@ -198,7 +240,8 @@ static int tclass_dup(const TClass *src, TClass **ret) {
+         if (!dst)
+                 return -ENOMEM;
+ 
+-        /* clear all pointers */
++        /* clear the reference counter and all pointers */
++        dst->n_ref = 1;
+         dst->network = NULL;
+         dst->section = NULL;
+         dst->link = NULL;
+@@ -286,7 +329,7 @@ void link_tclass_drop_marked(Link *link) {
+ 
+                 if (tclass->state == 0) {
+                         log_tclass_debug(tclass, link, "Forgetting");
+-                        tclass_free(tclass);
++                        tclass_detach(tclass);
+                 } else
+                         log_tclass_debug(tclass, link, "Removed");
+         }
+@@ -393,17 +436,17 @@ int link_request_tclass(Link *link, TClass *tclass) {
+         assert(tclass);
+ 
+         if (tclass_get(link, tclass, &existing) < 0) {
+-                _cleanup_(tclass_freep) TClass *tmp = NULL;
++                _cleanup_(tclass_unrefp) TClass *tmp = NULL;
+ 
+                 r = tclass_dup(tclass, &tmp);
+                 if (r < 0)
+                         return log_oom();
+ 
+-                r = tclass_add(link, tmp);
++                r = tclass_attach(link, tmp);
+                 if (r < 0)
+                         return log_link_warning_errno(link, r, "Failed to store TClass: %m");
+ 
+-                existing = TAKE_PTR(tmp);
++                existing = tmp;
+         } else
+                 existing->source = tclass->source;
+ 
+@@ -426,7 +469,7 @@ int link_request_tclass(Link *link, TClass *tclass) {
+ }
+ 
+ int manager_rtnl_process_tclass(sd_netlink *rtnl, sd_netlink_message *message, Manager *m) {
+-        _cleanup_(tclass_freep) TClass *tmp = NULL;
++        _cleanup_(tclass_unrefp) TClass *tmp = NULL;
+         TClass *tclass = NULL;
+         Link *link;
+         uint16_t type;
+@@ -501,13 +544,13 @@ int manager_rtnl_process_tclass(sd_netlink *rtnl, sd_netlink_message *message, M
+                         tclass_enter_configured(tmp);
+                         log_tclass_debug(tmp, link, "Received new");
+ 
+-                        r = tclass_add(link, tmp);
++                        r = tclass_attach(link, tmp);
+                         if (r < 0) {
+                                 log_link_warning_errno(link, r, "Failed to remember TClass, ignoring: %m");
+                                 return 0;
+                         }
+ 
+-                        tclass = TAKE_PTR(tmp);
++                        tclass = tmp;
+                 }
+ 
+                 break;
+@@ -566,7 +609,7 @@ void network_drop_invalid_tclass(Network *network) {
+ 
+         HASHMAP_FOREACH(tclass, network->tclasses_by_section)
+                 if (tclass_section_verify(tclass) < 0)
+-                        tclass_free(tclass);
++                        tclass_detach(tclass);
+ }
+ 
+ int config_parse_tclass_parent(
+@@ -581,7 +624,7 @@ int config_parse_tclass_parent(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(tclass_free_or_set_invalidp) TClass *tclass = NULL;
++        _cleanup_(tclass_unref_or_set_invalidp) TClass *tclass = NULL;
+         Network *network = ASSERT_PTR(data);
+         int r;
+ 
+@@ -627,7 +670,7 @@ int config_parse_tclass_classid(
+                 void *data,
+                 void *userdata) {
+ 
+-        _cleanup_(tclass_free_or_set_invalidp) TClass *tclass = NULL;
++        _cleanup_(tclass_unref_or_set_invalidp) TClass *tclass = NULL;
+         Network *network = ASSERT_PTR(data);
+         int r;
+ 
+diff --git a/src/network/tc/tclass.h b/src/network/tc/tclass.h
+index 85df57d42c21e..44f71814501dc 100644
+--- a/src/network/tc/tclass.h
++++ b/src/network/tc/tclass.h
+@@ -24,6 +24,8 @@ typedef struct TClass {
+         NetworkConfigSource source;
+         NetworkConfigState state;
+ 
++        unsigned n_ref;
++
+         uint32_t classid;
+         uint32_t parent;
+ 
+@@ -55,7 +57,8 @@ extern const TClassVTable * const tclass_vtable[_TCLASS_KIND_MAX];
+ 
+ DEFINE_NETWORK_CONFIG_STATE_FUNCTIONS(TClass, tclass);
+ 
+-TClass* tclass_free(TClass *tclass);
++TClass* tclass_ref(TClass *tclass);
++TClass* tclass_unref(TClass *tclass);
+ int tclass_new_static(TClassKind kind, Network *network, const char *filename, unsigned section_line, TClass **ret);
+ 
+ void tclass_mark_recursive(TClass *tclass);
+@@ -71,7 +74,7 @@ void network_drop_invalid_tclass(Network *network);
+ int manager_rtnl_process_tclass(sd_netlink *rtnl, sd_netlink_message *message, Manager *m);
+ int link_enumerate_tclass(Link *link, uint32_t parent);
+ 
+-DEFINE_SECTION_CLEANUP_FUNCTIONS(TClass, tclass_free);
++DEFINE_SECTION_CLEANUP_FUNCTIONS(TClass, tclass_unref);
+ 
+ CONFIG_PARSER_PROTOTYPE(config_parse_tclass_parent);
+ CONFIG_PARSER_PROTOTYPE(config_parse_tclass_classid);
+
+From 4bdc3d85aee073cb7d22b53bde13fd878333b12c Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Mon, 2 Sep 2024 13:03:09 +0900
+Subject: [PATCH 03/10] network/neighbor: skip requesting neighbor if it is
+ already requested
+
+---
+ src/network/networkd-neighbor.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/network/networkd-neighbor.c b/src/network/networkd-neighbor.c
+index 6b81950f96c63..3377bb056e589 100644
+--- a/src/network/networkd-neighbor.c
++++ b/src/network/networkd-neighbor.c
+@@ -343,6 +343,9 @@ static int link_request_neighbor(Link *link, const Neighbor *neighbor) {
+                 return 0;
+         }
+ 
++        if (neighbor_get_request(link, neighbor, NULL) >= 0)
++                return 0; /* already requested, skipping. */
++
+         r = neighbor_dup(neighbor, &tmp);
+         if (r < 0)
+                 return r;
+
+From 998973e313a680a3434c2dd23384e86ff01726f3 Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Mon, 2 Sep 2024 12:55:59 +0900
+Subject: [PATCH 04/10] network/qdisc: skip requesting qdisc if it is already
+ requested
+
+---
+ src/network/tc/qdisc.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git a/src/network/tc/qdisc.c b/src/network/tc/qdisc.c
+index d372481d6280b..1475b4aced4de 100644
+--- a/src/network/tc/qdisc.c
++++ b/src/network/tc/qdisc.c
+@@ -238,6 +238,30 @@ static int qdisc_get(Link *link, const QDisc *in, QDisc **ret) {
+         return 0;
+ }
+ 
++static int qdisc_get_request(Link *link, const QDisc *qdisc, Request **ret) {
++        Request *req;
++
++        assert(link);
++        assert(link->manager);
++        assert(qdisc);
++
++        req = ordered_set_get(
++                        link->manager->request_queue,
++                        &(Request) {
++                                .link = link,
++                                .type = REQUEST_TYPE_TC_QDISC,
++                                .userdata = (void*) qdisc,
++                                .hash_func = (hash_func_t) qdisc_hash_func,
++                                .compare_func = (compare_func_t) qdisc_compare_func,
++                        });
++        if (!req)
++                return -ENOENT;
++
++        if (ret)
++                *ret = req;
++        return 0;
++}
++
+ static int qdisc_attach(Link *link, QDisc *qdisc) {
+         int r;
+ 
+@@ -485,6 +509,9 @@ int link_request_qdisc(Link *link, QDisc *qdisc) {
+         assert(link);
+         assert(qdisc);
+ 
++        if (qdisc_get_request(link, qdisc, NULL) >= 0)
++                return 0; /* already requested, skipping. */
++
+         if (qdisc_get(link, qdisc, &existing) < 0) {
+                 _cleanup_(qdisc_unrefp) QDisc *tmp = NULL;
+ 
+
+From e3f91033aea354c28011e841b7043549a1a5226b Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Mon, 2 Sep 2024 13:06:54 +0900
+Subject: [PATCH 05/10] network/tclass: skip requesting tclass if it is already
+ requested
+
+---
+ src/network/tc/tclass.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git a/src/network/tc/tclass.c b/src/network/tc/tclass.c
+index 168d93e1c521f..926ec69adf0fe 100644
+--- a/src/network/tc/tclass.c
++++ b/src/network/tc/tclass.c
+@@ -208,6 +208,30 @@ static int tclass_get(Link *link, const TClass *in, TClass **ret) {
+         return 0;
+ }
+ 
++static int tclass_get_request(Link *link, const TClass *tclass, Request **ret) {
++        Request *req;
++
++        assert(link);
++        assert(link->manager);
++        assert(tclass);
++
++        req = ordered_set_get(
++                        link->manager->request_queue,
++                        &(Request) {
++                                .link = link,
++                                .type = REQUEST_TYPE_TC_CLASS,
++                                .userdata = (void*) tclass,
++                                .hash_func = (hash_func_t) tclass_hash_func,
++                                .compare_func = (compare_func_t) tclass_compare_func,
++                        });
++        if (!req)
++                return -ENOENT;
++
++        if (ret)
++                *ret = req;
++        return 0;
++}
++
+ static int tclass_attach(Link *link, TClass *tclass) {
+         int r;
+ 
+@@ -435,6 +459,9 @@ int link_request_tclass(Link *link, TClass *tclass) {
+         assert(link);
+         assert(tclass);
+ 
++        if (tclass_get_request(link, tclass, NULL) >= 0)
++                return 0; /* already requested, skipping. */
++
+         if (tclass_get(link, tclass, &existing) < 0) {
+                 _cleanup_(tclass_unrefp) TClass *tmp = NULL;
+ 
+
+From 4a31c768a9f4e1ff957880a5c4f52d36d768e4a4 Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Mon, 2 Sep 2024 13:20:59 +0900
+Subject: [PATCH 06/10] network/qdisc: make qdisc_drop() static
+
+This also drops unused constant return value.
+---
+ src/network/tc/qdisc.c | 4 +---
+ src/network/tc/qdisc.h | 1 -
+ 2 files changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/src/network/tc/qdisc.c b/src/network/tc/qdisc.c
+index 1475b4aced4de..851f624c45954 100644
+--- a/src/network/tc/qdisc.c
++++ b/src/network/tc/qdisc.c
+@@ -392,7 +392,7 @@ void link_qdisc_drop_marked(Link *link) {
+         }
+ }
+ 
+-QDisc* qdisc_drop(QDisc *qdisc) {
++static void qdisc_drop(QDisc *qdisc) {
+         assert(qdisc);
+         assert(qdisc->link);
+ 
+@@ -401,8 +401,6 @@ QDisc* qdisc_drop(QDisc *qdisc) {
+         /* link_qdisc_drop_marked() may invalidate qdisc, so run link_tclass_drop_marked() first. */
+         link_tclass_drop_marked(qdisc->link);
+         link_qdisc_drop_marked(qdisc->link);
+-
+-        return NULL;
+ }
+ 
+ static int qdisc_handler(sd_netlink *rtnl, sd_netlink_message *m, Request *req, Link *link, QDisc *qdisc) {
+diff --git a/src/network/tc/qdisc.h b/src/network/tc/qdisc.h
+index 3989ad7651531..75351fb8ada1f 100644
+--- a/src/network/tc/qdisc.h
++++ b/src/network/tc/qdisc.h
+@@ -81,7 +81,6 @@ QDisc* qdisc_unref(QDisc *qdisc);
+ int qdisc_new_static(QDiscKind kind, Network *network, const char *filename, unsigned section_line, QDisc **ret);
+ 
+ void qdisc_mark_recursive(QDisc *qdisc);
+-QDisc* qdisc_drop(QDisc *qdisc);
+ void link_qdisc_drop_marked(Link *link);
+ 
+ int link_find_qdisc(Link *link, uint32_t handle, const char *kind, QDisc **qdisc);
+
+From 3d7f26d9f2d2e1129dfd64f786ae04d75d546a61 Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Mon, 2 Sep 2024 13:22:41 +0900
+Subject: [PATCH 07/10] network/tclass: make tclass_drop() static
+
+This also drops unused constant return value.
+---
+ src/network/tc/tclass.c | 6 ++----
+ src/network/tc/tclass.h | 1 -
+ 2 files changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/src/network/tc/tclass.c b/src/network/tc/tclass.c
+index 926ec69adf0fe..3c74f95992ce2 100644
+--- a/src/network/tc/tclass.c
++++ b/src/network/tc/tclass.c
+@@ -359,7 +359,7 @@ void link_tclass_drop_marked(Link *link) {
+         }
+ }
+ 
+-TClass* tclass_drop(TClass *tclass) {
++static void tclass_drop(TClass *tclass) {
+         assert(tclass);
+ 
+         tclass_mark_recursive(tclass);
+@@ -367,8 +367,6 @@ TClass* tclass_drop(TClass *tclass) {
+         /* link_tclass_drop_marked() may invalidate tclass, so run link_qdisc_drop_marked() first. */
+         link_qdisc_drop_marked(tclass->link);
+         link_tclass_drop_marked(tclass->link);
+-
+-        return NULL;
+ }
+ 
+ static int tclass_handler(sd_netlink *rtnl, sd_netlink_message *m, Request *req, Link *link, TClass *tclass) {
+@@ -584,7 +582,7 @@ int manager_rtnl_process_tclass(sd_netlink *rtnl, sd_netlink_message *message, M
+ 
+         case RTM_DELTCLASS:
+                 if (tclass)
+-                        (void) tclass_drop(tclass);
++                        tclass_drop(tclass);
+                 else
+                         log_tclass_debug(tmp, link, "Kernel removed unknown");
+ 
+diff --git a/src/network/tc/tclass.h b/src/network/tc/tclass.h
+index 44f71814501dc..ce51b2499ecc8 100644
+--- a/src/network/tc/tclass.h
++++ b/src/network/tc/tclass.h
+@@ -62,7 +62,6 @@ TClass* tclass_unref(TClass *tclass);
+ int tclass_new_static(TClassKind kind, Network *network, const char *filename, unsigned section_line, TClass **ret);
+ 
+ void tclass_mark_recursive(TClass *tclass);
+-TClass* tclass_drop(TClass *tclass);
+ void link_tclass_drop_marked(Link *link);
+ 
+ int link_find_tclass(Link *link, uint32_t classid, TClass **ret);
+
+From 0a35458f5eff59225aaa53734e6194f3e548ba03 Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Mon, 2 Sep 2024 12:27:04 +0900
+Subject: [PATCH 08/10] network/qdisc: do not save qdisc to Link before it is
+ configured
+
+Otherwise, if the same kind of qdisc is already assigned, parameters
+configured in .network file will not be used. So, let's first copy the
+qdisc and put it on Request, then on success generate a new copy based
+on the netlink notification and store it to Link.
+
+This is the same as 0a0c2672dbd22dc85d660e5baa7e1bef701beb88,
+65f5f581568448d6098358b704cae10a656d09f0, and friends, but for qdisc.
+
+Preparation for fixing #31226.
+---
+ src/network/tc/qdisc.c | 115 ++++++++++++++++++++++-------------------
+ src/network/tc/qdisc.h |   2 +-
+ src/network/tc/tc.c    |   2 +-
+ 3 files changed, 65 insertions(+), 54 deletions(-)
+
+diff --git a/src/network/tc/qdisc.c b/src/network/tc/qdisc.c
+index 851f624c45954..0f89d844f585a 100644
+--- a/src/network/tc/qdisc.c
++++ b/src/network/tc/qdisc.c
+@@ -378,11 +378,15 @@ void link_qdisc_drop_marked(Link *link) {
+         assert(link);
+ 
+         SET_FOREACH(qdisc, link->qdiscs) {
++                Request *req;
++
+                 if (!qdisc_is_marked(qdisc))
+                         continue;
+ 
+                 qdisc_unmark(qdisc);
+                 qdisc_enter_removed(qdisc);
++                if (qdisc_get_request(link, qdisc, &req) >= 0)
++                        qdisc_enter_removed(req->userdata);
+ 
+                 if (qdisc->state == 0) {
+                         log_qdisc_debug(qdisc, link, "Forgetting");
+@@ -483,6 +487,7 @@ static bool qdisc_is_ready_to_configure(QDisc *qdisc, Link *link) {
+ }
+ 
+ static int qdisc_process_request(Request *req, Link *link, QDisc *qdisc) {
++        QDisc *existing;
+         int r;
+ 
+         assert(req);
+@@ -497,54 +502,56 @@ static int qdisc_process_request(Request *req, Link *link, QDisc *qdisc) {
+                 return log_link_warning_errno(link, r, "Failed to configure QDisc: %m");
+ 
+         qdisc_enter_configuring(qdisc);
++        if (qdisc_get(link, qdisc, &existing) >= 0)
++                qdisc_enter_configuring(existing);
++
+         return 1;
+ }
+ 
+-int link_request_qdisc(Link *link, QDisc *qdisc) {
+-        QDisc *existing;
++int link_request_qdisc(Link *link, const QDisc *qdisc) {
++        _cleanup_(qdisc_unrefp) QDisc *tmp = NULL;
++        QDisc *existing = NULL;
+         int r;
+ 
+         assert(link);
+         assert(qdisc);
++        assert(qdisc->source != NETWORK_CONFIG_SOURCE_FOREIGN);
+ 
+         if (qdisc_get_request(link, qdisc, NULL) >= 0)
+                 return 0; /* already requested, skipping. */
+ 
+-        if (qdisc_get(link, qdisc, &existing) < 0) {
+-                _cleanup_(qdisc_unrefp) QDisc *tmp = NULL;
+-
+-                r = qdisc_dup(qdisc, &tmp);
+-                if (r < 0)
+-                        return log_oom();
+-
+-                r = qdisc_attach(link, tmp);
+-                if (r < 0)
+-                        return log_link_warning_errno(link, r, "Failed to store QDisc: %m");
++        r = qdisc_dup(qdisc, &tmp);
++        if (r < 0)
++                return r;
+ 
+-                existing = tmp;
+-        } else
+-                existing->source = qdisc->source;
++        if (qdisc_get(link, qdisc, &existing) >= 0)
++                /* Copy state for logging below. */
++                tmp->state = existing->state;
+ 
+-        log_qdisc_debug(existing, link, "Requesting");
++        log_qdisc_debug(tmp, link, "Requesting");
+         r = link_queue_request_safe(link, REQUEST_TYPE_TC_QDISC,
+-                                    existing, NULL,
++                                    tmp,
++                                    qdisc_unref,
+                                     qdisc_hash_func,
+                                     qdisc_compare_func,
+                                     qdisc_process_request,
+                                     &link->tc_messages,
+                                     qdisc_handler,
+                                     NULL);
+-        if (r < 0)
+-                return log_link_warning_errno(link, r, "Failed to request QDisc: %m");
+-        if (r == 0)
+-                return 0;
++        if (r <= 0)
++                return r;
+ 
+-        qdisc_enter_requesting(existing);
++        qdisc_enter_requesting(tmp);
++        if (existing)
++                qdisc_enter_requesting(existing);
++
++        TAKE_PTR(tmp);
+         return 1;
+ }
+ 
+ int manager_rtnl_process_qdisc(sd_netlink *rtnl, sd_netlink_message *message, Manager *m) {
+         _cleanup_(qdisc_unrefp) QDisc *tmp = NULL;
++        Request *req = NULL;
+         QDisc *qdisc = NULL;
+         Link *link;
+         uint16_t type;
+@@ -609,45 +616,49 @@ int manager_rtnl_process_qdisc(sd_netlink *rtnl, sd_netlink_message *message, Ma
+         }
+ 
+         (void) qdisc_get(link, tmp, &qdisc);
++        (void) qdisc_get_request(link, tmp, &req);
+ 
+-        switch (type) {
+-        case RTM_NEWQDISC:
+-                if (qdisc) {
+-                        qdisc_enter_configured(qdisc);
+-                        log_qdisc_debug(qdisc, link, "Received remembered");
+-                } else {
+-                        qdisc_enter_configured(tmp);
+-                        log_qdisc_debug(tmp, link, "Received new");
++        if (type == RTM_DELQDISC) {
++                if (qdisc)
++                        qdisc_drop(qdisc);
++                else
++                        log_qdisc_debug(tmp, link, "Kernel removed unknown");
+ 
+-                        r = qdisc_attach(link, tmp);
+-                        if (r < 0) {
+-                                log_link_warning_errno(link, r, "Failed to remember QDisc, ignoring: %m");
+-                                return 0;
+-                        }
++                return 0;
++        }
+ 
+-                        qdisc = tmp;
++        bool is_new = false;
++        if (!qdisc) {
++                /* If we did not know the qdisc, then save it. */
++                r = qdisc_attach(link, tmp);
++                if (r < 0) {
++                        log_link_warning_errno(link, r, "Failed to remember QDisc, ignoring: %m");
++                        return 0;
+                 }
+ 
+-                if (!m->enumerating) {
+-                        /* Some kind of QDisc (e.g. tbf) also create an implicit class under the qdisc, but
+-                         * the kernel may not notify about the class. Hence, we need to enumerate classes. */
+-                        r = link_enumerate_tclass(link, qdisc->handle);
+-                        if (r < 0)
+-                                log_link_warning_errno(link, r, "Failed to enumerate TClass, ignoring: %m");
+-                }
++                qdisc = tmp;
++                is_new = true;
++        }
+ 
+-                break;
++        /* Also update information that cannot be obtained through netlink notification. */
++        if (req && req->waiting_reply) {
++                QDisc *q = ASSERT_PTR(req->userdata);
+ 
+-        case RTM_DELQDISC:
+-                if (qdisc)
+-                        qdisc_drop(qdisc);
+-                else
+-                        log_qdisc_debug(tmp, link, "Kernel removed unknown");
++                qdisc->source = q->source;
++        }
+ 
+-                break;
++        qdisc_enter_configured(qdisc);
++        if (req)
++                qdisc_enter_configured(req->userdata);
+ 
+-        default:
+-                assert_not_reached();
++        log_qdisc_debug(qdisc, link, is_new ? "Remembering" : "Received remembered");
++
++        if (!m->enumerating) {
++                /* Some kind of QDisc (e.g. tbf) also create an implicit class under the qdisc, but
++                 * the kernel may not notify about the class. Hence, we need to enumerate classes. */
++                r = link_enumerate_tclass(link, qdisc->handle);
++                if (r < 0)
++                        log_link_warning_errno(link, r, "Failed to enumerate TClass, ignoring: %m");
+         }
+ 
+         return 1;
+diff --git a/src/network/tc/qdisc.h b/src/network/tc/qdisc.h
+index 75351fb8ada1f..50a8f4ead1951 100644
+--- a/src/network/tc/qdisc.h
++++ b/src/network/tc/qdisc.h
+@@ -85,7 +85,7 @@ void link_qdisc_drop_marked(Link *link);
+ 
+ int link_find_qdisc(Link *link, uint32_t handle, const char *kind, QDisc **qdisc);
+ 
+-int link_request_qdisc(Link *link, QDisc *qdisc);
++int link_request_qdisc(Link *link, const QDisc *qdisc);
+ 
+ void network_drop_invalid_qdisc(Network *network);
+ 
+diff --git a/src/network/tc/tc.c b/src/network/tc/tc.c
+index 8a1c5b3a3b3a1..37e30441e163f 100644
+--- a/src/network/tc/tc.c
++++ b/src/network/tc/tc.c
+@@ -20,7 +20,7 @@ int link_request_traffic_control(Link *link) {
+         HASHMAP_FOREACH(qdisc, link->network->qdiscs_by_section) {
+                 r = link_request_qdisc(link, qdisc);
+                 if (r < 0)
+-                        return r;
++                        return log_link_warning_errno(link, r, "Failed to request QDisc: %m");
+         }
+ 
+         HASHMAP_FOREACH(tclass, link->network->tclasses_by_section) {
+
+From 304e2419c79778bf8811fbb5ec672a8c1197dbb3 Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Mon, 2 Sep 2024 13:15:49 +0900
+Subject: [PATCH 09/10] network/tclass: do not save tclass to Link before it is
+ configured
+
+Otherwise, if the same kind of tclass is already assigned, parameters
+configured in .network file will not be used. So, let's first copy the
+tclass and put it on Request, then on success generate a new copy based
+on the netlink notification and store it to Link.
+
+This is the same as 0a0c2672dbd22dc85d660e5baa7e1bef701beb88,
+65f5f581568448d6098358b704cae10a656d09f0, and friends, but for tclass.
+---
+ src/network/tc/tc.c     |   2 +-
+ src/network/tc/tclass.c | 102 ++++++++++++++++++++++------------------
+ src/network/tc/tclass.h |   2 +-
+ 3 files changed, 58 insertions(+), 48 deletions(-)
+
+diff --git a/src/network/tc/tc.c b/src/network/tc/tc.c
+index 37e30441e163f..4679e86ac9789 100644
+--- a/src/network/tc/tc.c
++++ b/src/network/tc/tc.c
+@@ -26,7 +26,7 @@ int link_request_traffic_control(Link *link) {
+         HASHMAP_FOREACH(tclass, link->network->tclasses_by_section) {
+                 r = link_request_tclass(link, tclass);
+                 if (r < 0)
+-                        return r;
++                        return log_link_warning_errno(link, r, "Failed to request TClass: %m");
+         }
+ 
+         if (link->tc_messages == 0) {
+diff --git a/src/network/tc/tclass.c b/src/network/tc/tclass.c
+index 3c74f95992ce2..684f917c50562 100644
+--- a/src/network/tc/tclass.c
++++ b/src/network/tc/tclass.c
+@@ -345,11 +345,15 @@ void link_tclass_drop_marked(Link *link) {
+         assert(link);
+ 
+         SET_FOREACH(tclass, link->tclasses) {
++                Request *req;
++
+                 if (!tclass_is_marked(tclass))
+                         continue;
+ 
+                 tclass_unmark(tclass);
+                 tclass_enter_removed(tclass);
++                if (tclass_get_request(link, tclass, &req) >= 0)
++                        tclass_enter_removed(req->userdata);
+ 
+                 if (tclass->state == 0) {
+                         log_tclass_debug(tclass, link, "Forgetting");
+@@ -433,6 +437,7 @@ static bool tclass_is_ready_to_configure(TClass *tclass, Link *link) {
+ }
+ 
+ static int tclass_process_request(Request *req, Link *link, TClass *tclass) {
++        TClass *existing;
+         int r;
+ 
+         assert(req);
+@@ -447,54 +452,56 @@ static int tclass_process_request(Request *req, Link *link, TClass *tclass) {
+                 return log_link_warning_errno(link, r, "Failed to configure TClass: %m");
+ 
+         tclass_enter_configuring(tclass);
++        if (tclass_get(link, tclass, &existing) >= 0)
++                tclass_enter_configuring(existing);
++
+         return 1;
+ }
+ 
+-int link_request_tclass(Link *link, TClass *tclass) {
+-        TClass *existing;
++int link_request_tclass(Link *link, const TClass *tclass) {
++        _cleanup_(tclass_unrefp) TClass *tmp = NULL;
++        TClass *existing = NULL;
+         int r;
+ 
+         assert(link);
+         assert(tclass);
++        assert(tclass->source != NETWORK_CONFIG_SOURCE_FOREIGN);
+ 
+         if (tclass_get_request(link, tclass, NULL) >= 0)
+                 return 0; /* already requested, skipping. */
+ 
+-        if (tclass_get(link, tclass, &existing) < 0) {
+-                _cleanup_(tclass_unrefp) TClass *tmp = NULL;
+-
+-                r = tclass_dup(tclass, &tmp);
+-                if (r < 0)
+-                        return log_oom();
+-
+-                r = tclass_attach(link, tmp);
+-                if (r < 0)
+-                        return log_link_warning_errno(link, r, "Failed to store TClass: %m");
++        r = tclass_dup(tclass, &tmp);
++        if (r < 0)
++                return r;
+ 
+-                existing = tmp;
+-        } else
+-                existing->source = tclass->source;
++        if (tclass_get(link, tclass, &existing) >= 0)
++                /* Copy state for logging below. */
++                tmp->state = existing->state;
+ 
+-        log_tclass_debug(existing, link, "Requesting");
++        log_tclass_debug(tmp, link, "Requesting");
+         r = link_queue_request_safe(link, REQUEST_TYPE_TC_CLASS,
+-                                    existing, NULL,
++                                    tmp,
++                                    tclass_unref,
+                                     tclass_hash_func,
+                                     tclass_compare_func,
+                                     tclass_process_request,
+                                     &link->tc_messages,
+                                     tclass_handler,
+                                     NULL);
+-        if (r < 0)
+-                return log_link_warning_errno(link, r, "Failed to request TClass: %m");
+-        if (r == 0)
+-                return 0;
++        if (r <= 0)
++                return r;
+ 
+-        tclass_enter_requesting(existing);
++        tclass_enter_requesting(tmp);
++        if (existing)
++                tclass_enter_requesting(existing);
++
++        TAKE_PTR(tmp);
+         return 1;
+ }
+ 
+ int manager_rtnl_process_tclass(sd_netlink *rtnl, sd_netlink_message *message, Manager *m) {
+         _cleanup_(tclass_unrefp) TClass *tmp = NULL;
++        Request *req = NULL;
+         TClass *tclass = NULL;
+         Link *link;
+         uint16_t type;
+@@ -559,39 +566,42 @@ int manager_rtnl_process_tclass(sd_netlink *rtnl, sd_netlink_message *message, M
+         }
+ 
+         (void) tclass_get(link, tmp, &tclass);
++        (void) tclass_get_request(link, tmp, &req);
+ 
+-        switch (type) {
+-        case RTM_NEWTCLASS:
+-                if (tclass) {
+-                        tclass_enter_configured(tclass);
+-                        log_tclass_debug(tclass, link, "Received remembered");
+-                } else {
+-                        tclass_enter_configured(tmp);
+-                        log_tclass_debug(tmp, link, "Received new");
+-
+-                        r = tclass_attach(link, tmp);
+-                        if (r < 0) {
+-                                log_link_warning_errno(link, r, "Failed to remember TClass, ignoring: %m");
+-                                return 0;
+-                        }
+-
+-                        tclass = tmp;
+-                }
+-
+-                break;
+-
+-        case RTM_DELTCLASS:
++        if (type == RTM_DELTCLASS) {
+                 if (tclass)
+                         tclass_drop(tclass);
+                 else
+                         log_tclass_debug(tmp, link, "Kernel removed unknown");
+ 
+-                break;
++                return 0;
++        }
+ 
+-        default:
+-                assert_not_reached();
++        bool is_new = false;
++        if (!tclass) {
++                /* If we did not know the tclass, then save it. */
++                r = tclass_attach(link, tmp);
++                if (r < 0) {
++                        log_link_warning_errno(link, r, "Failed to remember TClass, ignoring: %m");
++                        return 0;
++                }
++
++                tclass = tmp;
++                is_new = true;
+         }
+ 
++        /* Also update information that cannot be obtained through netlink notification. */
++        if (req && req->waiting_reply) {
++                TClass *t = ASSERT_PTR(req->userdata);
++
++                tclass->source = t->source;
++        }
++
++        tclass_enter_configured(tclass);
++        if (req)
++                tclass_enter_configured(req->userdata);
++
++        log_tclass_debug(tclass, link, is_new ? "Remembering" : "Received remembered");
+         return 1;
+ }
+ 
+diff --git a/src/network/tc/tclass.h b/src/network/tc/tclass.h
+index ce51b2499ecc8..31374d6da8dcc 100644
+--- a/src/network/tc/tclass.h
++++ b/src/network/tc/tclass.h
+@@ -66,7 +66,7 @@ void link_tclass_drop_marked(Link *link);
+ 
+ int link_find_tclass(Link *link, uint32_t classid, TClass **ret);
+ 
+-int link_request_tclass(Link *link, TClass *tclass);
++int link_request_tclass(Link *link, const TClass *tclass);
+ 
+ void network_drop_invalid_tclass(Network *network);
+ 
+
+From 21d9eeb5e6177544b32a5e25c355373573a3ccee Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Thu, 1 Aug 2024 14:38:05 +0200
+Subject: [PATCH 10/10] networkd: Replace existing objects instead of doing
+ nothing if they exist
+
+Currently, if for example a traffic control object already exist, networkd
+will silently do nothing, even if the settings in the network file for the
+traffic control object have changed. Let's instead replace the object if it
+already exists so that new settings from the network file are applied as
+expected.
+
+Fixes #31226
+---
+ src/libsystemd/sd-netlink/netlink-message-rtnl.c |  6 +++---
+ test/test-network/systemd-networkd-tests.py      | 11 +++++++++++
+ 2 files changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/src/libsystemd/sd-netlink/netlink-message-rtnl.c b/src/libsystemd/sd-netlink/netlink-message-rtnl.c
+index fb11c7e02bb28..9184c43fecced 100644
+--- a/src/libsystemd/sd-netlink/netlink-message-rtnl.c
++++ b/src/libsystemd/sd-netlink/netlink-message-rtnl.c
+@@ -892,7 +892,7 @@ int sd_rtnl_message_new_addrlabel(
+                 return r;
+ 
+         if (nlmsg_type == RTM_NEWADDRLABEL)
+-                (*ret)->hdr->nlmsg_flags |= NLM_F_CREATE | NLM_F_EXCL;
++                (*ret)->hdr->nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
+ 
+         addrlabel = NLMSG_DATA((*ret)->hdr);
+ 
+@@ -1143,7 +1143,7 @@ int sd_rtnl_message_new_traffic_control(
+                 return r;
+ 
+         if (IN_SET(nlmsg_type, RTM_NEWQDISC, RTM_NEWTCLASS))
+-                (*ret)->hdr->nlmsg_flags |= NLM_F_CREATE | NLM_F_EXCL;
++                (*ret)->hdr->nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
+ 
+         tcm = NLMSG_DATA((*ret)->hdr);
+         tcm->tcm_ifindex = ifindex;
+@@ -1212,7 +1212,7 @@ int sd_rtnl_message_new_mdb(
+                 return r;
+ 
+         if (nlmsg_type == RTM_NEWMDB)
+-                (*ret)->hdr->nlmsg_flags |= NLM_F_CREATE | NLM_F_EXCL;
++                (*ret)->hdr->nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
+ 
+         bpm = NLMSG_DATA((*ret)->hdr);
+         bpm->family = AF_BRIDGE;
+diff --git a/test/test-network/systemd-networkd-tests.py b/test/test-network/systemd-networkd-tests.py
+index 8a2c5af3989a7..1b61038d09e08 100755
+--- a/test/test-network/systemd-networkd-tests.py
++++ b/test/test-network/systemd-networkd-tests.py
+@@ -4489,6 +4489,17 @@ def test_qdisc_cake(self):
+         self.assertIn('rtt 1s', output)
+         self.assertIn('ack-filter-aggressive', output)
+ 
++        # Test for replacing existing qdisc. See #31226.
++        with open(os.path.join(network_unit_dir, '25-qdisc-cake.network'), mode='a', encoding='utf-8') as f:
++            f.write('Bandwidth=250M\n')
++
++        networkctl_reload()
++        self.wait_online('dummy98:routable')
++
++        output = check_output('tc qdisc show dev dummy98')
++        print(output)
++        self.assertIn('bandwidth 250Mbit', output)
++
+     @expectedFailureIfModuleIsNotAvailable('sch_codel')
+     def test_qdisc_codel(self):
+         copy_network_unit('25-qdisc-codel.network', '12-dummy.netdev')
