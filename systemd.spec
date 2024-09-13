@@ -123,8 +123,20 @@ Patch0491:      https://github.com/systemd/systemd/pull/30846.patch
 # Soft-disable tmpfiles --purge until a good use case comes up.
 Patch0492:      0001-tmpfiles-make-purge-hard-to-mis-use.patch
 
+# Meta specific backports (900-1000)
+
+%if 0%{?facebook}
+
+# network: Make qdisc reconfigurable
+Patch0900:      https://github.com/systemd/systemd/pull/34224.patch
+
 # network: Add support for multiq qdisc
-Patch0493:      https://github.com/systemd/systemd/pull/34251.patch
+Patch0901:      https://github.com/systemd/systemd/pull/34251.patch
+
+# core: Add support for PrivateUsers=identity
+Patch0902:      https://github.com/systemd/systemd/pull/34321.patch
+
+%endif
 
 %ifarch %{ix86} x86_64 aarch64 riscv64
 %global want_bootloader 1
