@@ -128,13 +128,13 @@ Patch0492:      0001-tmpfiles-make-purge-hard-to-mis-use.patch
 %if 0%{?facebook}
 
 # network: Make qdisc reconfigurable
-Patch0900:      https://github.com/systemd/systemd/pull/34224.patch
+Patch0900:      https://github.com/systemd/systemd/pull/34543.patch
 
 # network: Add support for multiq qdisc
 Patch0901:      https://github.com/systemd/systemd/pull/34251.patch
 
 # core: Add support for PrivateUsers=identity
-Patch0902:      https://github.com/systemd/systemd/pull/34321.patch
+Patch0902:      https://github.com/systemd/systemd/pull/34400.patch
 
 %endif
 

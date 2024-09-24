@@ -1,9 +1,11 @@
-From 9b294afa2dbdb05695925ded55a8f1bfa70bb087 Mon Sep 17 00:00:00 2001
+From f5d23169d737f6c6fe123dbaeae053227c744457 Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Mon, 2 Sep 2024 11:41:57 +0900
 Subject: [PATCH 01/10] network/qdisc: introduce qdisc_ref() and qdisc_unref()
 
 No functional change, just refactoring and preparation for later change.
+
+(cherry picked from commit 9b294afa2dbdb05695925ded55a8f1bfa70bb087)
 ---
  src/network/networkd-network.c |   2 +-
  src/network/tc/cake.c          |  20 +++----
@@ -27,11 +29,11 @@ No functional change, just refactoring and preparation for later change.
  19 files changed, 122 insertions(+), 76 deletions(-)
 
 diff --git a/src/network/networkd-network.c b/src/network/networkd-network.c
-index 94666c2bdd03e..fafa0e570ee36 100644
+index 8232db06c934c..155e9568e2a27 100644
 --- a/src/network/networkd-network.c
 +++ b/src/network/networkd-network.c
-@@ -801,7 +801,7 @@ static Network *network_free(Network *network) {
-         hashmap_free(network->rules_by_section);
+@@ -799,7 +799,7 @@ static Network *network_free(Network *network) {
+         hashmap_free_with_destructor(network->rules_by_section, routing_policy_rule_free);
          hashmap_free_with_destructor(network->dhcp_static_leases_by_section, dhcp_static_lease_free);
          ordered_hashmap_free_with_destructor(network->sr_iov_by_section, sr_iov_free);
 -        hashmap_free_with_destructor(network->qdiscs_by_section, qdisc_free);
@@ -787,13 +789,15 @@ index dcb149dbe2a5b..f4fa331f523c2 100644
          Network *network = ASSERT_PTR(data);
          unsigned id;
 
-From 541d0ed20a4e8572536d3f5268e6ffa84c9faa04 Mon Sep 17 00:00:00 2001
+From 51800c582a03cfb58de19020b4fd81cf6754c17f Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Mon, 2 Sep 2024 11:59:51 +0900
 Subject: [PATCH 02/10] network/tclass: introduce tclass_ref() and
  tclass_unref()
 
 No functional change, just refactoring and preparation for later change.
+
+(cherry picked from commit 541d0ed20a4e8572536d3f5268e6ffa84c9faa04)
 ---
  src/network/networkd-network.c |   2 +-
  src/network/tc/drr.c           |   2 +-
@@ -804,10 +808,10 @@ No functional change, just refactoring and preparation for later change.
  6 files changed, 84 insertions(+), 38 deletions(-)
 
 diff --git a/src/network/networkd-network.c b/src/network/networkd-network.c
-index fafa0e570ee36..a5bb6dd529822 100644
+index 155e9568e2a27..d4161a608dae3 100644
 --- a/src/network/networkd-network.c
 +++ b/src/network/networkd-network.c
-@@ -802,7 +802,7 @@ static Network *network_free(Network *network) {
+@@ -800,7 +800,7 @@ static Network *network_free(Network *network) {
          hashmap_free_with_destructor(network->dhcp_static_leases_by_section, dhcp_static_lease_free);
          ordered_hashmap_free_with_destructor(network->sr_iov_by_section, sr_iov_free);
          hashmap_free(network->qdiscs_by_section);
@@ -1171,12 +1175,13 @@ index 85df57d42c21e..44f71814501dc 100644
  CONFIG_PARSER_PROTOTYPE(config_parse_tclass_parent);
  CONFIG_PARSER_PROTOTYPE(config_parse_tclass_classid);
 
-From 4bdc3d85aee073cb7d22b53bde13fd878333b12c Mon Sep 17 00:00:00 2001
+From 7594bd35d1756a5ce938763a26450c5ba0c99df5 Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Mon, 2 Sep 2024 13:03:09 +0900
 Subject: [PATCH 03/10] network/neighbor: skip requesting neighbor if it is
  already requested
 
+(cherry picked from commit 4bdc3d85aee073cb7d22b53bde13fd878333b12c)
 ---
  src/network/networkd-neighbor.c | 3 +++
  1 file changed, 3 insertions(+)
@@ -1196,12 +1201,13 @@ index 6b81950f96c63..3377bb056e589 100644
          if (r < 0)
                  return r;
 
-From 998973e313a680a3434c2dd23384e86ff01726f3 Mon Sep 17 00:00:00 2001
+From b7ca4295dd22d7998ecbe87ef5883c106b1e7182 Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Mon, 2 Sep 2024 12:55:59 +0900
 Subject: [PATCH 04/10] network/qdisc: skip requesting qdisc if it is already
  requested
 
+(cherry picked from commit 998973e313a680a3434c2dd23384e86ff01726f3)
 ---
  src/network/tc/qdisc.c | 27 +++++++++++++++++++++++++++
  1 file changed, 27 insertions(+)
@@ -1252,12 +1258,13 @@ index d372481d6280b..1475b4aced4de 100644
                  _cleanup_(qdisc_unrefp) QDisc *tmp = NULL;
  
 
-From e3f91033aea354c28011e841b7043549a1a5226b Mon Sep 17 00:00:00 2001
+From e51b9362c36f787e231e41e485dbdf0cebf94ded Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Mon, 2 Sep 2024 13:06:54 +0900
 Subject: [PATCH 05/10] network/tclass: skip requesting tclass if it is already
  requested
 
+(cherry picked from commit e3f91033aea354c28011e841b7043549a1a5226b)
 ---
  src/network/tc/tclass.c | 27 +++++++++++++++++++++++++++
  1 file changed, 27 insertions(+)
@@ -1308,12 +1315,14 @@ index 168d93e1c521f..926ec69adf0fe 100644
                  _cleanup_(tclass_unrefp) TClass *tmp = NULL;
  
 
-From 4a31c768a9f4e1ff957880a5c4f52d36d768e4a4 Mon Sep 17 00:00:00 2001
+From 36e35ff4583b0f4b609a82e1a7178c3c810da4f9 Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Mon, 2 Sep 2024 13:20:59 +0900
 Subject: [PATCH 06/10] network/qdisc: make qdisc_drop() static
 
 This also drops unused constant return value.
+
+(cherry picked from commit 4a31c768a9f4e1ff957880a5c4f52d36d768e4a4)
 ---
  src/network/tc/qdisc.c | 4 +---
  src/network/tc/qdisc.h | 1 -
@@ -1354,12 +1363,14 @@ index 3989ad7651531..75351fb8ada1f 100644
  
  int link_find_qdisc(Link *link, uint32_t handle, const char *kind, QDisc **qdisc);
 
-From 3d7f26d9f2d2e1129dfd64f786ae04d75d546a61 Mon Sep 17 00:00:00 2001
+From 29aa394b2b267d993ae7ea713396315b0fe239ff Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Mon, 2 Sep 2024 13:22:41 +0900
 Subject: [PATCH 07/10] network/tclass: make tclass_drop() static
 
 This also drops unused constant return value.
+
+(cherry picked from commit 3d7f26d9f2d2e1129dfd64f786ae04d75d546a61)
 ---
  src/network/tc/tclass.c | 6 ++----
  src/network/tc/tclass.h | 1 -
@@ -1409,7 +1420,7 @@ index 44f71814501dc..ce51b2499ecc8 100644
  
  int link_find_tclass(Link *link, uint32_t classid, TClass **ret);
 
-From 0a35458f5eff59225aaa53734e6194f3e548ba03 Mon Sep 17 00:00:00 2001
+From 02d55715180e4d2002fe2e1f14f2945e48674a22 Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Mon, 2 Sep 2024 12:27:04 +0900
 Subject: [PATCH 08/10] network/qdisc: do not save qdisc to Link before it is
@@ -1424,6 +1435,8 @@ This is the same as 0a0c2672dbd22dc85d660e5baa7e1bef701beb88,
 65f5f581568448d6098358b704cae10a656d09f0, and friends, but for qdisc.
 
 Preparation for fixing #31226.
+
+(cherry picked from commit 0a35458f5eff59225aaa53734e6194f3e548ba03)
 ---
  src/network/tc/qdisc.c | 115 ++++++++++++++++++++++-------------------
  src/network/tc/qdisc.h |   2 +-
@@ -1644,7 +1657,7 @@ index 8a1c5b3a3b3a1..37e30441e163f 100644
  
          HASHMAP_FOREACH(tclass, link->network->tclasses_by_section) {
 
-From 304e2419c79778bf8811fbb5ec672a8c1197dbb3 Mon Sep 17 00:00:00 2001
+From ae6eaa526e47e520da69ad98b74bde43e7fe914f Mon Sep 17 00:00:00 2001
 From: Yu Watanabe <watanabe.yu+github@gmail.com>
 Date: Mon, 2 Sep 2024 13:15:49 +0900
 Subject: [PATCH 09/10] network/tclass: do not save tclass to Link before it is
@@ -1657,6 +1670,8 @@ on the netlink notification and store it to Link.
 
 This is the same as 0a0c2672dbd22dc85d660e5baa7e1bef701beb88,
 65f5f581568448d6098358b704cae10a656d09f0, and friends, but for tclass.
+
+(cherry picked from commit 304e2419c79778bf8811fbb5ec672a8c1197dbb3)
 ---
  src/network/tc/tc.c     |   2 +-
  src/network/tc/tclass.c | 102 ++++++++++++++++++++++------------------
@@ -1864,7 +1879,7 @@ index ce51b2499ecc8..31374d6da8dcc 100644
  void network_drop_invalid_tclass(Network *network);
  
 
-From 21d9eeb5e6177544b32a5e25c355373573a3ccee Mon Sep 17 00:00:00 2001
+From 91823bc0cdb41df6e8b66e58ae5cecee2f83b4d4 Mon Sep 17 00:00:00 2001
 From: Daan De Meyer <daan.j.demeyer@gmail.com>
 Date: Thu, 1 Aug 2024 14:38:05 +0200
 Subject: [PATCH 10/10] networkd: Replace existing objects instead of doing
@@ -1877,6 +1892,8 @@ already exists so that new settings from the network file are applied as
 expected.
 
 Fixes #31226
+
+(cherry picked from commit 21d9eeb5e6177544b32a5e25c355373573a3ccee)
 ---
  src/libsystemd/sd-netlink/netlink-message-rtnl.c |  6 +++---
  test/test-network/systemd-networkd-tests.py      | 11 +++++++++++
@@ -1914,10 +1931,10 @@ index fb11c7e02bb28..9184c43fecced 100644
          bpm = NLMSG_DATA((*ret)->hdr);
          bpm->family = AF_BRIDGE;
 diff --git a/test/test-network/systemd-networkd-tests.py b/test/test-network/systemd-networkd-tests.py
-index 8a2c5af3989a7..1b61038d09e08 100755
+index ba8e65ee90bfc..83a98c2902104 100755
 --- a/test/test-network/systemd-networkd-tests.py
 +++ b/test/test-network/systemd-networkd-tests.py
-@@ -4489,6 +4489,17 @@ def test_qdisc_cake(self):
+@@ -4424,6 +4424,17 @@ def test_qdisc_cake(self):
          self.assertIn('rtt 1s', output)
          self.assertIn('ack-filter-aggressive', output)
  
