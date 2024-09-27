@@ -44,7 +44,7 @@ Url:            https://systemd.io
 # Allow users to specify the version and release when building the rpm by 
 # setting the %%version_override and %%release_override macros.
 Version:        %{?version_override}%{!?version_override:256.6}
-Release:        %{?release_override}%{!?release_override:1.1}%{?dist}
+Release:        %{?release_override}%{!?release_override:1.2}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -1083,9 +1083,17 @@ if [ $1 -ge 1 ]; then
   systemd-tmpfiles --create &>/dev/null || :
 fi
 
+# systemd-logind restart is disabled because of DRM fds getting closed which breaks
+# graphical sessions. However, every release we encounter breakage because something
+# in pam_systemd or so starts making use of new logind APIs which then fails because
+# logind wasn't restarted. As a workaround, for FB builds, we enable logind restarts
+# because the problems with logind restarts are limited to graphical sessions of which
+# FB has none.
+%if 0%{?facebook}
+%systemd_postun_with_restart systemd-timedated.service systemd-hostnamed.service systemd-journald.service systemd-localed.service systemd-userdbd.service systemd-logind.service
+%else
 %systemd_postun_with_restart systemd-timedated.service systemd-hostnamed.service systemd-journald.service systemd-localed.service systemd-userdbd.service
-
-# FIXME: systemd-logind.service is excluded (https://github.com/systemd/systemd/pull/17558)
+%endif
 
 # This is the expanded form of %%systemd_user_daemon_reexec. We
 # can't use the macro because we define it ourselves.
