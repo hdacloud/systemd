@@ -1029,6 +1029,16 @@ meson test -C %{_vpath_builddir} -t 6 --print-errorlogs
 
 %include %{SOURCE1}
 
+# This macro is newly added upstream so we can't rely on it being always being available
+# in the systemd-rpm-macros yet so we define it ourselves.
+%global systemd_posttrans_with_restart() \
+%{expand:%%{?__systemd_someargs_%#:%%__systemd_someargs_%# systemd_posttrans_with_restart}} \
+if [ $1 -ge 2 ] && [ -x "/usr/lib/systemd/systemd-update-helper" ]; then \
+    # Package upgrade, not install \
+    /usr/lib/systemd/systemd-update-helper mark-restart-system-units %* || : \
+fi \
+%{nil}
+
 %post
 systemd-machine-id-setup &>/dev/null || :
 
@@ -1052,7 +1062,7 @@ systemd-tmpfiles --create &>/dev/null || :
 systemctl preset-all &>/dev/null || :
 systemctl --global preset-all &>/dev/null || :
 
-%postun
+%posttrans
 if [ $1 -ge 1 ]; then
   [ -w %{_localstatedir} ] && journalctl --update-catalog || :
 
@@ -1061,7 +1071,7 @@ if [ $1 -ge 1 ]; then
   systemd-tmpfiles --create &>/dev/null || :
 fi
 
-%systemd_postun_with_restart systemd-timedated.service systemd-hostnamed.service systemd-journald.service systemd-localed.service systemd-userdbd.service
+%systemd_posttrans_with_restart systemd-timedated.service systemd-hostnamed.service systemd-journald.service systemd-localed.service systemd-userdbd.service
 
 # FIXME: systemd-logind.service is excluded (https://github.com/systemd/systemd/pull/17558)
 
@@ -1114,11 +1124,10 @@ grep -q -E '^KEYMAP="?fi-latin[19]"?' /etc/vconsole.conf 2>/dev/null &&
 %preun udev
 %systemd_preun %udev_services
 
-%postun udev
+%posttrans udev
 # Restart some services.
 # Others are either oneshot services, or sockets, and restarting them causes issues (#1378974)
-%systemd_postun_with_restart systemd-udevd.service systemd-timesyncd.service
-
+%systemd_posttrans_with_restart systemd-udevd.service systemd-timesyncd.service
 
 %global journal_remote_units_restart systemd-journal-gatewayd.service systemd-journal-remote.service systemd-journal-upload.service
 %global journal_remote_units_norestart systemd-journal-gatewayd.socket systemd-journal-remote.socket
@@ -1136,8 +1145,8 @@ if [ $1 -eq 1 ] ; then
     fi
 fi
 
-%postun journal-remote
-%systemd_postun_with_restart %journal_remote_units_restart
+%posttrans journal-remote
+%systemd_posttrans_with_restart %journal_remote_units_restart
 %firewalld_reload
 
 %post networkd
@@ -1159,9 +1168,8 @@ fi
 %preun networkd
 %systemd_preun systemd-networkd.service systemd-networkd-wait-online.service
 
-%postun networkd
-%systemd_postun_with_restart systemd-networkd.service
-%systemd_postun systemd-networkd-wait-online.service
+%posttrans networkd
+%systemd_posttrans_with_restart systemd-networkd.service
 
 %post resolved
 [ $1 -eq 1 ] || exit 0
@@ -1192,10 +1200,8 @@ if [ $1 -eq 0 ] ; then
         fi
 fi
 
-%postun resolved
-%systemd_postun_with_restart systemd-resolved.service
-
 %posttrans resolved
+%systemd_posttrans_with_restart systemd-resolved.service
 [ -e %{_localstatedir}/lib/rpm-state/systemd-resolved.initial-installation ] || exit 0
 rm %{_localstatedir}/lib/rpm-state/systemd-resolved.initial-installation
 # Initial installation
