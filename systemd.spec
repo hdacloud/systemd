@@ -1208,7 +1208,7 @@ fi
 %posttrans networkd
 %if %{undefined facebook}
 %systemd_posttrans_with_restart systemd-networkd.service
-%else
+%endif
 
 %post resolved
 [ $1 -eq 1 ] || exit 0
