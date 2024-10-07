@@ -67,9 +67,6 @@ Source2:        split-files.py
 Source3:        purge-nobody-user
 Source4:        test_sysusers_defined.py
 
-# Prevent accidental removal of the systemd package
-Source5:        yum-protect-systemd.conf
-
 Source6:        inittab
 Source7:        sysctl.conf.README
 Source8:        systemd-journal-remote.xml
@@ -646,8 +643,8 @@ Requires:      python3dist(psutil)
 License:       LGPL-2.1-or-later
 
 %description tests
-"Installed tests" that are usually run as part of the build system. They can be
-useful to test systemd internals.
+Systemd unit tests used to test the internal implementation after a build.
+Different binaries test different parts of the codebase.
 
 %package standalone-repart
 Summary:       Standalone systemd-repart binary for use on systems without systemd
@@ -657,9 +654,9 @@ Suggests:      coreutils-single
 RemovePathPostfixes: .standalone
 
 %description standalone-repart
-Standalone systemd-repart binary with no dependencies on the systemd-shared library or
-other libraries from systemd-libs. This package conflicts with the main systemd
-package and is meant for use on systems without systemd.
+Standalone systemd-repart binary with no dependencies on the systemd-shared
+library or other libraries from systemd-libs. This package conflicts with the
+main systemd package and is meant for use on systems without systemd.
 
 %package standalone-tmpfiles
 Summary:       Standalone systemd-tmpfiles binary for use on systems without systemd
@@ -669,9 +666,9 @@ Suggests:      coreutils-single
 RemovePathPostfixes: .standalone
 
 %description standalone-tmpfiles
-Standalone systemd-tmpfiles binary with no dependencies on the systemd-shared library or
-other libraries from systemd-libs. This package conflicts with the main systemd
-package and is meant for use on systems without systemd.
+Standalone systemd-tmpfiles binary with no dependencies on the systemd-shared
+library or other libraries from systemd-libs. This package conflicts with the
+main systemd package and is meant for use on systems without systemd.
 
 %package standalone-sysusers
 Summary:       Standalone systemd-sysusers binary for use on systems without systemd
@@ -681,21 +678,21 @@ Suggests:      coreutils-single
 RemovePathPostfixes: .standalone
 
 %description standalone-sysusers
-Standalone systemd-sysusers binary with no dependencies on the systemd-shared library or
-other libraries from systemd-libs. This package conflicts with the main systemd
-package and is meant for use on systems without systemd.
+Standalone systemd-sysusers binary with no dependencies on the systemd-shared
+library or other libraries from systemd-libs. This package conflicts with the
+main systemd package and is meant for use on systems without systemd.
 
 %package standalone-shutdown
-Summary:       Standalone systemd-shutdown binary for use on systems without systemd
+Summary:       Standalone systemd-shutdown binary for use in exitrds
 Provides:      %{name}-shutdown = %{version}-%{release}
 Conflicts:     %{name}
 Suggests:      coreutils-single
 RemovePathPostfixes: .standalone
 
 %description standalone-shutdown
-Standalone systemd-shutdown binary with no dependencies on the systemd-shared library or
-other libraries from systemd-libs. This package conflicts with the main systemd
-package and is meant for use in exitrds.
+Standalone systemd-shutdown binary with no dependencies on the systemd-shared
+library or other libraries from systemd-libs. This package conflicts with the
+main systemd package and is meant for use in exitrds.
 
 %prep
 %if %{defined branch}
@@ -962,8 +959,18 @@ touch %{buildroot}%{_localstatedir}/lib/systemd/random-seed
 touch %{buildroot}%{_localstatedir}/lib/systemd/timesync/clock
 touch %{buildroot}%{_localstatedir}/lib/private/systemd/journal-upload/state
 
-# Install yum protection fragment
-install -Dm0644 %{SOURCE5} %{buildroot}/etc/dnf/protected.d/systemd.conf
+# Install yum protection config. Old location in /etc.
+mkdir -p %{buildroot}/etc/dnf/protected.d/
+cat >%{buildroot}/etc/dnf/protected.d/systemd.conf <<EOF
+systemd
+systemd-udev
+EOF
+# Install dnf5 protection config. New location under /usr.
+mkdir -p %{buildroot}/usr/share/dnf5/libdnf.conf.d/
+cat >%{buildroot}/usr/share/dnf5/libdnf.conf.d/protect-systemd.conf <<EOF
+[main]
+protected_packages = systemd, systemd-udev
+EOF
 
 install -Dm0644 -t %{buildroot}/usr/lib/firewalld/services/ %{SOURCE8} %{SOURCE9}
 
