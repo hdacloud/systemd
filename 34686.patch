@@ -1,0 +1,255 @@
+From 0d0ecaab000cf2768a3edf1e73119bf2fce952b0 Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Wed, 9 Oct 2024 14:49:07 +0200
+Subject: [PATCH 1/6] mkosi: Fix up ownership of testuser home directory on
+ first boot
+
+When building unprivileged, the testuser home directory ends up
+owned by root:root because mkosi can't chown directories to other
+owners when running unprivileged. So let's fix up the testuser
+ownership on first boot with tmpfiles instead.
+---
+ mkosi.extra/usr/lib/tmpfiles.d/testuser.conf | 3 +++
+ 1 file changed, 3 insertions(+)
+ create mode 100644 mkosi.extra/usr/lib/tmpfiles.d/testuser.conf
+
+diff --git a/mkosi.extra/usr/lib/tmpfiles.d/testuser.conf b/mkosi.extra/usr/lib/tmpfiles.d/testuser.conf
+new file mode 100644
+index 0000000000000..7113177f4deba
+--- /dev/null
++++ b/mkosi.extra/usr/lib/tmpfiles.d/testuser.conf
+@@ -0,0 +1,3 @@
++# SPDX-License-Identifier: LGPL-2.1-or-later
++
++z! /home/testuser 700 testuser testuser
+
+From ec9fd0d4f5f77404fbfabde9e7a9d01aaa1356ff Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Wed, 9 Oct 2024 16:37:06 +0200
+Subject: [PATCH 2/6] update-utmp: Make reconnect logic more robust
+
+We might also fail to connect to the private manager bus itself if
+the daemon-reexec is still ongoing, so let's handle that as well by
+retrying on ECONNREFUSED.
+---
+ src/update-utmp/update-utmp.c | 45 +++++++++++++++++++----------------
+ 1 file changed, 25 insertions(+), 20 deletions(-)
+
+diff --git a/src/update-utmp/update-utmp.c b/src/update-utmp/update-utmp.c
+index c376676e8d0a5..7a8a53f7e8ec5 100644
+--- a/src/update-utmp/update-utmp.c
++++ b/src/update-utmp/update-utmp.c
+@@ -82,6 +82,25 @@ static int get_current_runlevel(Context *c) {
+         assert(c);
+ 
+         for (unsigned n_attempts = 0;;) {
++                if (n_attempts++ > 0) {
++                        /* systemd might have dropped off momentarily, let's not make this an error,
++                        * and wait some random time. Let's pick a random time in the range 0ms…250ms,
++                        * linearly scaled by the number of failed attempts. */
++                        c->bus = sd_bus_flush_close_unref(c->bus);
++
++                        usec_t usec = random_u64_range(UINT64_C(10) * USEC_PER_MSEC +
++                                                UINT64_C(240) * USEC_PER_MSEC * n_attempts/64);
++                        (void) usleep_safe(usec);
++
++                        r = bus_connect_system_systemd(&c->bus);
++                        if (r == -ECONNREFUSED && n_attempts < 64) {
++                                log_debug_errno(r, "Failed to reconnect to system bus, retrying after a slight delay: %m");
++                                continue;
++                        }
++                        if (r < 0)
++                                return log_error_errno(r, "Failed to reconnect to system bus: %m");
++                }
++
+                 FOREACH_ELEMENT(e, table) {
+                         _cleanup_(sd_bus_error_free) sd_bus_error error = SD_BUS_ERROR_NULL;
+                         _cleanup_free_ char *state = NULL, *path = NULL;
+@@ -102,18 +121,10 @@ static int get_current_runlevel(Context *c) {
+                              sd_bus_error_has_names(&error,
+                                                     SD_BUS_ERROR_NO_REPLY,
+                                                     SD_BUS_ERROR_DISCONNECTED)) &&
+-                            ++n_attempts < 64) {
+-
+-                                /* systemd might have dropped off momentarily, let's not make this an error,
+-                                 * and wait some random time. Let's pick a random time in the range 0ms…250ms,
+-                                 * linearly scaled by the number of failed attempts. */
+-
+-                                usec_t usec = random_u64_range(UINT64_C(10) * USEC_PER_MSEC +
+-                                                               UINT64_C(240) * USEC_PER_MSEC * n_attempts/64);
+-                                log_debug_errno(r, "Failed to get state of %s, retrying after %s: %s",
+-                                                e->special, FORMAT_TIMESPAN(usec, USEC_PER_MSEC), bus_error_message(&error, r));
+-                                (void) usleep_safe(usec);
+-                                goto reconnect;
++                            n_attempts < 64) {
++                                log_debug_errno(r, "Failed to get state of %s, retrying after a slight delay: %s",
++                                                e->special, bus_error_message(&error, r));
++                                break;
+                         }
+                         if (r < 0)
+                                 return log_warning_errno(r, "Failed to get state of %s: %s", e->special, bus_error_message(&error, r));
+@@ -121,14 +132,8 @@ static int get_current_runlevel(Context *c) {
+                         if (STR_IN_SET(state, "active", "reloading"))
+                                 return e->runlevel;
+                 }
+-
+-                return 0;
+-
+-reconnect:
+-                c->bus = sd_bus_flush_close_unref(c->bus);
+-                r = bus_connect_system_systemd(&c->bus);
+-                if (r < 0)
+-                        return log_error_errno(r, "Failed to reconnect to system bus: %m");
++                if (r >= 0)
++                        return 0;
+         }
+ }
+ 
+
+From a339495b1d67f69f49ffffdd96002164a28f1c93 Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Wed, 9 Oct 2024 11:44:34 +0200
+Subject: [PATCH 3/6] bus-util: Drop fallback to system/user bus if manager bus
+ doesn't work
+
+We have various callsites that explicitly need the manager bus and
+won't work with the system bus, like daemon-reexec and friends which
+can't properly wait until the operation has finished unless using the
+manager bus.
+
+If we silently fall back to the system bus for these operations, we
+can end up with rather hard to debug issues so let's remove the fallback
+as it was added back in 2013 in a6aa89122d2fa5e811a72200773068c13bfffea2
+without a clear explanation of why it was needed (I expect as a fallback
+if kdbus wasn't available but that's not a thing anymore these days).
+---
+ src/shared/bus-util.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/shared/bus-util.c b/src/shared/bus-util.c
+index f4c4eed70702a..44ed617da8dfb 100644
+--- a/src/shared/bus-util.c
++++ b/src/shared/bus-util.c
+@@ -245,7 +245,7 @@ int bus_connect_system_systemd(sd_bus **ret_bus) {
+ 
+         r = sd_bus_start(bus);
+         if (r < 0)
+-                return sd_bus_default_system(ret_bus);
++                return r;
+ 
+         r = bus_check_peercred(bus);
+         if (r < 0)
+@@ -265,7 +265,7 @@ int bus_connect_user_systemd(sd_bus **ret_bus) {
+ 
+         e = secure_getenv("XDG_RUNTIME_DIR");
+         if (!e)
+-                return sd_bus_default_user(ret_bus);
++                return -ENXIO;
+ 
+         ee = bus_address_escape(e);
+         if (!ee)
+@@ -281,7 +281,7 @@ int bus_connect_user_systemd(sd_bus **ret_bus) {
+ 
+         r = sd_bus_start(bus);
+         if (r < 0)
+-                return sd_bus_default_user(ret_bus);
++                return r;
+ 
+         r = bus_check_peercred(bus);
+         if (r < 0)
+
+From a178ffdfcd9d25886a6e563a0fbd9929852e85c4 Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Wed, 9 Oct 2024 12:10:44 +0200
+Subject: [PATCH 4/6] bus-util: Move geteuid() check out of
+ bus_connect_system_systemd()
+
+Let's move this check to bus_connect_transport_systemd() so that
+bus_connect_system_systemd() will only ever connect to the manager
+private manager bus instance and fail otherwise.
+---
+ src/shared/bus-util.c | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
+
+diff --git a/src/shared/bus-util.c b/src/shared/bus-util.c
+index 44ed617da8dfb..a196ba47f647c 100644
+--- a/src/shared/bus-util.c
++++ b/src/shared/bus-util.c
+@@ -229,12 +229,6 @@ int bus_connect_system_systemd(sd_bus **ret_bus) {
+ 
+         assert(ret_bus);
+ 
+-        if (geteuid() != 0)
+-                return sd_bus_default_system(ret_bus);
+-
+-        /* If we are root then let's talk directly to the system
+-         * instance, instead of going via the bus */
+-
+         r = sd_bus_new(&bus);
+         if (r < 0)
+                 return r;
+@@ -521,8 +515,13 @@ int bus_connect_transport_systemd(
+                                 /* Print a friendly message when the local system is actually not running systemd as PID 1. */
+                                 return log_error_errno(SYNTHETIC_ERRNO(EHOSTDOWN),
+                                                        "System has not been booted with systemd as init system (PID 1). Can't operate.");
+-                        return bus_connect_system_systemd(ret_bus);
+ 
++                        if (geteuid() == 0)
++                                /* If we are root then let's talk directly to the system
++                                 * instance, instead of going via the bus. */
++                                return bus_connect_system_systemd(ret_bus);
++
++                        return sd_bus_default_system(ret_bus);
+                 default:
+                         assert_not_reached();
+                 }
+
+From b066b683539675bc51a71259f1e0f42cef5379ad Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Thu, 10 Oct 2024 15:54:37 +0200
+Subject: [PATCH 5/6] stdio-bridge: Use bus_log_connect_error()
+
+---
+ src/stdio-bridge/stdio-bridge.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/stdio-bridge/stdio-bridge.c b/src/stdio-bridge/stdio-bridge.c
+index d3629f5fb0dc5..7b774860c8eb1 100644
+--- a/src/stdio-bridge/stdio-bridge.c
++++ b/src/stdio-bridge/stdio-bridge.c
+@@ -142,7 +142,7 @@ static int run(int argc, char *argv[]) {
+ 
+         r = sd_bus_start(a);
+         if (r < 0)
+-                return log_error_errno(r, "Failed to start bus client: %m");
++                return bus_log_connect_error(r, arg_transport, arg_runtime_scope);
+ 
+         r = sd_bus_get_bus_id(a, &server_id);
+         if (r < 0)
+
+From d94e85c2279ac255a9c964046723684ca99b7f00 Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Thu, 10 Oct 2024 15:54:57 +0200
+Subject: [PATCH 6/6] stdio-bridge: Use customized log message for forwarding
+ bus
+
+Let's more clearly indicate that we failed to set up the server
+which forwards messages from the remote client to the local bus
+instead of logging a generic bus client message.
+---
+ src/stdio-bridge/stdio-bridge.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/stdio-bridge/stdio-bridge.c b/src/stdio-bridge/stdio-bridge.c
+index 7b774860c8eb1..22570511cbabb 100644
+--- a/src/stdio-bridge/stdio-bridge.c
++++ b/src/stdio-bridge/stdio-bridge.c
+@@ -170,7 +170,7 @@ static int run(int argc, char *argv[]) {
+ 
+         r = sd_bus_start(b);
+         if (r < 0)
+-                return log_error_errno(r, "Failed to start bus client: %m");
++                return log_error_errno(r, "Failed to start bus forwarding server: %m");
+ 
+         for (;;) {
+                 _cleanup_(sd_bus_message_unrefp) sd_bus_message *m = NULL;
