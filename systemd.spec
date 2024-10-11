@@ -1062,11 +1062,12 @@ meson test -C %{_vpath_builddir} -t 6 --print-errorlogs
 %include %{SOURCE1}
 
 # This macro is newly added upstream so we can't rely on it being always being available
-# in the systemd-rpm-macros yet so we define it ourselves.
+# in the systemd-rpm-macros yet so we define it ourselves. Also, we can't detect upgrades
+# on c9s because https://github.com/rpm-software-management/rpm/commit/3848c97cb227e7c018781aa7d5e1e46990ce1ffb
+# is not in c9s so we remove the upgrade check and unconditionally try to restart the units.
 %global systemd_posttrans_with_restart() \
 %{expand:%%{?__systemd_someargs_%#:%%__systemd_someargs_%# systemd_posttrans_with_restart}} \
-if [ $1 -ge 2 ] && [ -x "/usr/lib/systemd/systemd-update-helper" ]; then \
-    # Package upgrade, not install \
+if [ -x "/usr/lib/systemd/systemd-update-helper" ]; then \
     /usr/lib/systemd/systemd-update-helper mark-restart-system-units %* || : \
 fi \
 %{nil}
@@ -1095,13 +1096,13 @@ systemctl preset-all &>/dev/null || :
 systemctl --global preset-all &>/dev/null || :
 
 %posttrans
-if [ $1 -ge 1 ]; then
-  [ -w %{_localstatedir} ] && journalctl --update-catalog || :
+# We can't check for upgrades on c9s as https://github.com/rpm-software-management/rpm/commit/3848c97cb227e7c018781aa7d5e1e46990ce1ffb
+# is missing so we run this stuff unconditionally on installs and upgrades.
+[ -w %{_localstatedir} ] && journalctl --update-catalog || :
 
-  systemctl daemon-reexec || :
+systemctl daemon-reexec || :
 
-  systemd-tmpfiles --create &>/dev/null || :
-fi
+systemd-tmpfiles --create &>/dev/null || :
 
 # systemd-logind restart is disabled because of DRM fds getting closed which breaks
 # graphical sessions. However, every release we encounter breakage because something
@@ -1117,8 +1118,7 @@ fi
 
 # This is the expanded form of %%systemd_user_daemon_reexec. We
 # can't use the macro because we define it ourselves.
-if [ $1 -ge 1 ] && [ -x "/usr/lib/systemd/systemd-update-helper" ]; then
-    # Package upgrade, not uninstall
+if [ -x "/usr/lib/systemd/systemd-update-helper" ]; then
     /usr/lib/systemd/systemd-update-helper user-reexec || :
 fi
 
