@@ -113,6 +113,14 @@ Patch0010:      https://github.com/systemd/systemd/pull/26494.patch
 # Requested in https://bugzilla.redhat.com/show_bug.cgi?id=2298422
 Patch0011:      https://github.com/systemd/systemd/pull/33738.patch
 
+# Various logging improvements
+Patch0013:      https://github.com/systemd/systemd/pull/34728.patch
+
+# Make sure bus_connect_transport_systemd() actually connects to the private manager bus
+Patch0014:      https://github.com/systemd/systemd/pull/34686.patch
+
+# Simplify user manager upgrades
+Patch0015:      https://github.com/systemd/systemd/pull/34707.patch
 
 # Those are downstream-only patches, but we don't want them in packit builds:
 # https://bugzilla.redhat.com/show_bug.cgi?id=2251843
