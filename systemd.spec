@@ -1095,6 +1095,33 @@ systemd-tmpfiles --create &>/dev/null || :
 systemctl preset-all &>/dev/null || :
 systemctl --global preset-all &>/dev/null || :
 
+%postun
+if [ $1 -ge 1 ]; then
+    [ -w %{_localstatedir} ] && journalctl --update-catalog || :
+
+    systemctl daemon-reexec || :
+
+    systemd-tmpfiles --create &>/dev/null || :
+fi
+
+# systemd-logind restart is disabled because of DRM fds getting closed which breaks
+# graphical sessions. However, every release we encounter breakage because something
+# in pam_systemd or so starts making use of new logind APIs which then fails because
+# logind wasn't restarted. As a workaround, for FB builds, we enable logind restarts
+# because the problems with logind restarts are limited to graphical sessions of which
+# FB has none.
+%if 0%{?facebook}
+%systemd_postun_with_restart systemd-timedated.service systemd-hostnamed.service systemd-journald.service systemd-localed.service systemd-userdbd.service systemd-logind.service
+%else
+%systemd_postun_with_restart systemd-timedated.service systemd-hostnamed.service systemd-journald.service systemd-localed.service systemd-userdbd.service
+%endif
+
+# This is the expanded form of %%systemd_user_daemon_reexec. We
+# can't use the macro because we define it ourselves.
+if [ $1 -ge 1 ] && [ -x "/usr/lib/systemd/systemd-update-helper" ]; then
+    /usr/lib/systemd/systemd-update-helper user-reexec || :
+fi
+
 %posttrans
 # We can't check for upgrades on c9s as https://github.com/rpm-software-management/rpm/commit/3848c97cb227e7c018781aa7d5e1e46990ce1ffb
 # is missing so we run this stuff unconditionally on installs and upgrades.
@@ -1164,6 +1191,9 @@ grep -q -E '^KEYMAP="?fi-latin[19]"?' /etc/vconsole.conf 2>/dev/null &&
 %preun udev
 %systemd_preun %udev_services
 
+%postun udev
+%systemd_postun_with_restart systemd-udevd.service systemd-timesyncd.service
+
 %posttrans udev
 # Restart some services.
 # Others are either oneshot services, or sockets, and restarting them causes issues (#1378974)
@@ -1208,6 +1238,11 @@ fi
 %preun networkd
 %systemd_preun systemd-networkd.service systemd-networkd-wait-online.service
 
+%postun networkd
+%if %{undefined facebook}
+%systemd_postun_with_restart systemd-networkd.service
+%endif
+
 %posttrans networkd
 %if %{undefined facebook}
 %systemd_posttrans_with_restart systemd-networkd.service
@@ -1241,6 +1276,9 @@ if [ $1 -eq 0 ] ; then
                     ln -fsv ../run/NetworkManager/resolv.conf /etc/resolv.conf
         fi
 fi
+
+%postun resolved
+%systemd_postun_with_restart systemd-resolved.service
 
 %posttrans resolved
 %systemd_posttrans_with_restart systemd-resolved.service
