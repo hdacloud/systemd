@@ -43,8 +43,8 @@ Name:           systemd
 Url:            https://systemd.io
 # Allow users to specify the version and release when building the rpm by 
 # setting the %%version_override and %%release_override macros.
-Version:        %{?version_override}%{!?version_override:256.6}
-Release:        %{?release_override}%{!?release_override:1.4}%{?dist}
+Version:        %{?version_override}%{!?version_override:256.7}
+Release:        %{?release_override}%{!?release_override:1.1}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -113,8 +113,6 @@ Patch0010:      https://github.com/systemd/systemd/pull/26494.patch
 # Requested in https://bugzilla.redhat.com/show_bug.cgi?id=2298422
 Patch0011:      https://github.com/systemd/systemd/pull/33738.patch
 
-# Fix nsresourced compilation issue on aarch64.
-Patch0012:      https://github.com/systemd/systemd/pull/34621.patch
 
 # Those are downstream-only patches, but we don't want them in packit builds:
 # https://bugzilla.redhat.com/show_bug.cgi?id=2251843
