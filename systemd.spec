@@ -44,7 +44,7 @@ Url:            https://systemd.io
 # Allow users to specify the version and release when building the rpm by 
 # setting the %%version_override and %%release_override macros.
 Version:        %{?version_override}%{!?version_override:256.7}
-Release:        %{?release_override}%{!?release_override:1.2}%{?dist}
+Release:        %{?release_override}%{!?release_override:1.3}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -144,6 +144,9 @@ Patch0902:      https://github.com/systemd/systemd/pull/34400.patch
 
 # Fix error when upgrading from v255
 Patch0903: 0001-keep-on-using-DBus-as-fallback-if-varlink-is-not-ava.patch
+
+# bus-util: Return ENOMEDIUM if XDG_RUNTIME_DIR is unset
+Patch0904:      https://github.com/systemd/systemd/pull/34851.patch
 
 %endif
 
