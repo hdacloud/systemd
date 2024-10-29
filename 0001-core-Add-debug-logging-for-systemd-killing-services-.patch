@@ -1,0 +1,86 @@
+From a246b1c63f082565c4492d8bdd945623863df07d Mon Sep 17 00:00:00 2001
+From: Ryan Wilson <ryantimwilson@meta.com>
+Date: Tue, 29 Oct 2024 10:25:53 -0700
+Subject: [PATCH] core: Add debug logging for systemd killing services/units
+
+---
+ src/basic/pidref.c |  2 ++
+ src/core/service.c |  3 +++
+ src/core/unit.c    | 12 ++++++++++++
+ src/core/unit.h    |  3 +++
+ 4 files changed, 20 insertions(+)
+
+diff --git a/src/basic/pidref.c b/src/basic/pidref.c
+index 69a010210d..6bd7198d0d 100644
+--- a/src/basic/pidref.c
++++ b/src/basic/pidref.c
+@@ -268,6 +268,8 @@ int pidref_kill(const PidRef *pidref, int sig) {
+         if (!pidref)
+                 return -ESRCH;
+ 
++        log_debug("Sending signal %s for PID " PID_FMT " and PIDFD %d", signal_to_string(sig), pidref->pid, pidref->fd);
++
+         if (pidref->fd >= 0)
+                 return RET_NERRNO(pidfd_send_signal(pidref->fd, sig, NULL, 0));
+ 
+diff --git a/src/core/service.c b/src/core/service.c
+index 6e81460ad0..577f1f067d 100644
+--- a/src/core/service.c
++++ b/src/core/service.c
+@@ -2138,6 +2138,9 @@ static void service_enter_signal(Service *s, ServiceState state, ServiceResult f
+          * died now */
+         (void) unit_enqueue_rewatch_pids(UNIT(s));
+ 
++        log_unit_debug(UNIT(s), "Sending signal to unit for state %s with result %s",
++                       service_state_to_string(state), service_result_to_string(f));
++
+         kill_operation = state_to_kill_operation(s, state);
+         r = unit_kill_context(UNIT(s), kill_operation);
+         if (r < 0) {
+diff --git a/src/core/unit.c b/src/core/unit.c
+index 136b7aacb0..3a47331985 100644
+--- a/src/core/unit.c
++++ b/src/core/unit.c
+@@ -4796,6 +4796,16 @@ static int unit_kill_context_one(
+         return !is_alien;
+ }
+ 
++static const char* const kill_operation_table[_KILL_OPERATION_MAX] = {
++        [KILL_TERMINATE]         = "terminate",
++        [KILL_TERMINATE_AND_LOG] = "terminate-and-log",
++        [KILL_RESTART]           = "restart",
++        [KILL_KILL]              = "kill",
++        [KILL_WATCHDOG]          = "watchdog",
++};
++
++DEFINE_STRING_TABLE_LOOKUP(kill_operation, KillOperation);
++
+ int unit_kill_context(Unit *u, KillOperation k) {
+         bool wait_for_exit = false, send_sighup;
+         cg_kill_log_func_t log_func = NULL;
+@@ -4807,6 +4817,8 @@ int unit_kill_context(Unit *u, KillOperation k) {
+          * if we killed something worth waiting for, 0 otherwise. Do not confuse with unit_kill_common()
+          * which is used for user-requested killing of unit processes. */
+ 
++        log_unit_debug(u, "Killing unit context with operation %s", kill_operation_to_string(k));
++
+         KillContext *c = unit_get_kill_context(u);
+         if (!c || c->kill_mode == KILL_NONE)
+                 return 0;
+diff --git a/src/core/unit.h b/src/core/unit.h
+index b135fecc51..e46dfb7c58 100644
+--- a/src/core/unit.h
++++ b/src/core/unit.h
+@@ -1053,6 +1053,9 @@ UnitMountDependencyType unit_mount_dependency_type_from_string(const char *s) _c
+ const char* unit_mount_dependency_type_to_string(UnitMountDependencyType t) _const_;
+ UnitDependency unit_mount_dependency_type_to_dependency_type(UnitMountDependencyType t) _pure_;
+ 
++const char* kill_operation_to_string(KillOperation t) _const_;
++KillOperation kill_operation_from_string(const char *s) _pure_;
++
+ /* Macros which append UNIT= or USER_UNIT= to the message */
+ 
+ #define log_unit_full_errno_zerook(unit, level, error, ...)             \
+-- 
+2.43.5
+
