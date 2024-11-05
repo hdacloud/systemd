@@ -43,7 +43,7 @@ Url:            https://pagure.io/centos-sig-hyperscale/systemd
 # Allow users to specify the version and release when building the rpm by
 # setting the %%version_override and %%release_override macros.
 Version:        %{?version_override}%{!?version_override:255.5}
-Release:        %{?release_override}%{!?release_override:1.4}%{?dist}
+Release:        %{?release_override}%{!?release_override:1.5}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -968,6 +968,19 @@ meson test -C %{_vpath_builddir} -t 6 --print-errorlogs
 
 %include %{SOURCE1}
 
+# This macro is newly added upstream so we can't rely on it being always being available
+# in the systemd-rpm-macros yet so we define it ourselves. Also, we can't detect upgrades
+# on c9s because https://github.com/rpm-software-management/rpm/commit/3848c97cb227e7c018781aa7d5e1e46990ce1ffb
+# is not in c9s so we remove the upgrade check and unconditionally try to restart the units.
+%global systemd_posttrans_with_restart() \
+%{expand:%%{?__systemd_someargs_%#:%%__systemd_someargs_%# systemd_posttrans_with_restart}} \
+if [ -x "/usr/lib/systemd/systemd-update-helper" ]; then \
+    /usr/lib/systemd/systemd-update-helper mark-restart-system-units %* || : \
+fi \
+%{nil}
+
+%define systemd_rpmstatedir %{_localstatedir}/lib/rpm-state/systemd
+
 %post
 systemd-machine-id-setup &>/dev/null || :
 
@@ -991,7 +1004,38 @@ systemd-tmpfiles --create &>/dev/null || :
 systemctl preset-all &>/dev/null || :
 systemctl --global preset-all &>/dev/null || :
 
+%pre
+[ -w %{_localstatedir} ] && mkdir -p %{systemd_rpmstatedir} && touch %{systemd_rpmstatedir}/restart-required || :
+
+%posttrans
+[ -w %{systemd_rpmstatedir} ] && [ ! -f %{systemd_rpmstatedir}/restart-required ] && exit 0 || :
+
+[ -w %{systemd_rpmstatedir} ] && rm -f %{systemd_rpmstatedir}/restart-required || :
+
+# We can't check for upgrades on c9s as https://github.com/rpm-software-management/rpm/commit/3848c97cb227e7c018781aa7d5e1e46990ce1ffb
+# is missing so we run this stuff unconditionally on installs and upgrades.
+[ -w %{_localstatedir} ] && journalctl --update-catalog || :
+
+systemctl daemon-reexec || :
+
+systemd-tmpfiles --create &>/dev/null || :
+
+%systemd_posttrans_with_restart systemd-timedated.service systemd-hostnamed.service systemd-journald.service systemd-localed.service systemd-userdbd.service
+
+# FIXME: systemd-logind.service is excluded (https://github.com/systemd/systemd/pull/17558)
+
+# This is the explanded form of %%systemd_user_daemon_reexec. We
+# can't use the macro because we define it ourselves.
+if [ -x "/usr/lib/systemd/systemd-update-helper" ]; then
+    # Package upgrade, not uninstall
+    /usr/lib/systemd/systemd-update-helper user-reexec || :
+fi
+
 %postun
+[ -w %{systemd_rpmstatedir} ] && [ ! -f %{systemd_rpmstatedir}/restart-required ] && exit 0 || :
+
+[ -w %{systemd_rpmstatedir} ] && rm -f %{systemd_rpmstatedir}/restart-required || :
+
 if [ $1 -ge 1 ]; then
   [ -w %{_localstatedir} ] && journalctl --update-catalog || :
 
@@ -1011,9 +1055,15 @@ if [ $1 -ge 1 ] && [ -x "/usr/lib/systemd/systemd-update-helper" ]; then
     /usr/lib/systemd/systemd-update-helper user-reexec || :
 fi
 
+# Facebook minimum version is 255 so once 255-1.5 is released to Facebook's fleet,
+# we can rely on the fact all systemd RPMs will use posttrans/postun and RPM state
+# to ensure only one daemon-reexec. However, non-Facebook Centos RPMs may be older
+# versions and we can't rely on removing triggerun for versions < 256.
+%if 0%{?facebook} == 0
 %triggerun -- systemd < 256
 # This is for upgrades from previous versions before systemd restart was moved to %%postun
 systemctl daemon-reexec || :
+%endif
 
 %triggerpostun -- systemd < 253~rc1-2
 # This is for upgrades from previous versions where systemd-journald-audit.socket
