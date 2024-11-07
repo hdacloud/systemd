@@ -44,7 +44,7 @@ Url:            https://systemd.io
 # Allow users to specify the version and release when building the rpm by 
 # setting the %%version_override and %%release_override macros.
 Version:        %{?version_override}%{!?version_override:256.7}
-Release:        %{?release_override}%{!?release_override:1.4}%{?dist}
+Release:        %{?release_override}%{!?release_override:1.5}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -1089,6 +1089,8 @@ if [ -x "/usr/lib/systemd/systemd-update-helper" ]; then \
 fi \
 %{nil}
 
+%define systemd_rpmstatedir %{_localstatedir}/lib/rpm-state/systemd
+
 %post
 systemd-machine-id-setup &>/dev/null || :
 
@@ -1112,7 +1114,22 @@ systemd-tmpfiles --create &>/dev/null || :
 systemctl preset-all &>/dev/null || :
 systemctl --global preset-all &>/dev/null || :
 
+%pre
+[ -w %{_localstatedir} ] && mkdir -p %{systemd_rpmstatedir} && touch %{systemd_rpmstatedir}/restart-required || :
+
 %postun
+if [ -w %{systemd_rpmstatedir} ] && [ ! -f %{systemd_rpmstatedir}/restart-required ]; then
+%if 0%{?facebook}
+    # Always restart logind since systemd < 256 does not include logind restart in postun
+    # and the older uninstalled RPM postun will run first on upgrade. We will get rid of
+    # this once Facebook upgrades systemd >= 256
+    %systemd_postun_with_restart systemd-logind.service
+%endif
+    exit 0 || :
+fi
+
+[ -w %{systemd_rpmstatedir} ] && rm -f %{systemd_rpmstatedir}/restart-required || :
+
 if [ $1 -ge 1 ]; then
     [ -w %{_localstatedir} ] && journalctl --update-catalog || :
 
@@ -1140,6 +1157,18 @@ if [ $1 -ge 1 ] && [ -x "/usr/lib/systemd/systemd-update-helper" ]; then
 fi
 
 %posttrans
+if [ -w %{systemd_rpmstatedir} ] && [ ! -f %{systemd_rpmstatedir}/restart-required ]; then
+%if 0%{?facebook}
+    # Always restart logind since systemd < 256 does not include logind restart in postun
+    # and the older uninstalled RPM postun will run first on upgrade. We will get rid of
+    # this once Facebook upgrades systemd >= 256
+    %systemd_posttrans_with_restart systemd-logind.service
+%endif
+    exit 0 || :
+fi
+
+[ -w %{systemd_rpmstatedir} ] && rm -f %{systemd_rpmstatedir}/restart-required || :
+
 # We can't check for upgrades on c9s as https://github.com/rpm-software-management/rpm/commit/3848c97cb227e7c018781aa7d5e1e46990ce1ffb
 # is missing so we run this stuff unconditionally on installs and upgrades.
 [ -w %{_localstatedir} ] && journalctl --update-catalog || :
@@ -1166,9 +1195,15 @@ if [ -x "/usr/lib/systemd/systemd-update-helper" ]; then
     /usr/lib/systemd/systemd-update-helper user-reexec || :
 fi
 
+# Facebook minimum version is 255 so once 255-1.5 is released to Facebook's fleet,
+# we can rely on the fact all systemd RPMs will use posttrans/postun and RPM state
+# to ensure only one daemon-reexec. However, non-Facebook Centos RPMs may be older
+# versions and we can't rely on removing triggerun for versions < 256.
+%if 0%{?facebook} == 0
 %triggerun -- systemd < 256
 # This is for upgrades from previous versions before systemd restart was moved to %%postun
 systemctl daemon-reexec || :
+%endif
 
 %triggerpostun -- systemd < 253~rc1-2
 # This is for upgrades from previous versions where systemd-journald-audit.socket
