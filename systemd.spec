@@ -44,7 +44,7 @@ Url:            https://systemd.io
 # Allow users to specify the version and release when building the rpm by 
 # setting the %%version_override and %%release_override macros.
 Version:        %{?version_override}%{!?version_override:256.7}
-Release:        %{?release_override}%{!?release_override:1.5}%{?dist}
+Release:        %{?release_override}%{!?release_override:1.6}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -148,10 +148,8 @@ Patch0903: 0001-keep-on-using-DBus-as-fallback-if-varlink-is-not-ava.patch
 # bus-util: Return ENOMEDIUM if XDG_RUNTIME_DIR is unset
 Patch0904:      https://github.com/systemd/systemd/pull/34851.patch
 
-# core: Add debug logging for systemd killing services/units
-# Once we root cause systemd 256 killing services/units on upgrade, we should
-# upstream this patch + any other patches used for debugging.
-Patch0905:      0001-core-Add-debug-logging-for-systemd-killing-services-.patch
+# pam_systemd: Make pam_systemd 256 backwards compatible to logind 255
+Patch0905: 0001-pam_systemd-Make-pam_systemd-256-backwards-compatibl.patch
 
 %endif
 
@@ -1118,15 +1116,7 @@ systemctl --global preset-all &>/dev/null || :
 [ -w %{_localstatedir} ] && mkdir -p %{systemd_rpmstatedir} && touch %{systemd_rpmstatedir}/restart-required || :
 
 %postun
-if [ -w %{systemd_rpmstatedir} ] && [ ! -f %{systemd_rpmstatedir}/restart-required ]; then
-%if 0%{?facebook}
-    # Always restart logind since systemd < 256 does not include logind restart in postun
-    # and the older uninstalled RPM postun will run first on upgrade. We will get rid of
-    # this once Facebook upgrades systemd >= 256
-    %systemd_postun_with_restart systemd-logind.service
-%endif
-    exit 0 || :
-fi
+[ -w %{systemd_rpmstatedir} ] && [ ! -f %{systemd_rpmstatedir}/restart-required ] && exit 0 || :
 
 [ -w %{systemd_rpmstatedir} ] && rm -f %{systemd_rpmstatedir}/restart-required || :
 
@@ -1138,17 +1128,7 @@ if [ $1 -ge 1 ]; then
     systemd-tmpfiles --create &>/dev/null || :
 fi
 
-# systemd-logind restart is disabled because of DRM fds getting closed which breaks
-# graphical sessions. However, every release we encounter breakage because something
-# in pam_systemd or so starts making use of new logind APIs which then fails because
-# logind wasn't restarted. As a workaround, for FB builds, we enable logind restarts
-# because the problems with logind restarts are limited to graphical sessions of which
-# FB has none.
-%if 0%{?facebook}
-%systemd_postun_with_restart systemd-timedated.service systemd-hostnamed.service systemd-journald.service systemd-localed.service systemd-userdbd.service systemd-logind.service
-%else
 %systemd_postun_with_restart systemd-timedated.service systemd-hostnamed.service systemd-journald.service systemd-localed.service systemd-userdbd.service
-%endif
 
 # This is the expanded form of %%systemd_user_daemon_reexec. We
 # can't use the macro because we define it ourselves.
@@ -1157,15 +1137,7 @@ if [ $1 -ge 1 ] && [ -x "/usr/lib/systemd/systemd-update-helper" ]; then
 fi
 
 %posttrans
-if [ -w %{systemd_rpmstatedir} ] && [ ! -f %{systemd_rpmstatedir}/restart-required ]; then
-%if 0%{?facebook}
-    # Always restart logind since systemd < 256 does not include logind restart in postun
-    # and the older uninstalled RPM postun will run first on upgrade. We will get rid of
-    # this once Facebook upgrades systemd >= 256
-    %systemd_posttrans_with_restart systemd-logind.service
-%endif
-    exit 0 || :
-fi
+[ -w %{systemd_rpmstatedir} ] && [ ! -f %{systemd_rpmstatedir}/restart-required ] && exit 0 || :
 
 [ -w %{systemd_rpmstatedir} ] && rm -f %{systemd_rpmstatedir}/restart-required || :
 
@@ -1177,17 +1149,7 @@ systemctl daemon-reexec || :
 
 systemd-tmpfiles --create &>/dev/null || :
 
-# systemd-logind restart is disabled because of DRM fds getting closed which breaks
-# graphical sessions. However, every release we encounter breakage because something
-# in pam_systemd or so starts making use of new logind APIs which then fails because
-# logind wasn't restarted. As a workaround, for FB builds, we enable logind restarts
-# because the problems with logind restarts are limited to graphical sessions of which
-# FB has none.
-%if 0%{?facebook}
-%systemd_posttrans_with_restart systemd-timedated.service systemd-hostnamed.service systemd-journald.service systemd-localed.service systemd-userdbd.service systemd-logind.service
-%else
 %systemd_posttrans_with_restart systemd-timedated.service systemd-hostnamed.service systemd-journald.service systemd-localed.service systemd-userdbd.service
-%endif
 
 # This is the expanded form of %%systemd_user_daemon_reexec. We
 # can't use the macro because we define it ourselves.
