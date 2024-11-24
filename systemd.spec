@@ -129,6 +129,9 @@ Patch0491:      https://github.com/systemd/systemd/pull/30846.patch
 # Soft-disable tmpfiles --purge until a good use case comes up.
 Patch0492:      0001-tmpfiles-make-purge-hard-to-mis-use.patch
 
+# core/device: ignore ID_PROCESSING udev property on enumerate
+Patch0493: https://github.com/systemd/systemd/pull/35332.patch
+
 # Meta specific backports (900-1000)
 
 %if 0%{?facebook}
@@ -150,9 +153,6 @@ Patch0904:      https://github.com/systemd/systemd/pull/34851.patch
 
 # pam_systemd: Make pam_systemd 256 backwards compatible to logind 255
 Patch0905: 0001-pam_systemd-Make-pam_systemd-256-backwards-compatibl.patch
-
-# pid1: Do not updated state for device units being processed by udev
-Patch0906: 0001-pid1-Do-not-update-state-for-device-units-being-proc.patch
 
 %endif
 
