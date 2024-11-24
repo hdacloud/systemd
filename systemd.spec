@@ -44,7 +44,7 @@ Url:            https://systemd.io
 # Allow users to specify the version and release when building the rpm by 
 # setting the %%version_override and %%release_override macros.
 Version:        %{?version_override}%{!?version_override:256.7}
-Release:        %{?release_override}%{!?release_override:1.6}%{?dist}
+Release:        %{?release_override}%{!?release_override:1.7}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -150,6 +150,9 @@ Patch0904:      https://github.com/systemd/systemd/pull/34851.patch
 
 # pam_systemd: Make pam_systemd 256 backwards compatible to logind 255
 Patch0905: 0001-pam_systemd-Make-pam_systemd-256-backwards-compatibl.patch
+
+# pid1: Do not updated state for device units being processed by udev
+Patch0906: 0001-pid1-Do-not-update-state-for-device-units-being-proc.patch
 
 %endif
 
