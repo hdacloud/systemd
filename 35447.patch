@@ -1,0 +1,679 @@
+From 186eb0d3dc17b700a7709ebb23012ed9e3e41d6a Mon Sep 17 00:00:00 2001
+From: Ryan Wilson <ryantimwilson@meta.com>
+Date: Mon, 2 Dec 2024 07:38:06 -0800
+Subject: [PATCH 1/2] core: Migrate ProtectHostname to use enum vs boolean
+
+Migrating ProtectHostname to enum will set the stage for adding more
+properties like ProtectHostname=private in future commits.
+
+In addition, we add PrivateHostnameEx property to dbus API which uses
+string instead of boolean.
+---
+ man/org.freedesktop.systemd1.xml      | 34 +++++++++++----
+ src/core/dbus-execute.c               | 59 +++++++++++++++++++++++++--
+ src/core/exec-invoke.c                |  8 ++--
+ src/core/execute-serialize.c          |  9 ++--
+ src/core/execute.c                    |  2 +-
+ src/core/execute.h                    |  2 +-
+ src/core/load-fragment-gperf.gperf.in |  2 +-
+ src/core/load-fragment.c              |  1 +
+ src/core/load-fragment.h              |  1 +
+ src/core/namespace.c                  | 13 ++++--
+ src/core/namespace.h                  | 10 +++++
+ src/shared/bus-unit-util.c            |  1 +
+ 12 files changed, 115 insertions(+), 27 deletions(-)
+
+diff --git a/man/org.freedesktop.systemd1.xml b/man/org.freedesktop.systemd1.xml
+index 9cd6a69311a97..d196f4767cea2 100644
+--- a/man/org.freedesktop.systemd1.xml
++++ b/man/org.freedesktop.systemd1.xml
+@@ -3359,6 +3359,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b ProtectHostname = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
++      readonly s ProtectHostnameEx = '...';
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b MemoryKSM = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly s NetworkNamespacePath = '...';
+@@ -3958,8 +3960,6 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+ 
+     <!--property ProcSubset is not documented!-->
+ 
+-    <!--property ProtectHostname is not documented!-->
+-
+     <!--property MemoryKSM is not documented!-->
+ 
+     <!--property NetworkNamespacePath is not documented!-->
+@@ -4682,6 +4682,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="ProtectHostname"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="ProtectHostnameEx"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryKSM"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="NetworkNamespacePath"/>
+@@ -4879,6 +4881,12 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+       unit file setting <varname>PrivatePIDs=</varname> listed in
+       <citerefentry><refentrytitle>systemd.exec</refentrytitle><manvolnum>5</manvolnum></citerefentry>.
+       Note <varname>PrivatePIDs</varname> is a string type to allow adding more values in the future.</para>
++
++      <para><varname>ProtectHostnameEx</varname> implement the destination parameter of the
++      unit file setting <varname>ProtectHostname=</varname> listed in
++      <citerefentry><refentrytitle>systemd.exec</refentrytitle><manvolnum>5</manvolnum></citerefentry>.
++      Unlike boolean <varname>ProtectHostname</varname>, <varname>ProtectHostnameEx</varname>
++      is a string type.</para>
+     </refsect2>
+   </refsect1>
+ 
+@@ -5544,6 +5552,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b ProtectHostname = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
++      readonly s ProtectHostnameEx = '...';
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b MemoryKSM = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly s NetworkNamespacePath = '...';
+@@ -6155,8 +6165,6 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
+ 
+     <!--property ProcSubset is not documented!-->
+ 
+-    <!--property ProtectHostname is not documented!-->
+-
+     <!--property MemoryKSM is not documented!-->
+ 
+     <!--property NetworkNamespacePath is not documented!-->
+@@ -6851,6 +6859,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="ProtectHostname"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="ProtectHostnameEx"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryKSM"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="NetworkNamespacePath"/>
+@@ -7551,6 +7561,8 @@ node /org/freedesktop/systemd1/unit/home_2emount {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b ProtectHostname = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
++      readonly s ProtectHostnameEx = '...';
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b MemoryKSM = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly s NetworkNamespacePath = '...';
+@@ -8088,8 +8100,6 @@ node /org/freedesktop/systemd1/unit/home_2emount {
+ 
+     <!--property ProcSubset is not documented!-->
+ 
+-    <!--property ProtectHostname is not documented!-->
+-
+     <!--property MemoryKSM is not documented!-->
+ 
+     <!--property NetworkNamespacePath is not documented!-->
+@@ -8696,6 +8706,8 @@ node /org/freedesktop/systemd1/unit/home_2emount {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="ProtectHostname"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="ProtectHostnameEx"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryKSM"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="NetworkNamespacePath"/>
+@@ -9525,6 +9537,8 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b ProtectHostname = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
++      readonly s ProtectHostnameEx = '...';
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b MemoryKSM = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly s NetworkNamespacePath = '...';
+@@ -10048,8 +10062,6 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
+ 
+     <!--property ProcSubset is not documented!-->
+ 
+-    <!--property ProtectHostname is not documented!-->
+-
+     <!--property MemoryKSM is not documented!-->
+ 
+     <!--property NetworkNamespacePath is not documented!-->
+@@ -10642,6 +10654,8 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="ProtectHostname"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="ProtectHostnameEx"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryKSM"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="NetworkNamespacePath"/>
+@@ -12305,6 +12319,7 @@ $ gdbus introspect --system --dest org.freedesktop.systemd1 \
+       <varname>ProtectControlGroupsEx</varname>,
+       <varname>PrivateUsersEx</varname>, and
+       <varname>PrivatePIDs</varname> were added in version 257.</para>
++      <para><varname>ProtectHostnameEx</varname> was added in version 258.</para>
+     </refsect2>
+     <refsect2>
+       <title>Socket Unit Objects</title>
+@@ -12348,6 +12363,7 @@ $ gdbus introspect --system --dest org.freedesktop.systemd1 \
+       <varname>ManagedOOMMemoryPressureDurationUSec</varname>,
+       <varname>ProtectControlGroupsEx</varname>, and
+       <varname>PrivatePIDs</varname> were added in version 257.</para>
++      <para><varname>ProtectHostnameEx</varname> was added in version 258.</para>
+     </refsect2>
+     <refsect2>
+       <title>Mount Unit Objects</title>
+@@ -12388,6 +12404,7 @@ $ gdbus introspect --system --dest org.freedesktop.systemd1 \
+       <varname>ManagedOOMMemoryPressureDurationUSec</varname>,
+       <varname>ProtectControlGroupsEx</varname>, and
+       <varname>PrivatePIDs</varname> were added in version 257.</para>
++      <para><varname>ProtectHostnameEx</varname> was added in version 258.</para>
+     </refsect2>
+     <refsect2>
+       <title>Swap Unit Objects</title>
+@@ -12428,6 +12445,7 @@ $ gdbus introspect --system --dest org.freedesktop.systemd1 \
+       <varname>ManagedOOMMemoryPressureDurationUSec</varname>,
+       <varname>ProtectControlGroupsEx</varname>, and
+       <varname>PrivatePIDs</varname> were added in version 257.</para>
++      <para><varname>ProtectHostnameEx</varname> was added in version 258.</para>
+     </refsect2>
+     <refsect2>
+       <title>Slice Unit Objects</title>
+diff --git a/src/core/dbus-execute.c b/src/core/dbus-execute.c
+index e297323f1d3e7..bfd6694683cf1 100644
+--- a/src/core/dbus-execute.c
++++ b/src/core/dbus-execute.c
+@@ -64,6 +64,7 @@ static BUS_DEFINE_PROPERTY_GET_REF(property_get_private_tmp_ex, "s", PrivateTmp,
+ static BUS_DEFINE_PROPERTY_GET_REF(property_get_private_users_ex, "s", PrivateUsers, private_users_to_string);
+ static BUS_DEFINE_PROPERTY_GET_REF(property_get_protect_control_groups_ex, "s", ProtectControlGroups, protect_control_groups_to_string);
+ static BUS_DEFINE_PROPERTY_GET_REF(property_get_private_pids, "s", PrivatePIDs, private_pids_to_string);
++static BUS_DEFINE_PROPERTY_GET_REF(property_get_protect_hostname_ex, "s", ProtectHostname, protect_hostname_to_string);
+ static BUS_DEFINE_PROPERTY_GET_REF(property_get_syslog_level, "i", int, LOG_PRI);
+ static BUS_DEFINE_PROPERTY_GET_REF(property_get_syslog_facility, "i", int, LOG_FAC);
+ static BUS_DEFINE_PROPERTY_GET(property_get_cpu_affinity_from_numa, "b", ExecContext, exec_context_get_cpu_affinity_from_numa);
+@@ -1068,6 +1069,21 @@ static int property_get_protect_control_groups(
+         return sd_bus_message_append_basic(reply, 'b', &b);
+ }
+ 
++static int property_get_protect_hostname(
++                sd_bus *bus,
++                const char *path,
++                const char *interface,
++                const char *property,
++                sd_bus_message *reply,
++                void *userdata,
++                sd_bus_error *error) {
++
++        ProtectHostname *p = ASSERT_PTR(userdata);
++        int b = *p != PROTECT_HOSTNAME_NO;
++
++        return sd_bus_message_append_basic(reply, 'b', &b);
++}
++
+ const sd_bus_vtable bus_exec_vtable[] = {
+         SD_BUS_VTABLE_START(0),
+         SD_BUS_PROPERTY("Environment", "as", NULL, offsetof(ExecContext, environment), SD_BUS_VTABLE_PROPERTY_CONST),
+@@ -1242,7 +1258,8 @@ const sd_bus_vtable bus_exec_vtable[] = {
+         SD_BUS_PROPERTY("KeyringMode", "s", property_get_exec_keyring_mode, offsetof(ExecContext, keyring_mode), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("ProtectProc", "s", property_get_protect_proc, offsetof(ExecContext, protect_proc), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("ProcSubset", "s", property_get_proc_subset, offsetof(ExecContext, proc_subset), SD_BUS_VTABLE_PROPERTY_CONST),
+-        SD_BUS_PROPERTY("ProtectHostname", "b", bus_property_get_bool, offsetof(ExecContext, protect_hostname), SD_BUS_VTABLE_PROPERTY_CONST),
++        SD_BUS_PROPERTY("ProtectHostname", "b", property_get_protect_hostname, offsetof(ExecContext, protect_hostname), SD_BUS_VTABLE_PROPERTY_CONST),
++        SD_BUS_PROPERTY("ProtectHostnameEx", "s", property_get_protect_hostname_ex, offsetof(ExecContext, protect_hostname), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("MemoryKSM", "b", bus_property_get_tristate, offsetof(ExecContext, memory_ksm), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("NetworkNamespacePath", "s", NULL, offsetof(ExecContext, network_namespace_path), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("IPCNamespacePath", "s", NULL, offsetof(ExecContext, ipc_namespace_path), SD_BUS_VTABLE_PROPERTY_CONST),
+@@ -1993,6 +2010,43 @@ int bus_exec_context_set_transient_property(
+                 return 1;
+         }
+ 
++        if (streq(name, "ProtectHostname")) {
++                int v;
++
++                r = sd_bus_message_read(message, "b", &v);
++                if (r < 0)
++                        return r;
++
++                if (!UNIT_WRITE_FLAGS_NOOP(flags)) {
++                        c->protect_hostname = v ? PROTECT_HOSTNAME_YES : PROTECT_HOSTNAME_NO;
++                        (void) unit_write_settingf(u, flags, name, "%s=%s", name, yes_no(v));
++                }
++
++                return 1;
++
++        }
++
++        if (streq(name, "ProtectHostnameEx")) {
++                const char *s;
++                ProtectHostname t;
++
++                r = sd_bus_message_read(message, "s", &s);
++                if (r < 0)
++                        return r;
++
++                t = protect_hostname_from_string(s);
++                if (t < 0)
++                        return sd_bus_error_setf(error, SD_BUS_ERROR_INVALID_ARGS, "Invalid %s setting: %s", name, s);
++
++                if (!UNIT_WRITE_FLAGS_NOOP(flags)) {
++                        c->protect_hostname = t;
++                        (void) unit_write_settingf(u, flags, name, "ProtectHostname=%s",
++                                                   protect_hostname_to_string(c->protect_hostname));
++                }
++
++                return 1;
++        }
++
+         if (streq(name, "PrivateDevices"))
+                 return bus_set_transient_bool(u, name, &c->private_devices, message, flags, error);
+ 
+@@ -2053,9 +2107,6 @@ int bus_exec_context_set_transient_property(
+         if (streq(name, "LockPersonality"))
+                 return bus_set_transient_bool(u, name, &c->lock_personality, message, flags, error);
+ 
+-        if (streq(name, "ProtectHostname"))
+-                return bus_set_transient_bool(u, name, &c->protect_hostname, message, flags, error);
+-
+         if (streq(name, "MemoryKSM"))
+                 return bus_set_transient_tristate(u, name, &c->memory_ksm, message, flags, error);
+ 
+diff --git a/src/core/exec-invoke.c b/src/core/exec-invoke.c
+index 9d636f552950d..f4aacb55b22bd 100644
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -1341,7 +1341,7 @@ static bool context_has_seccomp(const ExecContext *c) {
+                 c->memory_deny_write_execute ||
+                 c->private_devices ||
+                 c->protect_clock ||
+-                c->protect_hostname ||
++                c->protect_hostname == PROTECT_HOSTNAME_YES ||
+                 c->protect_kernel_tunables ||
+                 c->protect_kernel_modules ||
+                 c->protect_kernel_logs ||
+@@ -1701,7 +1701,7 @@ static int apply_protect_hostname(const ExecContext *c, const ExecParameters *p,
+         assert(c);
+         assert(p);
+ 
+-        if (!c->protect_hostname)
++        if (c->protect_hostname == PROTECT_HOSTNAME_NO)
+                 return 0;
+ 
+         if (ns_type_supported(NAMESPACE_UTS)) {
+@@ -3417,7 +3417,7 @@ static int apply_mount_namespace(
+                 .protect_kernel_tunables = needs_sandboxing && context->protect_kernel_tunables,
+                 .protect_kernel_modules = needs_sandboxing && context->protect_kernel_modules,
+                 .protect_kernel_logs = needs_sandboxing && context->protect_kernel_logs,
+-                .protect_hostname = needs_sandboxing && context->protect_hostname,
++                .protect_hostname = needs_sandboxing && context->protect_hostname == PROTECT_HOSTNAME_YES,
+ 
+                 .private_dev = needs_sandboxing && context->private_devices,
+                 .private_network = needs_sandboxing && exec_needs_network_namespace(context),
+@@ -4055,7 +4055,7 @@ static bool exec_context_need_unprivileged_private_users(
+                context->protect_kernel_logs ||
+                exec_needs_cgroup_mount(context, params) ||
+                context->protect_clock ||
+-               context->protect_hostname ||
++               context->protect_hostname != PROTECT_HOSTNAME_NO ||
+                !strv_isempty(context->read_write_paths) ||
+                !strv_isempty(context->read_only_paths) ||
+                !strv_isempty(context->inaccessible_paths) ||
+diff --git a/src/core/execute-serialize.c b/src/core/execute-serialize.c
+index bf6592faedcd2..9dce5a9c2587e 100644
+--- a/src/core/execute-serialize.c
++++ b/src/core/execute-serialize.c
+@@ -1978,7 +1978,7 @@ static int exec_context_serialize(const ExecContext *c, FILE *f) {
+         if (r < 0)
+                 return r;
+ 
+-        r = serialize_bool_elide(f, "exec-context-protect-hostname", c->protect_hostname);
++        r = serialize_item(f, "exec-context-protect-hostname", protect_hostname_to_string(c->protect_hostname));
+         if (r < 0)
+                 return r;
+ 
+@@ -2881,10 +2881,9 @@ static int exec_context_deserialize(ExecContext *c, FILE *f) {
+                         if (c->keyring_mode < 0)
+                                 return -EINVAL;
+                 } else if ((val = startswith(l, "exec-context-protect-hostname="))) {
+-                        r = parse_boolean(val);
+-                        if (r < 0)
+-                                return r;
+-                        c->protect_hostname = r;
++                        c->protect_hostname = protect_hostname_from_string(val);
++                        if (c->protect_hostname < 0)
++                                return -EINVAL;
+                 } else if ((val = startswith(l, "exec-context-protect-proc="))) {
+                         c->protect_proc = protect_proc_from_string(val);
+                         if (c->protect_proc < 0)
+diff --git a/src/core/execute.c b/src/core/execute.c
+index 3d55b0b772ece..40ab0ad1c53a9 100644
+--- a/src/core/execute.c
++++ b/src/core/execute.c
+@@ -1071,7 +1071,7 @@ void exec_context_dump(const ExecContext *c, FILE* f, const char *prefix) {
+                 prefix, yes_no(c->restrict_realtime),
+                 prefix, yes_no(c->restrict_suid_sgid),
+                 prefix, exec_keyring_mode_to_string(c->keyring_mode),
+-                prefix, yes_no(c->protect_hostname),
++                prefix, protect_hostname_to_string(c->protect_hostname),
+                 prefix, protect_proc_to_string(c->protect_proc),
+                 prefix, proc_subset_to_string(c->proc_subset));
+ 
+diff --git a/src/core/execute.h b/src/core/execute.h
+index 32dabf177f44a..63a56a900cb8c 100644
+--- a/src/core/execute.h
++++ b/src/core/execute.h
+@@ -336,7 +336,7 @@ struct ExecContext {
+         ProtectSystem protect_system;
+         ProtectHome protect_home;
+         PrivatePIDs private_pids;
+-        bool protect_hostname;
++        ProtectHostname protect_hostname;
+ 
+         bool dynamic_user;
+         bool remove_ipc;
+diff --git a/src/core/load-fragment-gperf.gperf.in b/src/core/load-fragment-gperf.gperf.in
+index d7564b3767a06..fa12580ae1113 100644
+--- a/src/core/load-fragment-gperf.gperf.in
++++ b/src/core/load-fragment-gperf.gperf.in
+@@ -180,7 +180,7 @@
+ {% else %}
+ {{type}}.SmackProcessLabel,                   config_parse_warn_compat,                           DISABLED_CONFIGURATION,             0
+ {% endif %}
+-{{type}}.ProtectHostname,                     config_parse_bool,                                  0,                                  offsetof({{type}}, exec_context.protect_hostname)
++{{type}}.ProtectHostname,                     config_parse_protect_hostname,                      0,                                  offsetof({{type}}, exec_context.protect_hostname)
+ {{type}}.MemoryKSM,                           config_parse_tristate,                              0,                                  offsetof({{type}}, exec_context.memory_ksm)
+ {%- endmacro -%}
+ 
+diff --git a/src/core/load-fragment.c b/src/core/load-fragment.c
+index f34c930f4e4e0..a108216a96045 100644
+--- a/src/core/load-fragment.c
++++ b/src/core/load-fragment.c
+@@ -141,6 +141,7 @@ DEFINE_CONFIG_PARSE_ENUM(config_parse_exec_utmp_mode, exec_utmp_mode, ExecUtmpMo
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_job_mode, job_mode, JobMode);
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_notify_access, notify_access, NotifyAccess);
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_protect_home, protect_home, ProtectHome);
++DEFINE_CONFIG_PARSE_ENUM(config_parse_protect_hostname, protect_hostname, ProtectHostname);
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_protect_system, protect_system, ProtectSystem);
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_exec_preserve_mode, exec_preserve_mode, ExecPreserveMode);
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_service_type, service_type, ServiceType);
+diff --git a/src/core/load-fragment.h b/src/core/load-fragment.h
+index 8ac962a94bd14..881ce152d550b 100644
+--- a/src/core/load-fragment.h
++++ b/src/core/load-fragment.h
+@@ -119,6 +119,7 @@ CONFIG_PARSER_PROTOTYPE(config_parse_protect_control_groups);
+ CONFIG_PARSER_PROTOTYPE(config_parse_cpu_quota);
+ CONFIG_PARSER_PROTOTYPE(config_parse_allowed_cpuset);
+ CONFIG_PARSER_PROTOTYPE(config_parse_protect_home);
++CONFIG_PARSER_PROTOTYPE(config_parse_protect_hostname);
+ CONFIG_PARSER_PROTOTYPE(config_parse_protect_system);
+ CONFIG_PARSER_PROTOTYPE(config_parse_bus_name);
+ CONFIG_PARSER_PROTOTYPE(config_parse_exec_utmp_mode);
+diff --git a/src/core/namespace.c b/src/core/namespace.c
+index 57dbbc4fc7dc5..c327c9a3ca488 100644
+--- a/src/core/namespace.c
++++ b/src/core/namespace.c
+@@ -250,7 +250,7 @@ static const MountEntry protect_system_strict_table[] = {
+ };
+ 
+ /* ProtectHostname=yes able */
+-static const MountEntry protect_hostname_table[] = {
++static const MountEntry protect_hostname_yes_table[] = {
+         { "/proc/sys/kernel/hostname",   MOUNT_READ_ONLY, false },
+         { "/proc/sys/kernel/domainname", MOUNT_READ_ONLY, false },
+ };
+@@ -2642,8 +2642,8 @@ int setup_namespace(const NamespaceParameters *p, char **reterr_path) {
+         if (p->protect_hostname) {
+                 r = append_static_mounts(
+                                 &ml,
+-                                protect_hostname_table,
+-                                ELEMENTSOF(protect_hostname_table),
++                                protect_hostname_yes_table,
++                                ELEMENTSOF(protect_hostname_yes_table),
+                                 ignore_protect_proc);
+                 if (r < 0)
+                         return r;
+@@ -3305,6 +3305,13 @@ static const char *const protect_home_table[_PROTECT_HOME_MAX] = {
+ 
+ DEFINE_STRING_TABLE_LOOKUP_WITH_BOOLEAN(protect_home, ProtectHome, PROTECT_HOME_YES);
+ 
++static const char *const protect_hostname_table[_PROTECT_HOSTNAME_MAX] = {
++        [PROTECT_HOSTNAME_NO]      = "no",
++        [PROTECT_HOSTNAME_YES]     = "yes",
++};
++
++DEFINE_STRING_TABLE_LOOKUP_WITH_BOOLEAN(protect_hostname, ProtectHostname, PROTECT_HOSTNAME_YES);
++
+ static const char *const protect_system_table[_PROTECT_SYSTEM_MAX] = {
+         [PROTECT_SYSTEM_NO]     = "no",
+         [PROTECT_SYSTEM_YES]    = "yes",
+diff --git a/src/core/namespace.h b/src/core/namespace.h
+index bd48aa31da71c..8df91e3bdf906 100644
+--- a/src/core/namespace.h
++++ b/src/core/namespace.h
+@@ -28,6 +28,13 @@ typedef enum ProtectHome {
+         _PROTECT_HOME_INVALID = -EINVAL,
+ } ProtectHome;
+ 
++typedef enum ProtectHostname {
++        PROTECT_HOSTNAME_NO,
++        PROTECT_HOSTNAME_YES,
++        _PROTECT_HOSTNAME_MAX,
++        _PROTECT_HOSTNAME_INVALID = -EINVAL,
++} ProtectHostname;
++
+ typedef enum ProtectSystem {
+         PROTECT_SYSTEM_NO,
+         PROTECT_SYSTEM_YES,
+@@ -215,6 +222,9 @@ int open_shareable_ns_path(int netns_storage_socket[static 2], const char *path,
+ const char* protect_home_to_string(ProtectHome p) _const_;
+ ProtectHome protect_home_from_string(const char *s) _pure_;
+ 
++const char* protect_hostname_to_string(ProtectHostname p) _const_;
++ProtectHostname protect_hostname_from_string(const char *s) _pure_;
++
+ const char* protect_system_to_string(ProtectSystem p) _const_;
+ ProtectSystem protect_system_from_string(const char *s) _pure_;
+ 
+diff --git a/src/shared/bus-unit-util.c b/src/shared/bus-unit-util.c
+index 06bfb90c8fa5d..4e623036d0353 100644
+--- a/src/shared/bus-unit-util.c
++++ b/src/shared/bus-unit-util.c
+@@ -1045,6 +1045,7 @@ static int bus_append_execute_property(sd_bus_message *m, const char *field, con
+                               "SyslogIdentifier",
+                               "ProtectSystem",
+                               "ProtectHome",
++                              "ProtectHostnameEx",
+                               "PrivateTmpEx",
+                               "PrivateUsersEx",
+                               "ProtectControlGroupsEx",
+
+From 0ca5c9a361732b6b43a8ee9d981539aa24d83623 Mon Sep 17 00:00:00 2001
+From: Ryan Wilson <ryantimwilson@meta.com>
+Date: Mon, 2 Dec 2024 08:10:05 -0800
+Subject: [PATCH 2/2] core: Add ProtectHostname=private
+
+This allows an option for systemd exec units to enable UTS namespaces
+but not restrict changing hostname via seccomp. Thus, units can change
+hostname without affecting the host.
+
+Fixes: #30348
+---
+ man/systemd.exec.xml                        | 13 +++++-
+ mkosi.conf                                  |  1 +
+ src/core/exec-invoke.c                      | 19 +++++----
+ src/core/namespace.c                        |  1 +
+ src/core/namespace.h                        |  1 +
+ test/TEST-07-PID1/test.sh                   |  2 +-
+ test/units/TEST-07-PID1.protect-hostname.sh | 44 +++++++++++++++++++++
+ 7 files changed, 71 insertions(+), 10 deletions(-)
+ create mode 100755 test/units/TEST-07-PID1.protect-hostname.sh
+
+diff --git a/man/systemd.exec.xml b/man/systemd.exec.xml
+index 607c88128ded4..5759874741815 100644
+--- a/man/systemd.exec.xml
++++ b/man/systemd.exec.xml
+@@ -2055,8 +2055,11 @@ BindReadOnlyPaths=/var/lib/systemd</programlisting>
+       <varlistentry>
+         <term><varname>ProtectHostname=</varname></term>
+ 
+-        <listitem><para>Takes a boolean argument. When set, sets up a new UTS namespace for the executed
+-        processes. In addition, changing hostname or domainname is prevented. Defaults to off.</para>
++        <listitem><para>Takes a boolean argument or <literal>private</literal>. If enabled, sets up a new UTS namespace
++        for the executed processes. If set to a true value, changing hostname or domainname via
++        <function>sethostname()</function> and <function>setdomainname()</function> system calls is prevented. If set to
++        <literal>private</literal>, changing hostname or domainname is allowed but only affects the unit's UTS namespace.
++        Defaults to off.</para>
+ 
+         <para>Note that the implementation of this setting might be impossible (for example if UTS namespaces
+         are not available), and the unit should be written in a way that does not solely rely on this setting
+@@ -2066,6 +2069,12 @@ BindReadOnlyPaths=/var/lib/systemd</programlisting>
+         the system into the service, it is hence not suitable for services that need to take notice of system
+         hostname changes dynamically.</para>
+ 
++        <para>Note that this option does not prevent changing system hostname via <command>hostnamectl</command>.
++        However, <varname>User=</varname> and <varname>Group=</varname> may be used to run as an unprivileged user
++        to disallow changing system hostname. See <function>SetHostname()</function> in
++        <citerefentry project="man-pages"><refentrytitle>org.freedesktop.hostname1</refentrytitle><manvolnum>5</manvolnum></citerefentry>
++        for more details.</para>
++
+         <xi:include href="system-or-user-ns.xml" xpointer="singular"/>
+ 
+         <xi:include href="version-info.xml" xpointer="v242"/></listitem>
+diff --git a/mkosi.conf b/mkosi.conf
+index 35a19a27aad39..535e2bd79bf43 100644
+--- a/mkosi.conf
++++ b/mkosi.conf
+@@ -101,6 +101,7 @@ Packages=
+         gdb
+         grep
+         gzip
++        hostname
+         jq
+         kbd
+         kexec-tools
+diff --git a/src/core/exec-invoke.c b/src/core/exec-invoke.c
+index f4aacb55b22bd..fd306f1143125 100644
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -1726,15 +1726,17 @@ static int apply_protect_hostname(const ExecContext *c, const ExecParameters *p,
+                                  "support UTS namespaces, ignoring namespace setup.");
+ 
+ #if HAVE_SECCOMP
+-        int r;
++        if (c->protect_hostname == PROTECT_HOSTNAME_YES) {
++                int r;
+ 
+-        if (skip_seccomp_unavailable(c, p, "ProtectHostname="))
+-                return 0;
++                if (skip_seccomp_unavailable(c, p, "ProtectHostname="))
++                        return 0;
+ 
+-        r = seccomp_protect_hostname();
+-        if (r < 0) {
+-                *ret_exit_status = EXIT_SECCOMP;
+-                return log_exec_error_errno(c, p, r, "Failed to apply hostname restrictions: %m");
++                r = seccomp_protect_hostname();
++                if (r < 0) {
++                        *ret_exit_status = EXIT_SECCOMP;
++                        return log_exec_error_errno(c, p, r, "Failed to apply hostname restrictions: %m");
++                }
+         }
+ #endif
+ 
+@@ -3417,6 +3419,9 @@ static int apply_mount_namespace(
+                 .protect_kernel_tunables = needs_sandboxing && context->protect_kernel_tunables,
+                 .protect_kernel_modules = needs_sandboxing && context->protect_kernel_modules,
+                 .protect_kernel_logs = needs_sandboxing && context->protect_kernel_logs,
++                /* Only mount /proc/sys/kernel/hostname and domainname read-only if ProtectHostname=yes. Otherwise, ProtectHostname=no
++                 * allows changing hostname for the host and ProtectHostname=private allows changing the hostname in the unit's UTS
++                 * namespace. */
+                 .protect_hostname = needs_sandboxing && context->protect_hostname == PROTECT_HOSTNAME_YES,
+ 
+                 .private_dev = needs_sandboxing && context->private_devices,
+diff --git a/src/core/namespace.c b/src/core/namespace.c
+index c327c9a3ca488..2f3b8f03d1308 100644
+--- a/src/core/namespace.c
++++ b/src/core/namespace.c
+@@ -3308,6 +3308,7 @@ DEFINE_STRING_TABLE_LOOKUP_WITH_BOOLEAN(protect_home, ProtectHome, PROTECT_HOME_
+ static const char *const protect_hostname_table[_PROTECT_HOSTNAME_MAX] = {
+         [PROTECT_HOSTNAME_NO]      = "no",
+         [PROTECT_HOSTNAME_YES]     = "yes",
++        [PROTECT_HOSTNAME_PRIVATE] = "private",
+ };
+ 
+ DEFINE_STRING_TABLE_LOOKUP_WITH_BOOLEAN(protect_hostname, ProtectHostname, PROTECT_HOSTNAME_YES);
+diff --git a/src/core/namespace.h b/src/core/namespace.h
+index 8df91e3bdf906..96f62be30a269 100644
+--- a/src/core/namespace.h
++++ b/src/core/namespace.h
+@@ -31,6 +31,7 @@ typedef enum ProtectHome {
+ typedef enum ProtectHostname {
+         PROTECT_HOSTNAME_NO,
+         PROTECT_HOSTNAME_YES,
++        PROTECT_HOSTNAME_PRIVATE,
+         _PROTECT_HOSTNAME_MAX,
+         _PROTECT_HOSTNAME_INVALID = -EINVAL,
+ } ProtectHostname;
+diff --git a/test/TEST-07-PID1/test.sh b/test/TEST-07-PID1/test.sh
+index 66e1b684ea8a3..8e8a799a7150c 100755
+--- a/test/TEST-07-PID1/test.sh
++++ b/test/TEST-07-PID1/test.sh
+@@ -13,7 +13,7 @@ TEST_INSTALL_VERITY_MINIMAL=1
+ . "${TEST_BASE_DIR:?}/test-functions"
+ 
+ test_append_files() {
+-    image_install logger socat
++    image_install logger socat hostname
+     inst_binary mksquashfs
+     inst_binary unsquashfs
+     install_verity_minimal
+diff --git a/test/units/TEST-07-PID1.protect-hostname.sh b/test/units/TEST-07-PID1.protect-hostname.sh
+new file mode 100755
+index 0000000000000..c2ede395535f5
+--- /dev/null
++++ b/test/units/TEST-07-PID1.protect-hostname.sh
+@@ -0,0 +1,44 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: LGPL-2.1-or-later
++# shellcheck disable=SC2016
++set -eux
++set -o pipefail
++
++# shellcheck source=test/units/test-control.sh
++. "$(dirname "$0")"/test-control.sh
++# shellcheck source=test/units/util.sh
++. "$(dirname "$0")"/util.sh
++
++LEGACY_HOSTNAME="$(hostname)"
++HOSTNAME_FROM_SYSTEMD="$(hostnamectl hostname)"
++
++testcase_yes() {
++    # hostnamectl calls SetHostname method via dbus socket which executes in homenamed
++    # in the init namespace. So hostnamectl is not affected by ProtectHostname=yes or
++    # private since sethostname() system call is executed in the init namespace.
++    #
++    # hostnamed does authentication based on UID via polkit so this guarantees admins
++    # can only set hostname.
++    (! systemd-run --wait -p ProtectHostname=yes hostname foo)
++
++    systemd-run --wait -p ProtectHostname=yes -p PrivateMounts=yes \
++        findmnt --mountpoint /proc/sys/kernel/hostname
++}
++
++testcase_private() {
++    systemd-run --wait -p ProtectHostnameEx=private \
++        -P bash -xec '
++            hostname foo
++            test "$(hostname)" = "foo"
++        '
++
++    # Verify host hostname is unchanged.
++    test "$(hostname)" = "$LEGACY_HOSTNAME"
++    test "$(hostnamectl hostname)" = "$HOSTNAME_FROM_SYSTEMD"
++
++    # Verify /proc/sys/kernel/hostname is not bind mounted from host read-only.
++    (! systemd-run --wait -p ProtectHostnameEx=private -p PrivateMounts=yes \
++        findmnt --mountpoint /proc/sys/kernel/hostname)
++}
++
++run_testcases

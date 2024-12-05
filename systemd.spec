@@ -160,6 +160,22 @@ Patch0906: 0001-networkctl-Make-lldp-status-backwards-compatible-wit.patch
 # Revert "network/lldp: do not save LLDP neighbors under /run/systemd"
 Patch0907: 0001-Revert-network-lldp-do-not-save-LLDP-neighbors-under.patch
 
+# Meta specific patches for builds from git main (1001-1100)
+# TODO: These should be removed once they are either merged into git main
+# or upstreamed
+%if %{with upstream}
+
+# core: Add ProtectHostname=private
+Patch1001: https://github.com/systemd/systemd/pull/35447.patch
+
+# core: Add PrivateUsers=full
+Patch1002: https://github.com/systemd/systemd/pull/35183.patch
+
+# Temporary workaround: PrivateUsers=full implies DelegateNamespaces=yes
+Patch1003: 0001-Temporary-workaround-PrivateUsers-full-implies-Deleg.patch
+
+%endif
+
 %endif
 
 %ifarch %{ix86} x86_64 aarch64 riscv64
@@ -722,12 +738,37 @@ library or other libraries from systemd-libs. This package conflicts with the
 main systemd package and is meant for use in exitrds.
 
 %prep
+%if 0%{?facebook} && %{with upstream}
+
+# Call autosetup but disable patch management, we'll do that with autopatch below
+%if %{defined branch}
+%autosetup -N -n %{name}-%{branch}
+%elif %{defined commit}
+%autosetup -N -n %{name}-%{commit}
+%else
+%autosetup -N -n %{name}-%{version_no_tilde}
+%endif
+
+# systemd-cd build defines autopatch as true to disable autopatch so undo this
+# https://gitlab.com/CentOS/Hyperscale/releng/systemd-releng
+%if 0%{?autopatch}
+%undefine autopatch
+%endif
+
+# Now only install only patches in the specific Meta-only range
+%autopatch -m 1001 -M 1100 -p1
+
+%else
+
+# Use standard autosetup with automatic patch management
 %if %{defined branch}
 %autosetup -n %{name}-%{branch} -p1
 %elif %{defined commit}
 %autosetup -n %{name}-%{commit} -p1
 %else
 %autosetup -n %{name}-%{version_no_tilde} -p1
+%endif
+
 %endif
 
 %build

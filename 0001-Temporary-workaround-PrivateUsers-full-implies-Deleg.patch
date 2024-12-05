@@ -1,0 +1,36 @@
+From 2641ff693f715dd5094c56c59e0e660b9b35c9e2 Mon Sep 17 00:00:00 2001
+From: Ryan Wilson <ryantimwilson@meta.com>
+Date: Thu, 5 Dec 2024 08:31:42 -0800
+Subject: [PATCH] Temporary workaround: PrivateUsers=full implies
+ DelegateNamespaces=yes
+
+---
+ src/core/exec-invoke.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/src/core/exec-invoke.c b/src/core/exec-invoke.c
+index 8305bb2bcf..8c2a689d6e 100644
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -4061,6 +4061,9 @@ static bool exec_context_need_unprivileged_private_users(
+         assert(context);
+         assert(params);
+ 
++        if (context->private_users == PRIVATE_USERS_FULL)
++                return true;
++
+         /* These options require PrivateUsers= when used in user units, as we need to be in a user namespace
+          * to have permission to enable them when not running as root. If we have effective CAP_SYS_ADMIN
+          * (system manager) then we have privileges and don't need this. */
+@@ -5015,7 +5018,7 @@ int exec_invoke(
+ 
+                 /* The kernel requires /proc/pid/setgroups be set to "deny" prior to writing /proc/pid/gid_map in
+                  * unprivileged user namespaces. */
+-                r = setup_private_users(pu, saved_uid, saved_gid, uid, gid, /* allow_setgroups= */ false);
++                r = setup_private_users(pu, saved_uid, saved_gid, uid, gid, /* allow_setgroups= */ params->runtime_scope != RUNTIME_SCOPE_USER);
+                 /* If it was requested explicitly and we can't set it up, fail early. Otherwise, continue and let
+                  * the actual requested operations fail (or silently continue). */
+                 if (r < 0 && context->private_users != PRIVATE_USERS_NO) {
+-- 
+2.43.5
+
