@@ -739,6 +739,8 @@ main systemd package and is meant for use in exitrds.
 
 %prep
 %if 0%{?facebook} && %{with upstream}
+# For systemd-cd (https://gitlab.com/CentOS/Hyperscale/releng/systemd-releng) builds,
+# we want to allow certain patches to accelerate internal projects.
 
 # Call autosetup but disable patch management, we'll do that with autopatch below
 %if %{defined branch}
@@ -747,12 +749,6 @@ main systemd package and is meant for use in exitrds.
 %autosetup -N -n %{name}-%{commit}
 %else
 %autosetup -N -n %{name}-%{version_no_tilde}
-%endif
-
-# systemd-cd build defines autopatch as true to disable autopatch so undo this
-# https://gitlab.com/CentOS/Hyperscale/releng/systemd-releng
-%if 0%{?autopatch}
-%undefine autopatch
 %endif
 
 # Now only install only patches in the specific Meta-only range
