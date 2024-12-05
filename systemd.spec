@@ -41,10 +41,10 @@
 
 Name:           systemd
 Url:            https://systemd.io
-# Allow users to specify the version and release when building the rpm by 
+# Allow users to specify the version and release when building the rpm by
 # setting the %%version_override and %%release_override macros.
 Version:        %{?version_override}%{!?version_override:256.7}
-Release:        %{?release_override}%{!?release_override:1.8}%{?dist}
+Release:        %{?release_override}%{!?release_override:1.9}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -145,17 +145,20 @@ Patch0901:      https://github.com/systemd/systemd/pull/34251.patch
 # core: Add support for PrivateUsers=identity
 Patch0902:      https://github.com/systemd/systemd/pull/34400.patch
 
-# Fix error when upgrading from v255
-Patch0903: 0001-keep-on-using-DBus-as-fallback-if-varlink-is-not-ava.patch
-
 # bus-util: Return ENOMEDIUM if XDG_RUNTIME_DIR is unset
-Patch0904:      https://github.com/systemd/systemd/pull/34851.patch
+Patch0903:      https://github.com/systemd/systemd/pull/34851.patch
 
 # pam_systemd: Make pam_systemd 256 backwards compatible to logind 255
-Patch0905: 0001-pam_systemd-Make-pam_systemd-256-backwards-compatibl.patch
+Patch0904: 0001-pam_systemd-Make-pam_systemd-256-backwards-compatibl.patch
 
 # networkctl: Make networkctl lldp output backwards compatible with 255
-Patch0906: 0001-networkctl-Make-networkctl-lldp-output-backwards-com.patch
+Patch0905: 0001-networkctl-Make-networkctl-lldp-output-backwards-com.patch
+
+# networkctl: Make lldp/status backwards compatible with 255 over dbus
+Patch0906: 0001-networkctl-Make-lldp-status-backwards-compatible-wit.patch
+
+# Revert "network/lldp: do not save LLDP neighbors under /run/systemd"
+Patch0907: 0001-Revert-network-lldp-do-not-save-LLDP-neighbors-under.patch
 
 %endif
 
