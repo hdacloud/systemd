@@ -44,7 +44,7 @@ Url:            https://systemd.io
 # Allow users to specify the version and release when building the rpm by
 # setting the %%version_override and %%release_override macros.
 Version:        %{?version_override}%{!?version_override:256.7}
-Release:        %{?release_override}%{!?release_override:1.9}%{?dist}
+Release:        %{?release_override}%{!?release_override:1.10}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -159,6 +159,9 @@ Patch0906: 0001-networkctl-Make-lldp-status-backwards-compatible-wit.patch
 
 # Revert "network/lldp: do not save LLDP neighbors under /run/systemd"
 Patch0907: 0001-Revert-network-lldp-do-not-save-LLDP-neighbors-under.patch
+
+# bump networkd netlink timeout to infinity
+Patch0908: FB_only_bump_netlink_timeout_to_infinity.patch
 
 # Meta specific patches for builds from git main (1001-1100)
 # TODO: These should be removed once they are either merged into git main

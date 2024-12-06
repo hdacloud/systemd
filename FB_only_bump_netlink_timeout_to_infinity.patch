@@ -1,0 +1,13 @@
+diff --git a/src/libsystemd/sd-netlink/netlink-internal.h b/src/libsystemd/sd-netlink/netlink-internal.h
+index 891d3e8413..0fd919407a 100644
+--- a/src/libsystemd/sd-netlink/netlink-internal.h
++++ b/src/libsystemd/sd-netlink/netlink-internal.h
+@@ -11,7 +11,7 @@
+ #include "prioq.h"
+ #include "time-util.h"
+ 
+-#define NETLINK_DEFAULT_TIMEOUT_USEC ((usec_t) (25 * USEC_PER_SEC))
++#define NETLINK_DEFAULT_TIMEOUT_USEC USEC_INFINITY
+ 
+ #define NETLINK_RQUEUE_MAX 64*1024
+ 
