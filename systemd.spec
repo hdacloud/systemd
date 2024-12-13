@@ -168,12 +168,6 @@ Patch0908: FB_only_bump_netlink_timeout_to_infinity.patch
 # or upstreamed
 %if %{with upstream}
 
-# core: Add ProtectHostname=private
-Patch1001: https://github.com/systemd/systemd/pull/35447.patch
-
-# core: Add PrivateUsers=full
-Patch1002: https://github.com/systemd/systemd/pull/35183.patch
-
 # Temporary workaround: PrivateUsers=full implies DelegateNamespaces=yes
 Patch1003: 0001-Temporary-workaround-PrivateUsers-full-implies-Deleg.patch
 
