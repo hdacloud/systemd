@@ -127,14 +127,14 @@ Patch0015:      https://github.com/systemd/systemd/pull/34707.patch
 # core/device: ignore ID_PROCESSING udev property on enumerate
 Patch0016:      https://github.com/systemd/systemd/pull/35332.patch
 
+# Soft-disable tmpfiles --purge until a good use case comes up.
+Patch0492:      0001-tmpfiles-make-purge-hard-to-mis-use.patch
+
 %endif
 
 # Those are downstream-only patches, but we don't want them in packit builds:
 # https://bugzilla.redhat.com/show_bug.cgi?id=2251843
 Patch0491:      https://github.com/systemd/systemd/pull/30846.patch
-
-# Soft-disable tmpfiles --purge until a good use case comes up.
-Patch0492:      0001-tmpfiles-make-purge-hard-to-mis-use.patch
 
 # Meta specific backports (900-1000)
 
