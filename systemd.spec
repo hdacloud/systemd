@@ -110,6 +110,8 @@ GIT_DIR=../../src/systemd/.git git diffab -M v233..master@{2017-06-15} -- hwdb/[
 Patch0010:      https://github.com/systemd/systemd/pull/26494.patch
 %endif
 
+%if %{without upstream}
+
 # Requested in https://bugzilla.redhat.com/show_bug.cgi?id=2298422
 Patch0011:      https://github.com/systemd/systemd/pull/33738.patch
 
@@ -122,6 +124,11 @@ Patch0014:      https://github.com/systemd/systemd/pull/34686.patch
 # Simplify user manager upgrades
 Patch0015:      https://github.com/systemd/systemd/pull/34707.patch
 
+# core/device: ignore ID_PROCESSING udev property on enumerate
+Patch0016:      https://github.com/systemd/systemd/pull/35332.patch
+
+%endif
+
 # Those are downstream-only patches, but we don't want them in packit builds:
 # https://bugzilla.redhat.com/show_bug.cgi?id=2251843
 Patch0491:      https://github.com/systemd/systemd/pull/30846.patch
@@ -129,12 +136,11 @@ Patch0491:      https://github.com/systemd/systemd/pull/30846.patch
 # Soft-disable tmpfiles --purge until a good use case comes up.
 Patch0492:      0001-tmpfiles-make-purge-hard-to-mis-use.patch
 
-# core/device: ignore ID_PROCESSING udev property on enumerate
-Patch0493: https://github.com/systemd/systemd/pull/35332.patch
-
 # Meta specific backports (900-1000)
 
 %if 0%{?facebook}
+
+%if %{without upstream}
 
 # network: Make qdisc reconfigurable
 Patch0900:      https://github.com/systemd/systemd/pull/34543.patch
@@ -159,6 +165,8 @@ Patch0906: 0001-networkctl-Make-lldp-status-backwards-compatible-wit.patch
 
 # Revert "network/lldp: do not save LLDP neighbors under /run/systemd"
 Patch0907: 0001-Revert-network-lldp-do-not-save-LLDP-neighbors-under.patch
+
+%endif
 
 # bump networkd netlink timeout to infinity
 Patch0908: FB_only_bump_netlink_timeout_to_infinity.patch
