@@ -44,7 +44,7 @@ Url:            https://systemd.io
 # Allow users to specify the version and release when building the rpm by
 # setting the %%version_override and %%release_override macros.
 Version:        %{?version_override}%{!?version_override:256.7}
-Release:        %{?release_override}%{!?release_override:1.11}%{?dist}
+Release:        %{?release_override}%{!?release_override:1.12}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -1206,7 +1206,13 @@ systemctl daemon-reexec || :
 
 systemd-tmpfiles --create &>/dev/null || :
 
-%systemd_posttrans_with_restart systemd-timedated.service systemd-hostnamed.service systemd-journald.service systemd-localed.service systemd-userdbd.service
+restarting_services='systemd-timedated.service systemd-hostnamed.service systemd-journald.service systemd-localed.service systemd-userdbd.service'
+
+%if 0%{?facebook}
+restarting_services="$restarting_services systemd-logind.service"
+%endif
+
+%systemd_posttrans_with_restart $restarting_services
 
 # This is the expanded form of %%systemd_user_daemon_reexec. We
 # can't use the macro because we define it ourselves.
