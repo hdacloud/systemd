@@ -1138,8 +1138,6 @@ if [ -x "/usr/lib/systemd/systemd-update-helper" ]; then \
 fi \
 %{nil}
 
-%define systemd_rpmstatedir %{_localstatedir}/lib/rpm-state/systemd
-
 %post
 systemd-machine-id-setup &>/dev/null || :
 
@@ -1163,41 +1161,7 @@ systemd-tmpfiles --create &>/dev/null || :
 systemctl preset-all &>/dev/null || :
 systemctl --global preset-all &>/dev/null || :
 
-%pre
-[ -w %{_localstatedir} ] && mkdir -p %{systemd_rpmstatedir} && touch %{systemd_rpmstatedir}/restart-required || :
-
-%postun
-[ -w %{systemd_rpmstatedir} ] && [ ! -f %{systemd_rpmstatedir}/restart-required ] && exit 0 || :
-
-[ -w %{systemd_rpmstatedir} ] && rm -f %{systemd_rpmstatedir}/restart-required || :
-
-if [ $1 -ge 1 ]; then
-    [ -w %{_localstatedir} ] && journalctl --update-catalog || :
-
-    systemctl daemon-reexec || :
-
-    systemd-tmpfiles --create &>/dev/null || :
-fi
-
-restarting_services='systemd-timedated.service systemd-hostnamed.service systemd-journald.service systemd-localed.service systemd-userdbd.service'
-
-%if 0%{?facebook}
-restarting_services="$restarting_services systemd-logind.service"
-%endif
-
-%systemd_postun_with_restart $restarting_services
-
-# This is the expanded form of %%systemd_user_daemon_reexec. We
-# can't use the macro because we define it ourselves.
-if [ $1 -ge 1 ] && [ -x "/usr/lib/systemd/systemd-update-helper" ]; then
-    /usr/lib/systemd/systemd-update-helper user-reexec || :
-fi
-
 %posttrans
-[ -w %{systemd_rpmstatedir} ] && [ ! -f %{systemd_rpmstatedir}/restart-required ] && exit 0 || :
-
-[ -w %{systemd_rpmstatedir} ] && rm -f %{systemd_rpmstatedir}/restart-required || :
-
 # We can't check for upgrades on c9s as https://github.com/rpm-software-management/rpm/commit/3848c97cb227e7c018781aa7d5e1e46990ce1ffb
 # is missing so we run this stuff unconditionally on installs and upgrades.
 [ -w %{_localstatedir} ] && journalctl --update-catalog || :
@@ -1268,9 +1232,6 @@ grep -q -E '^KEYMAP="?fi-latin[19]"?' /etc/vconsole.conf 2>/dev/null &&
 %preun udev
 %systemd_preun %udev_services
 
-%postun udev
-%systemd_postun_with_restart systemd-udevd.service systemd-timesyncd.service
-
 %posttrans udev
 # Restart some services.
 # Others are either oneshot services, or sockets, and restarting them causes issues (#1378974)
@@ -1315,11 +1276,6 @@ fi
 %preun networkd
 %systemd_preun systemd-networkd.service systemd-networkd-wait-online.service
 
-%postun networkd
-%if %{undefined facebook}
-%systemd_postun_with_restart systemd-networkd.service
-%endif
-
 %posttrans networkd
 %if %{undefined facebook}
 %systemd_posttrans_with_restart systemd-networkd.service
@@ -1353,9 +1309,6 @@ if [ $1 -eq 0 ] ; then
                     ln -fsv ../run/NetworkManager/resolv.conf /etc/resolv.conf
         fi
 fi
-
-%postun resolved
-%systemd_postun_with_restart systemd-resolved.service
 
 %posttrans resolved
 %systemd_posttrans_with_restart systemd-resolved.service
