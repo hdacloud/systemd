@@ -1,0 +1,638 @@
+From 020c48ffda361eb4962a11b888aca1ba75284ba6 Mon Sep 17 00:00:00 2001
+From: Ryan Wilson <ryantimwilson@meta4.com>
+Date: Tue, 3 Dec 2024 14:46:54 -0800
+Subject: [PATCH 1/3] networkctl: Make networkctl lldp output backwards
+ compatible with 255
+
+---
+ src/network/networkctl-lldp.c | 16 +++++++---------
+ 1 file changed, 7 insertions(+), 9 deletions(-)
+
+diff --git a/src/network/networkctl-lldp.c b/src/network/networkctl-lldp.c
+index 43ffbabb9fcbb..b1dc927af9767 100644
+--- a/src/network/networkctl-lldp.c
++++ b/src/network/networkctl-lldp.c
+@@ -238,12 +238,11 @@ int link_lldp_status(int argc, char *argv[], void *userdata) {
+ 
+         table = table_new("index",
+                           "link",
+-                          "system-name",
+-                          "system-description",
+                           "chassis-id",
++                          "system-name",
++                          "caps",
+                           "port-id",
+-                          "port-description",
+-                          "caps");
++                          "port-description");
+         if (!table)
+                 return log_oom();
+ 
+@@ -256,7 +255,7 @@ int link_lldp_status(int argc, char *argv[], void *userdata) {
+         table_hide_column_from_display(table, (size_t) 0);
+ 
+         /* Make the capabilities not truncated */
+-        assert_se(cell = table_get_cell(table, 0, 7));
++        assert_se(cell = table_get_cell(table, 0, 4));
+         table_set_minimum_width(table, cell, 11);
+ 
+         sd_json_variant *i;
+@@ -285,12 +284,11 @@ int link_lldp_status(int argc, char *argv[], void *userdata) {
+                         r = table_add_many(table,
+                                            TABLE_INT,    info.ifindex,
+                                            TABLE_STRING, info.ifname,
+-                                           TABLE_STRING, neighbor_info.system_name,
+-                                           TABLE_STRING, neighbor_info.system_description,
+                                            TABLE_STRING, neighbor_info.chassis_id,
++                                           TABLE_STRING, neighbor_info.system_name,
++                                           TABLE_STRING, cap_str,
+                                            TABLE_STRING, neighbor_info.port_id,
+-                                           TABLE_STRING, neighbor_info.port_description,
+-                                           TABLE_STRING, cap_str);
++                                           TABLE_STRING, neighbor_info.port_description);
+                         if (r < 0)
+                                 return table_log_add_error(r);
+ 
+
+From b99fb7eb9882f261fa250d9d5c76a83cbf1e41c6 Mon Sep 17 00:00:00 2001
+From: Ryan Wilson <ryantimwilson@meta4.com>
+Date: Wed, 4 Dec 2024 16:15:30 -0800
+Subject: [PATCH 2/3] networkctl: Make lldp/status backwards compatible with
+ 255 over dbus
+
+---
+ src/libsystemd-network/lldp-neighbor.c |  22 +++
+ src/network/networkctl-lldp.c          | 198 ++++++++++++++++++++++++-
+ src/network/networkctl-lldp.h          |   1 +
+ src/network/networkctl-status-link.c   |   9 +-
+ src/network/networkctl-util.c          |   2 +-
+ src/systemd/sd-lldp-rx.h               |   1 +
+ 6 files changed, 226 insertions(+), 7 deletions(-)
+
+diff --git a/src/libsystemd-network/lldp-neighbor.c b/src/libsystemd-network/lldp-neighbor.c
+index 457b1e5926b0c..4e51a55bd1f64 100644
+--- a/src/libsystemd-network/lldp-neighbor.c
++++ b/src/libsystemd-network/lldp-neighbor.c
+@@ -630,6 +630,28 @@ int sd_lldp_neighbor_get_enabled_capabilities(sd_lldp_neighbor *n, uint16_t *ret
+         return 0;
+ }
+ 
++int sd_lldp_neighbor_from_raw(sd_lldp_neighbor **ret, const void *raw, size_t raw_size) {
++        _cleanup_(sd_lldp_neighbor_unrefp) sd_lldp_neighbor *n = NULL;
++        int r;
++
++        assert_return(ret, -EINVAL);
++        assert_return(raw || raw_size <= 0, -EINVAL);
++
++        n = lldp_neighbor_new(raw_size);
++        if (!n)
++                return -ENOMEM;
++
++        memcpy_safe(LLDP_NEIGHBOR_RAW(n), raw, raw_size);
++
++        r = lldp_neighbor_parse(n);
++        if (r < 0)
++                return r;
++
++        *ret = TAKE_PTR(n);
++
++        return r;
++}
++
+ int sd_lldp_neighbor_tlv_rewind(sd_lldp_neighbor *n) {
+         assert_return(n, -EINVAL);
+ 
+diff --git a/src/network/networkctl-lldp.c b/src/network/networkctl-lldp.c
+index b1dc927af9767..6a3a88210c8e2 100644
+--- a/src/network/networkctl-lldp.c
++++ b/src/network/networkctl-lldp.c
+@@ -1,11 +1,15 @@
+ /* SPDX-License-Identifier: LGPL-2.1-or-later */
+ 
+ #include "alloc-util.h"
++#include "fd-util.h"
+ #include "json-util.h"
+ #include "networkctl.h"
+ #include "networkctl-dump-util.h"
++#include "networkctl-link-info.h"
+ #include "networkctl-lldp.h"
+ #include "networkctl-util.h"
++#include "sd-lldp-rx.h"
++#include "sparse-endian.h"
+ #include "stdio-util.h"
+ #include "strv.h"
+ #include "terminal-util.h"
+@@ -214,6 +218,194 @@ static int dump_lldp_neighbors_json(sd_json_variant *reply, char * const *patter
+         return sd_json_variant_dump(v, arg_json_format_flags, NULL, NULL);
+ }
+ 
++static int open_lldp_neighbors_legacy(int ifindex, FILE **ret) {
++        _cleanup_fclose_ FILE *f = NULL;
++        char p[STRLEN("/run/systemd/netif/lldp/") + DECIMAL_STR_MAX(int)];
++
++        assert(ifindex >= 0);
++        assert(ret);
++
++        xsprintf(p, "/run/systemd/netif/lldp/%i", ifindex);
++
++        f = fopen(p, "re");
++        if (!f)
++                return -errno;
++
++        *ret = TAKE_PTR(f);
++        return 0;
++}
++
++static int next_lldp_neighbor_legacy(FILE *f, sd_lldp_neighbor **ret) {
++        _cleanup_free_ void *raw = NULL;
++        size_t l;
++        le64_t u;
++        int r;
++
++        assert(f);
++        assert(ret);
++
++        l = fread(&u, 1, sizeof(u), f);
++        if (l == 0 && feof(f))
++                return 0;
++        if (l != sizeof(u))
++                return -EBADMSG;
++
++        /* each LLDP packet is at most MTU size, but let's allow up to 4KiB just in case */
++        if (le64toh(u) >= 4096)
++                return -EBADMSG;
++
++        raw = new(uint8_t, le64toh(u));
++        if (!raw)
++                return -ENOMEM;
++
++        if (fread(raw, 1, le64toh(u), f) != le64toh(u))
++                return -EBADMSG;
++
++        r = sd_lldp_neighbor_from_raw(ret, raw, le64toh(u));
++        if (r < 0)
++                return r;
++
++        return 1;
++}
++
++int dump_lldp_neighbors_legacy(Table *table, const char *prefix, int ifindex) {
++        _cleanup_strv_free_ char **buf = NULL;
++        _cleanup_fclose_ FILE *f = NULL;
++        int r;
++
++        assert(table);
++        assert(prefix);
++        assert(ifindex > 0);
++
++        r = open_lldp_neighbors_legacy(ifindex, &f);
++        if (r == -ENOENT)
++                return 0;
++        if (r < 0)
++                return r;
++
++        for (;;) {
++                const char *system_name = NULL, *port_id = NULL, *port_description = NULL;
++                _cleanup_(sd_lldp_neighbor_unrefp) sd_lldp_neighbor *n = NULL;
++
++                r = next_lldp_neighbor_legacy(f, &n);
++                if (r < 0)
++                        return r;
++                if (r == 0)
++                        break;
++
++                (void) sd_lldp_neighbor_get_system_name(n, &system_name);
++                (void) sd_lldp_neighbor_get_port_id_as_string(n, &port_id);
++                (void) sd_lldp_neighbor_get_port_description(n, &port_description);
++
++                r = strv_extendf(&buf, "%s on port %s%s%s%s",
++                                 strna(system_name),
++                                 strna(port_id),
++                                 isempty(port_description) ? "" : " (",
++                                 strempty(port_description),
++                                 isempty(port_description) ? "" : ")");
++                if (r < 0)
++                        return log_oom();
++        }
++
++        return dump_list(table, prefix, buf);
++}
++static int link_lldp_status_legacy(int argc, char *argv[], void *userdata) {
++        _cleanup_(sd_netlink_unrefp) sd_netlink *rtnl = NULL;
++        _cleanup_(link_info_array_freep) LinkInfo *links = NULL;
++        _cleanup_(table_unrefp) Table *table = NULL;
++        int r, c, m = 0;
++        uint16_t all = 0;
++        TableCell *cell;
++
++        r = sd_netlink_open(&rtnl);
++        if (r < 0)
++                return log_error_errno(r, "Failed to connect to netlink: %m");
++
++        c = acquire_link_info(NULL, rtnl, argc > 1 ? argv + 1 : NULL, &links);
++        if (c < 0)
++                return c;
++
++        pager_open(arg_pager_flags);
++
++        table = table_new("link",
++                          "chassis-id",
++                          "system-name",
++                          "caps",
++                          "port-id",
++                          "port-description");
++        if (!table)
++                return log_oom();
++
++        if (arg_full)
++                table_set_width(table, 0);
++
++        table_set_header(table, arg_legend);
++
++        assert_se(cell = table_get_cell(table, 0, 3));
++        table_set_minimum_width(table, cell, 11);
++        table_set_ersatz_string(table, TABLE_ERSATZ_DASH);
++
++        FOREACH_ARRAY(link, links, c) {
++                _cleanup_fclose_ FILE *f = NULL;
++
++                r = open_lldp_neighbors_legacy(link->ifindex, &f);
++                if (r == -ENOENT)
++                        continue;
++                if (r < 0) {
++                        log_warning_errno(r, "Failed to open LLDP data for %i, ignoring: %m", link->ifindex);
++                        continue;
++                }
++
++                for (;;) {
++                        const char *chassis_id = NULL, *port_id = NULL, *system_name = NULL, *port_description = NULL;
++                        _cleanup_(sd_lldp_neighbor_unrefp) sd_lldp_neighbor *n = NULL;
++                        _cleanup_free_ char *capabilities = NULL;
++                        uint16_t cc;
++
++                        r = next_lldp_neighbor_legacy(f, &n);
++                        if (r < 0) {
++                                log_warning_errno(r, "Failed to read neighbor data: %m");
++                                break;
++                        }
++                        if (r == 0)
++                                break;
++
++                        (void) sd_lldp_neighbor_get_chassis_id_as_string(n, &chassis_id);
++                        (void) sd_lldp_neighbor_get_port_id_as_string(n, &port_id);
++                        (void) sd_lldp_neighbor_get_system_name(n, &system_name);
++                        (void) sd_lldp_neighbor_get_port_description(n, &port_description);
++
++                        if (sd_lldp_neighbor_get_enabled_capabilities(n, &cc) >= 0) {
++                                capabilities = lldp_capabilities_to_string(cc);
++                                all |= cc;
++                        }
++
++                        r = table_add_many(table,
++                                           TABLE_STRING, link->name,
++                                           TABLE_STRING, chassis_id,
++                                           TABLE_STRING, system_name,
++                                           TABLE_STRING, capabilities,
++                                           TABLE_STRING, port_id,
++                                           TABLE_STRING, port_description);
++                        if (r < 0)
++                                return table_log_add_error(r);
++
++                        m++;
++                }
++        }
++
++        r = table_print(table, NULL);
++        if (r < 0)
++                return table_log_print_error(r);
++
++        if (arg_legend) {
++                lldp_capabilities_legend(all);
++                printf("\n%i neighbors listed.\n", m);
++        }
++
++        return 0;
++}
++
+ int link_lldp_status(int argc, char *argv[], void *userdata) {
+         _cleanup_(sd_varlink_flush_close_unrefp) sd_varlink *vl = NULL;
+         _cleanup_(table_unrefp) Table *table = NULL;
+@@ -224,8 +416,10 @@ int link_lldp_status(int argc, char *argv[], void *userdata) {
+         int r;
+ 
+         r = varlink_connect_networkd(&vl);
+-        if (r < 0)
+-                return r;
++        if (r < 0) {
++                log_warning("Varlink connection failed, fallback to D-Bus.");
++                return link_lldp_status_legacy(argc, argv, userdata);
++        }
+ 
+         r = varlink_call_and_log(vl, "io.systemd.Network.GetLLDPNeighbors", NULL, &reply);
+         if (r < 0)
+diff --git a/src/network/networkctl-lldp.h b/src/network/networkctl-lldp.h
+index 3ec6fe76c1184..98288479241b3 100644
+--- a/src/network/networkctl-lldp.h
++++ b/src/network/networkctl-lldp.h
+@@ -7,3 +7,4 @@
+ 
+ int dump_lldp_neighbors(sd_varlink *vl, Table *table, int ifindex);
+ int link_lldp_status(int argc, char *argv[], void *userdata);
++int dump_lldp_neighbors_legacy(Table *table, const char *prefix, int ifindex);
+diff --git a/src/network/networkctl-status-link.c b/src/network/networkctl-status-link.c
+index ae13eba9ae076..fbda880e9c9b2 100644
+--- a/src/network/networkctl-status-link.c
++++ b/src/network/networkctl-status-link.c
+@@ -267,7 +267,6 @@ static int link_status_one(
+ 
+         assert(bus);
+         assert(rtnl);
+-        assert(vl);
+         assert(info);
+ 
+         (void) sd_network_link_get_operational_state(info->ifindex, &operational_state);
+@@ -904,7 +903,7 @@ static int link_status_one(
+                         return table_log_add_error(r);
+         }
+ 
+-        r = dump_lldp_neighbors(vl, table, info->ifindex);
++        r = vl ? dump_lldp_neighbors(vl, table, info->ifindex) : dump_lldp_neighbors_legacy(table, "Connected To", info->ifindex);
+         if (r < 0)
+                 return r;
+ 
+@@ -955,8 +954,10 @@ int link_status(int argc, char *argv[], void *userdata) {
+                 log_debug_errno(r, "Failed to open hardware database: %m");
+ 
+         r = varlink_connect_networkd(&vl);
+-        if (r < 0)
+-                return r;
++        if (r < 0) {
++                log_warning("Varlink connection failed, fallback to D-Bus.");
++                vl = NULL;
++        }
+ 
+         if (arg_all)
+                 c = acquire_link_info(bus, rtnl, NULL, &links);
+diff --git a/src/network/networkctl-util.c b/src/network/networkctl-util.c
+index 88620aad536a0..8bda6b1aec98f 100644
+--- a/src/network/networkctl-util.c
++++ b/src/network/networkctl-util.c
+@@ -90,7 +90,7 @@ int acquire_bus(sd_bus **ret) {
+         if (networkd_is_running()) {
+                 r = varlink_connect_networkd(/* ret_varlink = */ NULL);
+                 if (r < 0)
+-                        return r;
++                        log_warning("Varlink connection failed, fallback to D-Bus.");
+         } else
+                 log_warning("systemd-networkd is not running, output might be incomplete.");
+ 
+diff --git a/src/systemd/sd-lldp-rx.h b/src/systemd/sd-lldp-rx.h
+index 51b9f39482001..b697643a0721c 100644
+--- a/src/systemd/sd-lldp-rx.h
++++ b/src/systemd/sd-lldp-rx.h
+@@ -88,6 +88,7 @@ int sd_lldp_neighbor_get_port_description(sd_lldp_neighbor *n, const char **ret)
+ int sd_lldp_neighbor_get_mud_url(sd_lldp_neighbor *n, const char **ret);
+ int sd_lldp_neighbor_get_system_capabilities(sd_lldp_neighbor *n, uint16_t *ret);
+ int sd_lldp_neighbor_get_enabled_capabilities(sd_lldp_neighbor *n, uint16_t *ret);
++int sd_lldp_neighbor_from_raw(sd_lldp_neighbor **ret, const void *raw, size_t raw_size);
+ 
+ /* Low-level, iterative TLV access. This is for everything else, it iteratively goes through all available TLVs
+  * (including the ones covered with the calls above), and allows multiple TLVs for the same fields. */
+
+From ce39b00868dee5aa80c700185649f41026b88d76 Mon Sep 17 00:00:00 2001
+From: Ryan Wilson <ryantimwilson@meta4.com>
+Date: Wed, 4 Dec 2024 16:53:40 -0800
+Subject: [PATCH 3/3] Revert "network/lldp: do not save LLDP neighbors under
+ /run/systemd"
+
+This reverts commit 5a0f6adbb2e39914897f404ac97fecebcc2c385a.
+---
+ src/libsystemd-network/lldp-neighbor.c | 11 ++++
+ src/network/networkd-link.c            |  7 ++-
+ src/network/networkd-link.h            |  1 +
+ src/network/networkd-lldp-rx.c         | 69 ++++++++++++++++++++++++++
+ src/network/networkd-lldp-rx.h         |  1 +
+ src/network/networkd-state-file.c      |  2 +
+ src/network/networkd.c                 |  3 +-
+ src/systemd/sd-lldp-rx.h               |  1 +
+ tmpfiles.d/systemd-network.conf        |  1 +
+ 9 files changed, 94 insertions(+), 2 deletions(-)
+
+diff --git a/src/libsystemd-network/lldp-neighbor.c b/src/libsystemd-network/lldp-neighbor.c
+index 4e51a55bd1f64..39864d18f7919 100644
+--- a/src/libsystemd-network/lldp-neighbor.c
++++ b/src/libsystemd-network/lldp-neighbor.c
+@@ -377,6 +377,17 @@ int sd_lldp_neighbor_get_destination_address(sd_lldp_neighbor *n, struct ether_a
+         return 0;
+ }
+ 
++int sd_lldp_neighbor_get_raw(sd_lldp_neighbor *n, const void **ret, size_t *size) {
++        assert_return(n, -EINVAL);
++        assert_return(ret, -EINVAL);
++        assert_return(size, -EINVAL);
++
++        *ret = LLDP_NEIGHBOR_RAW(n);
++        *size = n->raw_size;
++
++        return 0;
++}
++
+ int sd_lldp_neighbor_get_chassis_id(sd_lldp_neighbor *n, uint8_t *type, const void **ret, size_t *size) {
+         assert_return(n, -EINVAL);
+         assert_return(type, -EINVAL);
+diff --git a/src/network/networkd-link.c b/src/network/networkd-link.c
+index 3f816d7fa25c4..d0b37bd65d074 100644
+--- a/src/network/networkd-link.c
++++ b/src/network/networkd-link.c
+@@ -276,6 +276,7 @@ static Link *link_free(Link *link) {
+         free(link->driver);
+ 
+         unlink_and_free(link->lease_file);
++        unlink_and_free(link->lldp_file);
+         unlink_and_free(link->state_file);
+ 
+         sd_device_unref(link->dev);
+@@ -2663,7 +2664,7 @@ static Link *link_drop_or_unref(Link *link) {
+ DEFINE_TRIVIAL_CLEANUP_FUNC(Link*, link_drop_or_unref);
+ 
+ static int link_new(Manager *manager, sd_netlink_message *message, Link **ret) {
+-        _cleanup_free_ char *ifname = NULL, *kind = NULL, *state_file = NULL, *lease_file = NULL;
++        _cleanup_free_ char *ifname = NULL, *kind = NULL, *state_file = NULL, *lease_file = NULL, *lldp_file = NULL;
+         _cleanup_(link_drop_or_unrefp) Link *link = NULL;
+         unsigned short iftype;
+         int r, ifindex;
+@@ -2704,6 +2705,9 @@ static int link_new(Manager *manager, sd_netlink_message *message, Link **ret) {
+ 
+                 if (asprintf(&lease_file, "/run/systemd/netif/leases/%d", ifindex) < 0)
+                         return log_oom_debug();
++
++                if (asprintf(&lldp_file, "/run/systemd/netif/lldp/%d", ifindex) < 0)
++                        return log_oom_debug();
+         }
+ 
+         link = new(Link, 1);
+@@ -2726,6 +2730,7 @@ static int link_new(Manager *manager, sd_netlink_message *message, Link **ret) {
+ 
+                 .state_file = TAKE_PTR(state_file),
+                 .lease_file = TAKE_PTR(lease_file),
++                .lldp_file = TAKE_PTR(lldp_file),
+ 
+                 .n_dns = UINT_MAX,
+                 .dns_default_route = -1,
+diff --git a/src/network/networkd-link.h b/src/network/networkd-link.h
+index 113217cdb6ad8..229ce976bc2b8 100644
+--- a/src/network/networkd-link.h
++++ b/src/network/networkd-link.h
+@@ -194,6 +194,7 @@ typedef struct Link {
+ 
+         /* This is about LLDP reception */
+         sd_lldp_rx *lldp_rx;
++        char *lldp_file;
+ 
+         /* This is about LLDP transmission */
+         sd_lldp_tx *lldp_tx;
+diff --git a/src/network/networkd-lldp-rx.c b/src/network/networkd-lldp-rx.c
+index 6ba198282e7a1..853e0a0aceb67 100644
+--- a/src/network/networkd-lldp-rx.c
++++ b/src/network/networkd-lldp-rx.c
+@@ -52,6 +52,8 @@ static void lldp_rx_handler(sd_lldp_rx *lldp_rx, sd_lldp_rx_event_t event, sd_ll
+         Link *link = ASSERT_PTR(userdata);
+         int r;
+ 
++        (void) link_lldp_save(link);
++
+         if (link->lldp_tx && event == SD_LLDP_RX_EVENT_ADDED) {
+                 /* If we received information about a new neighbor, restart the LLDP "fast" logic */
+ 
+@@ -102,3 +104,70 @@ int link_lldp_rx_configure(Link *link) {
+ 
+         return 0;
+ }
++
++int link_lldp_save(Link *link) {
++        _cleanup_(unlink_and_freep) char *temp_path = NULL;
++        _cleanup_fclose_ FILE *f = NULL;
++        sd_lldp_neighbor **l = NULL;
++        int n = 0, r, i;
++
++        assert(link);
++
++        if (isempty(link->lldp_file))
++                return 0; /* Do not update state file when running in test mode. */
++
++        if (!link->lldp_rx) {
++                (void) unlink(link->lldp_file);
++                return 0;
++        }
++
++        r = sd_lldp_rx_get_neighbors(link->lldp_rx, &l);
++        if (r < 0)
++                return r;
++        if (r == 0) {
++                (void) unlink(link->lldp_file);
++                return 0;
++        }
++
++        n = r;
++
++        r = fopen_temporary(link->lldp_file, &f, &temp_path);
++        if (r < 0)
++                goto finish;
++
++        (void) fchmod(fileno(f), 0644);
++
++        for (i = 0; i < n; i++) {
++                const void *p;
++                le64_t u;
++                size_t sz;
++
++                r = sd_lldp_neighbor_get_raw(l[i], &p, &sz);
++                if (r < 0)
++                        goto finish;
++
++                u = htole64(sz);
++                fwrite(&u, 1, sizeof(u), f);
++                fwrite(p, 1, sz, f);
++        }
++
++        r = fflush_and_check(f);
++        if (r < 0)
++                goto finish;
++
++        r = conservative_rename(temp_path, link->lldp_file);
++        if (r < 0)
++                goto finish;
++
++finish:
++        if (r < 0)
++                log_link_error_errno(link, r, "Failed to save LLDP data to %s: %m", link->lldp_file);
++
++        if (l) {
++                for (i = 0; i < n; i++)
++                        sd_lldp_neighbor_unref(l[i]);
++                free(l);
++        }
++
++        return r;
++}
+diff --git a/src/network/networkd-lldp-rx.h b/src/network/networkd-lldp-rx.h
+index 75c9f8ca8602f..22f6602bd0ffd 100644
+--- a/src/network/networkd-lldp-rx.h
++++ b/src/network/networkd-lldp-rx.h
+@@ -14,6 +14,7 @@ typedef enum LLDPMode {
+ } LLDPMode;
+ 
+ int link_lldp_rx_configure(Link *link);
++int link_lldp_save(Link *link);
+ 
+ const char* lldp_mode_to_string(LLDPMode m) _const_;
+ LLDPMode lldp_mode_from_string(const char *s) _pure_;
+diff --git a/src/network/networkd-state-file.c b/src/network/networkd-state-file.c
+index da917dd897241..2e32fbc300c10 100644
+--- a/src/network/networkd-state-file.c
++++ b/src/network/networkd-state-file.c
+@@ -714,6 +714,8 @@ static int link_save(Link *link) {
+         if (link->state == LINK_STATE_LINGER)
+                 return 0;
+ 
++        link_lldp_save(link);
++
+         admin_state = ASSERT_PTR(link_state_to_string(link->state));
+         oper_state = ASSERT_PTR(link_operstate_to_string(link->operstate));
+         carrier_state = ASSERT_PTR(link_carrier_state_to_string(link->carrier_state));
+diff --git a/src/network/networkd.c b/src/network/networkd.c
+index 883f16d81b257..12edb685839c9 100644
+--- a/src/network/networkd.c
++++ b/src/network/networkd.c
+@@ -75,7 +75,8 @@ static int run(int argc, char *argv[]) {
+          * to support old kernels not supporting AmbientCapabilities=. */
+         FOREACH_STRING(p,
+                        "/run/systemd/netif/links/",
+-                       "/run/systemd/netif/leases/") {
++                       "/run/systemd/netif/leases/",
++                       "/run/systemd/netif/lldp/") {
+                 r = mkdir_safe_label(p, 0755, UID_INVALID, GID_INVALID, MKDIR_WARN_MODE);
+                 if (r < 0)
+                         log_warning_errno(r, "Could not create directory '%s': %m", p);
+diff --git a/src/systemd/sd-lldp-rx.h b/src/systemd/sd-lldp-rx.h
+index b697643a0721c..fedf9956cf8da 100644
+--- a/src/systemd/sd-lldp-rx.h
++++ b/src/systemd/sd-lldp-rx.h
+@@ -75,6 +75,7 @@ sd_lldp_neighbor *sd_lldp_neighbor_unref(sd_lldp_neighbor *n);
+ int sd_lldp_neighbor_get_source_address(sd_lldp_neighbor *n, struct ether_addr* address);
+ int sd_lldp_neighbor_get_destination_address(sd_lldp_neighbor *n, struct ether_addr* address);
+ int sd_lldp_neighbor_get_timestamp(sd_lldp_neighbor *n, clockid_t clock, uint64_t *ret);
++int sd_lldp_neighbor_get_raw(sd_lldp_neighbor *n, const void **ret, size_t *size);
+ 
+ /* High-level, direct, parsed out field access. These fields exist at most once, hence may be queried directly. */
+ int sd_lldp_neighbor_get_chassis_id(sd_lldp_neighbor *n, uint8_t *type, const void **ret, size_t *size);
+diff --git a/tmpfiles.d/systemd-network.conf b/tmpfiles.d/systemd-network.conf
+index 75b61b7d07279..881937d456004 100644
+--- a/tmpfiles.d/systemd-network.conf
++++ b/tmpfiles.d/systemd-network.conf
+@@ -10,4 +10,5 @@
+ d$ /run/systemd/netif        0755 systemd-network systemd-network -
+ d$ /run/systemd/netif/links  0755 systemd-network systemd-network -
+ d$ /run/systemd/netif/leases 0755 systemd-network systemd-network -
++d$ /run/systemd/netif/lldp   0755 systemd-network systemd-network -
+ d$ /var/lib/systemd/network  0755 systemd-network systemd-network -
