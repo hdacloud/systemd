@@ -1,0 +1,17 @@
+# Test locally on Fedora by doing the following:
+# - Install gitlab-runner from https://docs.gitlab.com/runner/install/linux-manually.html#using-binary-file
+# - sudo dnf install podman
+# - systemctl enable --now --user podman.socket
+# - sudo ln -s /run/user/$(id -u)/podman/podman.sock /var/run/docker.sock
+# - gitlab-runner exec docker systemd-cd --env CENTOS_CERT=/root/.centos.cert --docker-volumes "$HOME/.centos.cert:/root/.centos.cert"
+systemd-cd:
+  stage: build
+  image: quay.io/fedora/fedora:latest
+  script:
+    - env # Show variables that were passed to the job
+    - dnf install -y tar git-core python3 centos-packager mock mock-centos-sig-configs
+    - ./releng.py cd --cert $CENTOS_CERT --repo $REPO --release $RELEASE $PUBLISH
+  parallel:
+    matrix:
+      - REPO: [main, facebook]
+        RELEASE: [9, 10]
