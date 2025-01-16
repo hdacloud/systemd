@@ -1,0 +1,18 @@
+#!/bin/bash
+# SPDX-License-Identifier: LGPL-2.1-or-later
+set -e
+
+env --chdir=selinux-policy \
+    rpmbuild \
+    -bb \
+    --build-in-place \
+    $( ((WITH_TESTS)) || echo "--nocheck") \
+    $( ((WITH_DOCS))  || echo "--without=docs") \
+    --define "_topdir /var/tmp" \
+    --define "_sourcedir $PWD/selinux-policy/rpm" \
+    --define "_rpmdir $PACKAGEDIR" \
+    --define "_build_name_fmt %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm" \
+    --define "_binary_payload w.ufdio" \
+    --define "debug_package %{nil}" \
+    --noclean \
+    rpm/selinux-policy.spec
