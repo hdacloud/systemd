@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+
+SYSTEMD_ESP_PATH=/efi SYSTEMD_XBOOTLDR_PATH=/boot bootctl --root="$BUILDROOT" install
