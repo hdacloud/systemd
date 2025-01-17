@@ -127,7 +127,7 @@ Patch:          https://github.com/systemd/systemd/pull/30846.patch
 Patch:          https://github.com/systemd/systemd/pull/35938.patch
 %endif
 
-# Meta specific backports (900-1000)
+# Meta specific backports
 
 %if 0%{?facebook}
 
@@ -144,7 +144,7 @@ Patch: https://github.com/systemd/systemd/pull/36050.patch
 # bump networkd netlink timeout to infinity
 Patch: FB_only_bump_netlink_timeout_to_infinity.patch
 
-# Meta specific patches for builds from git main (1001-1100)
+# Meta specific patches for builds from git main
 # TODO: These should be removed once they are either merged into git main
 # or upstreamed
 %if %{with upstream}
