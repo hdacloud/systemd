@@ -117,6 +117,9 @@ Patch:          0001-Revert-units-use-PrivateTmp-disconnected-instead-of-.patch
 # Those are downstream-only patches, but we don't want them in packit builds:
 # https://bugzilla.redhat.com/show_bug.cgi?id=2251843
 Patch:          https://github.com/systemd/systemd/pull/30846.patch
+
+# Backport various fmf fixes to allow running the integration tests in Fedora CI.
+Patch:          https://github.com/systemd/systemd/pull/35938.patch
 %endif
 
 # Meta specific backports (900-1000)
@@ -889,6 +892,11 @@ CONFIGURE_OPTS=(
         # considering that that support is untested, let's not do this now.
         -Dbootloader=%[%{?want_bootloader}?"enabled":"disabled"]
         -Dukify=enabled
+%if 0%{?want_bootloader} && %{with obs}
+        -Dsbat-distro-url=https://github.com/systemd/systemd
+        -Dsbat-distro=upstream
+        -Dsbat-distro-summary='Upstream build from git'
+%endif
 )
 
 %if 0%{?facebook}
@@ -1077,9 +1085,13 @@ mv -v %{buildroot}/usr/sbin/* %{buildroot}%{_bindir}/
 %endif
 
 %if 0%{?fedora} >= 41
+%if %{without upstream}
 # This requires https://pagure.io/setup/pull-request/50
 # and https://src.fedoraproject.org/rpms/setup/pull-request/10.
+# We skip this on upstream builds so that new users and groups
+# can be added without breaking the build.
 %{python3} %{SOURCE4} /usr/lib/sysusers.d/20-setup-{users,groups}.conf %{buildroot}/usr/lib/sysusers.d/basic.conf
+%endif
 rm %{buildroot}/usr/lib/sysusers.d/basic.conf
 %endif
 
