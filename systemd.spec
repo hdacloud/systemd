@@ -32,6 +32,9 @@
 # Build from git main
 %bcond upstream  0
 
+# Build with OBS-specific quirks
+%bcond obs       0
+
 # When bootstrap, libcryptsetup is disabled
 # but auto-features causes many options to be turned on
 # that depend on libcryptsetup (e.g. libcryptsetup-plugins, homed)
@@ -43,8 +46,14 @@ Name:           systemd
 Url:            https://systemd.io
 # Allow users to specify the version and release when building the rpm by
 # setting the %%version_override and %%release_override macros.
-Version:        %{?version_override}%{!?version_override:256.7}
-Release:        %{?release_override}%{!?release_override:1.13}%{?dist}
+# But don't do that on OBS, otherwise the version subst fails, and will be
+# like 257-123-gabcd257.1 instead of 257-123-gabcd
+%if %{without obs}
+Version:        %{?version_override}%{!?version_override:257.2}
+%else
+Version:        %{?version_override}%{!?version_override:%(cat meson.version)}
+%endif
+Release:        %{?release_override}%{!?release_override:1.1}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -74,7 +83,7 @@ Source9:        systemd-journal-gatewayd.xml
 Source10:       20-yama-ptrace.conf
 Source11:       systemd-udev-trigger-no-reload.conf
 # https://fedoraproject.org/wiki/How_to_filter_libabigail_reports
-Source13:       .abignore
+Source13:       libabigail.abignore
 
 Source14:       10-oomd-defaults.conf
 Source15:       10-oomd-per-slice-defaults.conf
@@ -91,50 +100,32 @@ Source25:       98-default-mac-none.link
 
 Source26:       systemd-user
 
-%if 0
-GIT_DIR=../../src/systemd/.git git format-patch-ab --no-signature -M -N v235..v235-stable
-i=1; for j in 00*patch; do printf "Patch%04d:      %s\n" $i $j; i=$((i+1));done|xclip
-GIT_DIR=../../src/systemd/.git git diffab -M v233..master@{2017-06-15} -- hwdb/[67]* hwdb/parse_hwdb.py >hwdb.patch
-%endif
-
-# Backports of patches from upstream (0000–0499)
-#
-# Any patches which are "in preparation" upstream should be listed here, rather
-# than in the next section. Packit CI will drop any patches in this range before
-# applying upstream pull requests.
-
 %if 0%{?fedora} < 40 && 0%{?rhel} < 10
 # Work-around for dracut issue: run generators directly when we are in initrd
 # https://bugzilla.redhat.com/show_bug.cgi?id=2164404
 # Drop when dracut-060 is available.
-Patch0010:      https://github.com/systemd/systemd/pull/26494.patch
+Patch:          https://github.com/systemd/systemd/pull/26494.patch
 %endif
 
 %if %{without upstream}
+# Temporarily drop use of PrivateTmp=disconnected. This is causing failures
+# in various places:
+# https://bugzilla.redhat.com/show_bug.cgi?id=2334015
+# https://github.com/coreos/fedora-coreos-tracker/issues/1857
+Patch:          0001-Revert-units-use-PrivateTmp-disconnected-instead-of-.patch
 
-# Requested in https://bugzilla.redhat.com/show_bug.cgi?id=2298422
-Patch0011:      https://github.com/systemd/systemd/pull/33738.patch
-
-# Various logging improvements
-Patch0013:      https://github.com/systemd/systemd/pull/34728.patch
-
-# Make sure bus_connect_transport_systemd() actually connects to the private manager bus
-Patch0014:      https://github.com/systemd/systemd/pull/34686.patch
-
-# Simplify user manager upgrades
-Patch0015:      https://github.com/systemd/systemd/pull/34707.patch
-
-# core/device: ignore ID_PROCESSING udev property on enumerate
-Patch0016:      https://github.com/systemd/systemd/pull/35332.patch
-
-# Soft-disable tmpfiles --purge until a good use case comes up.
-Patch0492:      0001-tmpfiles-make-purge-hard-to-mis-use.patch
-
-%endif
+# Backport of sysusers audit support for
+#  https://fedoraproject.org/wiki/Changes/RPMSuportForSystemdSysusers.
+Patch:          0001-update-utmp-do-not-give-up-if-the-first-attempt-at-c.patch
+Patch:          0002-sysusers-emit-audit-events-for-user-and-group-creati.patch
 
 # Those are downstream-only patches, but we don't want them in packit builds:
 # https://bugzilla.redhat.com/show_bug.cgi?id=2251843
-Patch0491:      https://github.com/systemd/systemd/pull/30846.patch
+Patch:          https://github.com/systemd/systemd/pull/30846.patch
+
+# Backport various fmf fixes to allow running the integration tests in Fedora CI.
+Patch:          https://github.com/systemd/systemd/pull/35938.patch
+%endif
 
 # Meta specific backports (900-1000)
 
@@ -142,34 +133,16 @@ Patch0491:      https://github.com/systemd/systemd/pull/30846.patch
 
 %if %{without upstream}
 
-# network: Make qdisc reconfigurable
-Patch0900:      https://github.com/systemd/systemd/pull/34543.patch
-
-# network: Add support for multiq qdisc
-Patch0901:      https://github.com/systemd/systemd/pull/34251.patch
-
-# core: Add support for PrivateUsers=identity
-Patch0902:      https://github.com/systemd/systemd/pull/34400.patch
-
-# bus-util: Return ENOMEDIUM if XDG_RUNTIME_DIR is unset
-Patch0903:      https://github.com/systemd/systemd/pull/34851.patch
-
 # pam_systemd: Make pam_systemd 256 backwards compatible to logind 255
-Patch0904: 0001-pam_systemd-Make-pam_systemd-256-backwards-compatibl.patch
+Patch: 0001-pam_systemd-Make-pam_systemd-256-backwards-compatibl.patch
 
-# networkctl: Make networkctl lldp output backwards compatible with 255
-Patch0905: 0001-networkctl-Make-networkctl-lldp-output-backwards-com.patch
-
-# networkctl: Make lldp/status backwards compatible with 255 over dbus
-Patch0906: 0001-networkctl-Make-lldp-status-backwards-compatible-wit.patch
-
-# Revert "network/lldp: do not save LLDP neighbors under /run/systemd"
-Patch0907: 0001-Revert-network-lldp-do-not-save-LLDP-neighbors-under.patch
+# Revert breaking changes to unstable systemd-networkd lldp interface
+Patch: https://github.com/systemd/systemd/pull/36050.patch
 
 %endif
 
 # bump networkd netlink timeout to infinity
-Patch0908: FB_only_bump_netlink_timeout_to_infinity.patch
+Patch: FB_only_bump_netlink_timeout_to_infinity.patch
 
 # Meta specific patches for builds from git main (1001-1100)
 # TODO: These should be removed once they are either merged into git main
@@ -177,10 +150,9 @@ Patch0908: FB_only_bump_netlink_timeout_to_infinity.patch
 %if %{with upstream}
 
 # Temporary workaround: PrivateUsers=full implies DelegateNamespaces=yes
-Patch1003: 0001-Temporary-workaround-PrivateUsers-full-implies-Deleg.patch
+Patch: 0001-Temporary-workaround-PrivateUsers-full-implies-Deleg.patch
 
 %endif
-
 %endif
 
 %ifarch %{ix86} x86_64 aarch64 riscv64
@@ -228,7 +200,7 @@ BuildRequires:  libcurl-devel
 BuildRequires:  kmod-devel
 BuildRequires:  elfutils-devel
 BuildRequires:  openssl-devel
-%if 0%{?fedora} >= 41 || 0%{?rhel} >= 11
+%if 0%{?fedora} >= 41
 BuildRequires:  openssl-devel-engine
 %endif
 %if %{with gnutls}
@@ -264,7 +236,6 @@ BuildRequires:  python3dist(lxml)
 BuildRequires:  python3dist(pefile)
 %if 0%{?fedora}
 BuildRequires:  python3dist(pillow)
-BuildRequires:  python3dist(pytest-flakes)
 %endif
 BuildRequires:  python3dist(pytest)
 %if 0%{?want_bootloader}
@@ -296,6 +267,10 @@ BuildRequires:  kernel-devel
 # That package is only built for those two architectures
 BuildRequires:  xen-devel
 %endif
+%endif
+
+%if %{with obs}
+BuildRequires:  pesign-obs-integration
 %endif
 
 Requires(post): coreutils
@@ -573,6 +548,7 @@ with a command line, and possibly PCR measurements and other metadata, into a
 Unified Kernel Image (UKI).
 
 %if 0%{?want_bootloader}
+%if %{without obs}
 %package boot-unsigned
 Summary: UEFI boot manager (unsigned version)
 
@@ -593,6 +569,27 @@ line. systemd-boot supports systems with UEFI firmware only.
 
 This package contains the unsigned version. Install systemd-boot instead to get
 the version that works with Secure Boot.
+%else
+%package boot
+Summary: UEFI boot manager (signed version)
+
+Provides: systemd-boot-signed-%{efi_arch} = %version-%release
+Provides: systemd-boot = %version-%release
+Provides: systemd-boot%{_isa} = %version-%release
+# A provides with just the version, no release or dist, used to build systemd-boot
+Provides: version(systemd-boot-signed) = %version
+Provides: version(systemd-boot-signed)%{_isa} = %version
+
+# self-obsoletes to install both packages after split of systemd-boot
+Obsoletes:      systemd-udev < 252.2^
+
+%description boot
+systemd-boot (short: sd-boot) is a simple UEFI boot manager. It provides a
+graphical menu to select the entry to boot and an editor for the kernel command
+line. systemd-boot supports systems with UEFI firmware only.
+
+This package contains the signed version.
+%endif
 %endif
 
 %package container
@@ -602,7 +599,13 @@ Requires:       %{name}%{_isa} = %{version}-%{release}
 Requires(post):   systemd%{_isa} = %{version}-%{release}
 Requires(preun):  systemd%{_isa} = %{version}-%{release}
 Requires(postun): systemd%{_isa} = %{version}-%{release}
-# obsolete parent package so that dnf will install new subpackage on upgrade (#1260394)
+# For systemd-vmspawn which uses qemu:
+Recommends:     qemu-kvm-core
+%if 0%{?fedora}
+Recommends:     qemu-device-display-virtio-gpu
+Recommends:     qemu-device-display-virtio-vga
+%endif
+# Obsolete parent package so that dnf will install new subpackage on upgrade (#1260394)
 Obsoletes:      %{name} < 229-5
 # Bias the system towards libcurl-minimal if nothing pulls in full libcurl (#1997040)
 Suggests:       libcurl-minimal
@@ -743,25 +746,6 @@ library or other libraries from systemd-libs. This package conflicts with the
 main systemd package and is meant for use in exitrds.
 
 %prep
-%if 0%{?facebook} && %{with upstream}
-# For systemd-cd (https://gitlab.com/CentOS/Hyperscale/releng/systemd-releng) builds,
-# we want to allow certain patches to accelerate internal projects.
-
-# Call autosetup but disable patch management, we'll do that with autopatch below
-%if %{defined branch}
-%autosetup -N -n %{name}-%{branch}
-%elif %{defined commit}
-%autosetup -N -n %{name}-%{commit}
-%else
-%autosetup -N -n %{name}-%{version_no_tilde}
-%endif
-
-# Now only install only patches in the specific Meta-only range
-%autopatch -m 1001 -M 1100 -p1
-
-%else
-
-# Use standard autosetup with automatic patch management
 %if %{defined branch}
 %autosetup -n %{name}-%{branch} -p1
 %elif %{defined commit}
@@ -770,7 +754,9 @@ main systemd package and is meant for use in exitrds.
 %autosetup -n %{name}-%{version_no_tilde} -p1
 %endif
 
-%endif
+# Disable user lockdown until rpm implements it natively.
+# https://github.com/rpm-software-management/rpm/issues/3450
+sed -r -i 's/^u!/u/' sysusers.d/*.conf*
 
 %build
 %global ntpvendor %(source /etc/os-release; echo ${ID})
@@ -799,7 +785,8 @@ VMLINUX_H_PATH=$(%python3 -c '%find_vmlinux_h')
 %endif
 
 CONFIGURE_OPTS=(
-        -Dmode=%[%{with upstream}?"developer":"release"]
+        -Dmode=release
+        -Dslow-tests=true
         -Dsysvinit-path=/etc/rc.d/init.d
         -Drc-local=/etc/rc.d/rc.local
         -Dntp-servers='0.%{ntpvendor}.pool.ntp.org 1.%{ntpvendor}.pool.ntp.org 2.%{ntpvendor}.pool.ntp.org 3.%{ntpvendor}.pool.ntp.org'
@@ -910,6 +897,11 @@ CONFIGURE_OPTS=(
         # considering that that support is untested, let's not do this now.
         -Dbootloader=%[%{?want_bootloader}?"enabled":"disabled"]
         -Dukify=enabled
+%if 0%{?want_bootloader} && %{with obs}
+        -Dsbat-distro-url=https://github.com/systemd/systemd
+        -Dsbat-distro=upstream
+        -Dsbat-distro-summary='Upstream build from git'
+%endif
 )
 
 %if 0%{?facebook}
@@ -1050,7 +1042,7 @@ install -Dm0644 -t %{buildroot}%{_pkgdocdir}/ %{SOURCE10}
 # https://bugzilla.redhat.com/show_bug.cgi?id=1378974
 install -Dm0644 -t %{buildroot}%{system_unit_dir}/systemd-udev-trigger.service.d/ %{SOURCE11}
 
-install -Dm0644 -t %{buildroot}%{_prefix}/lib/systemd/ %{SOURCE13}
+install -Dm0644 %{SOURCE13} %{buildroot}%{_prefix}/lib/systemd/.abignore
 
 # systemd-oomd default configuration
 install -Dm0644 -t %{buildroot}%{_prefix}/lib/systemd/oomd.conf.d/ %{SOURCE14}
@@ -1098,9 +1090,13 @@ mv -v %{buildroot}/usr/sbin/* %{buildroot}%{_bindir}/
 %endif
 
 %if 0%{?fedora} >= 41
+%if %{without upstream}
 # This requires https://pagure.io/setup/pull-request/50
 # and https://src.fedoraproject.org/rpms/setup/pull-request/10.
+# We skip this on upstream builds so that new users and groups
+# can be added without breaking the build.
 %{python3} %{SOURCE4} /usr/lib/sysusers.d/20-setup-{users,groups}.conf %{buildroot}/usr/lib/sysusers.d/basic.conf
+%endif
 rm %{buildroot}/usr/lib/sysusers.d/basic.conf
 %endif
 
@@ -1113,10 +1109,24 @@ mv %{buildroot}/usr/lib/tmpfiles.d/20-systemd-userdb.conf{,.example}
 
 install -m 0644 -t %{buildroot}%{_prefix}/lib/pam.d/ %{SOURCE26}
 
+# Disable freezing of user sessions while we're working out the details.
+mkdir -p %{buildroot}/usr/lib/systemd/system/service.d/
+cat >>%{buildroot}/usr/lib/systemd/system/service.d/50-keep-warm.conf <<EOF
+# Disable freezing of user sessions to work around kernel bugs.
+# See https://bugzilla.redhat.com/show_bug.cgi?id=2321268
+[Service]
+Environment=SYSTEMD_SLEEP_FREEZE_USER_SESSIONS=0
+EOF
+
 %find_lang %{name}
 
 # Split files in build root into rpms
 python3 %{SOURCE2} %buildroot %{!?want_bootloader:--no-bootloader}
+
+# Stage sd-boot binaries for signing
+%if %{with obs} && 0%{?want_bootloader}
+BRP_PESIGN_FILES=/usr/lib/systemd/boot/efi/systemd-boot%{efi_arch}.efi BRP_PESIGN_PACKAGES=systemd-boot /usr/lib/rpm/brp-suse.d/brp-99-pesign
+%endif
 
 %check
 %if %{with tests}
@@ -1134,6 +1144,7 @@ meson test -C %{_vpath_builddir} -t 6 --print-errorlogs
 %global systemd_posttrans_with_restart() \
 %{expand:%%{?__systemd_someargs_%#:%%__systemd_someargs_%# systemd_posttrans_with_restart}} \
 if [ -x "/usr/lib/systemd/systemd-update-helper" ]; then \
+    # Package upgrade, not install \
     /usr/lib/systemd/systemd-update-helper mark-restart-system-units %* || : \
 fi \
 %{nil}
@@ -1181,6 +1192,7 @@ restarting_services="$restarting_services systemd-logind.service"
 # This is the expanded form of %%systemd_user_daemon_reexec. We
 # can't use the macro because we define it ourselves.
 if [ -x "/usr/lib/systemd/systemd-update-helper" ]; then
+    # Package upgrade, not uninstall
     /usr/lib/systemd/systemd-update-helper user-reexec || :
 fi
 
@@ -1216,7 +1228,7 @@ if [ -f %{_localstatedir}/lib/systemd/clock ]; then
     mv %{_localstatedir}/lib/systemd/clock %{_localstatedir}/lib/systemd/timesync/.
 fi
 
-udevadm hwdb --update &>/dev/null
+systemd-hwdb update &>/dev/null
 
 %systemd_post %udev_services
 
@@ -1296,10 +1308,8 @@ fi
 %systemd_post systemd-resolved.service
 
 %preun resolved
+%systemd_preun systemd-resolved.service
 if [ $1 -eq 0 ] ; then
-        systemctl disable --quiet \
-                systemd-resolved.service \
-                >/dev/null || :
         if [ -L /etc/resolv.conf ] && \
             realpath /etc/resolv.conf | grep ^/run/systemd/resolve/; then
                 rm -f /etc/resolv.conf # no longer useful
@@ -1386,7 +1396,11 @@ fi
 
 %files ukify -f .file-list-ukify
 %if 0%{?want_bootloader}
+%if %{without obs}
 %files boot-unsigned -f .file-list-boot
+%else
+%files boot -f .file-list-boot
+%endif
 %endif
 
 %files container -f .file-list-container
