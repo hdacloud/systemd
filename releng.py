@@ -13,6 +13,7 @@ import textwrap
 import tempfile
 import os
 import re
+import shutil
 
 SYSTEMD_REPO = "https://github.com/systemd/systemd"
 AUTHOR = "CentOS Hyperscale SIG <centos-devel@centos.org>"
@@ -64,15 +65,6 @@ def die(message: str) -> NoReturn:
 
 
 @contextlib.contextmanager
-def restore(path: Path) -> Iterator[None]:
-    old = path.read_text()
-    try:
-        yield
-    finally:
-        path.write_text(old)
-
-
-@contextlib.contextmanager
 def chdir(directory: Path) -> Iterator[None]:
     old = Path.cwd()
 
@@ -87,21 +79,22 @@ def chdir(directory: Path) -> Iterator[None]:
         os.chdir(old)
 
 
-def do_cd(args: argparse.Namespace) -> None:
-    if not Path(".git").exists():
-        die("The cd verb must be run from the rpm git repository")
+def do_cd(git_dir: Path, args: argparse.Namespace) -> None:
+    systemd_spec = Path.cwd() / "systemd.spec"
+    logging.info(f"Copying systemd.spec to {systemd_spec}")
+    shutil.copyfile(git_dir / "systemd.spec", systemd_spec)
 
     logging.info("Downloading sources")
     run(
         [
             "spectool",
             "--define",
-            f"_sourcedir {Path.cwd()}",
+            f"_sourcedir {git_dir}",
             "--define",
             "branch main",
             "--get-files",
-            "systemd.spec",
-        ],
+            f"{systemd_spec}",
+        ] + (["--debug"] if need_verbose() else []),
     )
 
     # We can't determine the version dynamically in the spec so we retrieve it
@@ -121,43 +114,44 @@ def do_cd(args: argparse.Namespace) -> None:
     # The timestamp is to ensure the release is always monotonically increasing
     rpmrelease = datetime.now().strftime(r"%Y%m%d%H%M%S")
 
-    with restore(Path("systemd.spec")):
-        Path("systemd.spec").write_text(
-            textwrap.dedent(
-                f"""\
-                %bcond upstream 1
-                %define version_override {version}
-                %define release_override {rpmrelease}
-                %define branch main
-                """
-            )
-            + Path("systemd.spec").read_text()
+    logging.info("Modifing systemd.spec")
+    systemd_spec.write_text(
+        textwrap.dedent(
+            f"""\
+            %bcond upstream 1
+            %define version_override {version}
+            %define release_override {rpmrelease}
+            %define branch main
+            """
         )
+        + systemd_spec.read_text()
+    )
 
-        if args.repo == "main":
-            root = f"centos-stream-hyperscale-{args.release}-x86_64"
-        else:
-            root = f"centos-stream-hyperscale-{args.repo}-{args.release}-x86_64"
+    if args.repo == "main":
+        root = f"centos-stream-hyperscale-{args.release}-x86_64"
+    else:
+        root = f"centos-stream-hyperscale-{args.repo}-{args.release}-x86_64"
 
-        logging.info("Building src.rpm")
-        run(
-            [
-                "mock",
-                "--root",
-                root,
-                "--sources=.",
-                "--spec=systemd.spec",
-                "--enable-network",
-                "--define",
-                "%_disable_source_fetch 0",
-                "--buildsrpm",
-                "--resultdir=.",
-            ],
-        )
+    logging.info("Building src.rpm")
+    run(
+        [
+            "mock",
+            "--root",
+            root,
+            f"--sources={git_dir}",
+            "--spec=systemd.spec",
+            "--enable-network",
+            "--define",
+            "%_disable_source_fetch 0",
+            "--buildsrpm",
+            "--resultdir=.",
+        ] + (["--quiet"] if not need_verbose() else []),
+    )
 
     srcrpm = next(Path.cwd().glob("*.src.rpm"))
     logging.info(f"Wrote: {srcrpm}")
 
+    logging.info("Triggering CBS build")
     run(
         [
             "cbs",
@@ -199,7 +193,7 @@ def get_mkosi_version(file: Path) -> str:
     return None
 
 
-def do_test(args: argparse.Namespace) -> None:
+def do_test(git_dir: Path, args: argparse.Namespace) -> None:
     if not args.task_id:
         die("Can't run tests without CBS build id")
 
@@ -378,17 +372,21 @@ class Verb(enum.Enum):
         return self.value
 
     def run(self, args: argparse.Namespace) -> None:
+        if not Path(".git").exists():
+            die("The cd verb must be run from the rpm git repository")
+
         func = {
             Verb.cd: do_cd,
             Verb.test: do_test,
         }[self]
 
-        with tempfile.TemporaryDirectory(dir='.', prefix='systemd-releng-test-', delete=args.cleanup) as workdir:
+        git_dir = Path.cwd()
+        with tempfile.TemporaryDirectory(dir='.', prefix='systemd-releng-', delete=args.cleanup) as workdir:
             logging.info(f"Created temporary directory {workdir}, will use it for all further work.")
             if not args.cleanup:
                 logging.info("The temporary directory will not be removed at the end!")
             with chdir(Path(workdir)):
-                return func(args)
+                return func(git_dir, args)
 
 
 def main() -> None:
