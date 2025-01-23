@@ -90,54 +90,71 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
             "spectool",
             "--define",
             f"_sourcedir {git_dir}",
-            "--define",
-            "branch main",
             "--get-files",
             f"{systemd_spec}",
-        ] + (["--debug"] if need_verbose() else []),
+        ] + (["--define", "branch main"] if args.head else []) +
+            (["--debug"] if need_verbose() else []),
     )
 
-    # We can't determine the version dynamically in the spec so we retrieve it
-    # up front and pass it in via a macro.
-    version = run(
-        [
-            "tar",
-            "--gunzip",
-            "--extract",
-            "--to-stdout",
-            "--file=main.tar.gz",
-            "systemd-main/meson.version",
-        ],
-        stdout=subprocess.PIPE,
-    ).stdout.strip()
+    if args.head:
+        # we're building upstream HEAD.
+        # Hence going to ignore all version/release/etc in the spec file.
 
-    # The timestamp is to ensure the release is always monotonically increasing
-    rpmrelease = datetime.now().strftime(r"%Y%m%d%H%M%S")
+        tarball_pattern = "*.tar.gz"
+        tarballs = list(Path.cwd().glob(tarball_pattern))
+        if len(tarballs) != 1:
+            die("Found no or more than one tarball with glob {tarball_pattern}")
 
-    logging.info("Modifing systemd.spec")
-    systemd_spec.write_text(
-        textwrap.dedent(
-            f"""\
-            %bcond upstream 1
-            %define version_override {version}
-            %define release_override {rpmrelease}
-            %define branch main
-            """
+        tarball = tarballs[0]
+        logging.info(f"Found tarball {tarball}")
+
+        if tarball.name == "main.tar.gz":
+            tarball_internal_dir = "systemd-main"
+        elif tarball.match("systemd-*.tar.gz"):
+            tarball_internal_dir = tarball.name.removesuffix(".tar.gz")
+        else:
+            die(f"Tarball {tarball} has unknown prefix")
+
+        # We can't determine the version dynamically in the spec so we retrieve it
+        # up front and pass it in via a macro.
+        version = run(
+            [
+                "tar",
+                "--gunzip",
+                "--extract",
+                "--to-stdout",
+                f"--file={tarball}",
+                f"{tarball_internal_dir}/meson.version",
+            ],
+            stdout=subprocess.PIPE,
+        ).stdout.strip()
+
+        # The timestamp is to ensure the release is always monotonically increasing
+        release = datetime.now().strftime(r"%Y%m%d%H%M%S")
+
+        logging.info(f"Modifing systemd.spec with version={version} release={release}")
+        systemd_spec.write_text(
+            textwrap.dedent(
+                f"""\
+                %bcond upstream 1
+                %define version_override {version}
+                %define release_override {release}
+                %define branch main
+                """
+            )
+            + systemd_spec.read_text()
         )
-        + systemd_spec.read_text()
-    )
 
     if args.repo == "main":
         root = f"centos-stream-hyperscale-{args.release}-x86_64"
     else:
         root = f"centos-stream-hyperscale-{args.repo}-{args.release}-x86_64"
 
-    logging.info("Building src.rpm")
+    logging.info("Building systemd src.rpm")
     run(
         [
             "mock",
-            "--root",
-            root,
+            f"--root={root}",
             f"--sources={git_dir}",
             "--spec=systemd.spec",
             "--enable-network",
@@ -162,7 +179,7 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
             "--skip-tag",
             f"hyperscale{args.release}s-packages-{args.repo}-el{args.release}s",
             str(srcrpm),
-        ],
+        ] + (["--scratch"] if not args.publish else []),
     )
 
     if not args.publish:
