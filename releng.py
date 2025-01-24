@@ -79,7 +79,7 @@ def chdir(directory: Path) -> Iterator[None]:
         os.chdir(old)
 
 
-def do_cd(git_dir: Path, args: argparse.Namespace) -> None:
+def do_build(git_dir: Path, args: argparse.Namespace) -> None:
     systemd_spec = Path.cwd() / "systemd.spec"
     logging.info(f"Copying systemd.spec to {systemd_spec}")
     shutil.copyfile(git_dir / "systemd.spec", systemd_spec)
@@ -364,7 +364,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
 
 
 class Verb(enum.Enum):
-    cd = "cd"  # will be renamed to build
+    build = "build"
     test = "test"
     # publish = "publish" # perhaps should be a separate step, but we will see
 
@@ -373,10 +373,10 @@ class Verb(enum.Enum):
 
     def run(self, args: argparse.Namespace) -> None:
         if not Path(".git").exists():
-            die("The cd verb must be run from the rpm git repository")
+            die("The verb must be run from the rpm git repository")
 
         func = {
-            Verb.cd: do_cd,
+            Verb.build: do_build,
             Verb.test: do_test,
         }[self]
 
