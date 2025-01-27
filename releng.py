@@ -78,6 +78,18 @@ def chdir(directory: Path) -> Iterator[None]:
     finally:
         os.chdir(old)
 
+
+def get_build_root(args: argparse.Namespace) -> str:
+    if args.repo == "main":
+        return f"centos-stream-hyperscale-{args.release}-{os.uname().machine}"
+    else:
+        return f"centos-stream-hyperscale-{args.repo}-{args.release}-{os.uname().machine}"
+
+
+def get_build_target(args: argparse.Namespace) -> str:
+    return f"hyperscale{args.release}s-packages-{args.repo}-el{args.release}s"
+
+
 def get_build_tag(args: argparse.Namespace) -> str:
     return f"hyperscale{args.release}s-packages-{args.repo}-{'testing' if args.testing else 'release'}"
 
@@ -148,16 +160,11 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
             + systemd_spec.read_text()
         )
 
-    if args.repo == "main":
-        root = f"centos-stream-hyperscale-{args.release}-x86_64"
-    else:
-        root = f"centos-stream-hyperscale-{args.repo}-{args.release}-x86_64"
-
     logging.info("Building systemd src.rpm")
     run(
         [
             "mock",
-            f"--root={root}",
+            "--root=" + get_build_root(args),
             f"--sources={git_dir}",
             "--spec=systemd.spec",
             "--enable-network",
@@ -180,7 +187,7 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
             "--wait",
             "--fail-fast",
             "--skip-tag",
-            f"hyperscale{args.release}s-packages-{args.repo}-el{args.release}s",
+            get_build_target(args),
             str(srcrpm),
         ] + (["--scratch"] if args.testing else []),
     )
