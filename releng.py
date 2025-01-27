@@ -47,12 +47,25 @@ def need_verbose():
     return logging.getLogger().level == logging.DEBUG
 
 
-def run(cmd: Sequence[str], dry_run: bool = False, *args: Any, **kwargs: Any) -> subprocess.CompletedProcess:
+def popen(cmd: Sequence[str], dry_run: bool = False, *args: Any, **kwargs: Any) -> subprocess.Popen:
     if dry_run:
-        logging.info(f"DRY RUN: {cmd}")
+        logging.info(f"DRY RUN: {" ".join(str(s) for s in cmd)}")
         return
 
     try:
+        logging.info(f"RUN: {" ".join(str(s) for s in cmd)}")
+        return subprocess.Popen(cmd, *args, **kwargs, text=True)
+    except FileNotFoundError:
+        die(f"{cmd[0]} not found in PATH.")
+
+
+def run(cmd: Sequence[str], dry_run: bool = False, *args: Any, **kwargs: Any) -> subprocess.CompletedProcess:
+    if dry_run:
+        logging.info(f"DRY RUN: {" ".join(str(s) for s in cmd)}")
+        return
+
+    try:
+        logging.info(f"RUN: {" ".join(str(s) for s in cmd)}")
         return subprocess.run(cmd, *args, **kwargs, check=True, text=True)
     except FileNotFoundError:
         die(f"{cmd[0]} not found in PATH.")
@@ -182,8 +195,9 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
     srcrpm = next(Path.cwd().glob("*.src.rpm"))
     logging.info(f"Wrote: {srcrpm}")
 
-    logging.info("Triggering CBS build")
-    run(
+    build_target = get_build_target(args)
+    logging.info(f"Triggering CBS build for {build_target}")
+    process = popen(
         [
             "cbs",
             *(["--cert", args.cert] if args.cert else []),
@@ -191,11 +205,44 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
             "--wait",
             "--fail-fast",
             "--skip-tag",
-            get_build_target(args),
+            build_target,
             str(srcrpm),
         ] + (["--scratch"] if args.testing else []),
+        stdout=subprocess.PIPE,
+        universal_newlines=True,
         dry_run=args.dry_run,
     )
+
+    if args.dry_run:
+        return
+
+    task_id = None
+    for line in iter(process.stdout.readline, ''):
+        if not task_id and line.startswith("Created task:"):
+            task_id = line.removeprefix("Created task:").strip()
+        print(line, end='', flush=True)  # explicetly not using logging.*
+
+    process.wait()
+    if process.returncode != 0:
+        die(f"CBS build returned non-zero exit code {process.returncode}")
+
+    if not task_id:
+        die("CBS completed but failed to found task id in CBS's output")
+
+    logging.info(f"All done. Task ID: {task_id}")
+    logging.info("")
+    logging.info(f"$ ./releng.py test --repo={args.repo} --release={args.release} --task-id={task_id}")
+    logging.info(f"$ ./releng.py publish --repo={args.repo} --release={args.release} {'--testing' if args.testing else '--no-testing'} --task-id={task_id}")
+
+    # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
+    if os.environ.get("GITLAB_CI"):
+        artifacts_dir = git_dir / "artifacts"
+        artifacts_dir.mkdir(exist_ok=True)
+
+        task_id_file = artifacts_dir / f"{build_target}{'-head' if args.head else ''}-task-id.txt"
+        logging.info("")
+        logging.info(f"Dumping task id to {task_id_file}")
+        task_id_file.write_text(task_id)
 
 
 def do_publish(git_dir: Path, args: argparse.Namespace) -> None:
