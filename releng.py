@@ -78,6 +78,9 @@ def chdir(directory: Path) -> Iterator[None]:
     finally:
         os.chdir(old)
 
+def get_build_tag(args: argparse.Namespace) -> str:
+    return f"hyperscale{args.release}s-packages-{args.repo}-{'testing' if args.testing else 'release'}"
+
 
 def do_build(git_dir: Path, args: argparse.Namespace) -> None:
     systemd_spec = Path.cwd() / "systemd.spec"
@@ -179,23 +182,39 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
             "--skip-tag",
             f"hyperscale{args.release}s-packages-{args.repo}-el{args.release}s",
             str(srcrpm),
-        ] + (["--scratch"] if not args.publish else []),
+        ] + (["--scratch"] if args.testing else []),
     )
 
-    if not args.publish:
-        logging.info("Publishing not requested, not tagging builds in testing")
-        return
 
+def do_publish(git_dir: Path, args: argparse.Namespace) -> None:
+    if not args.task_id:
+        die("Can't run tests without CBS build id")
+
+    logging.info("Downloading source RPM")
+    download_rpms(args.task_id, "src")
+
+    # it's important to search using args.repo/args.release because
+    # otherwise task can be from difference environment
     prefix = "hs+fb" if args.repo == "facebook" else "hs"
+    srcrpm_pattern = f"systemd-*-*.{prefix}.el{args.release}.src.rpm"
+    srcrpms = list(Path.cwd().glob(srcrpm_pattern))
+    if len(srcrpms) != 1:
+        die(f"Found no or more than one systemd source RPM ({srcrpm_pattern})")
+
+    srcrpm = srcrpms[0]
+    logging.info(f"Found source RPM {srcrpm}")
+
+    tag = get_build_tag(args)
+    package = srcrpm.name.removesuffix(".src.rpm")
+    logging.info(f"Tag package {package} with '{tag}' tag")
 
     run(
         [
             "cbs",
-            *(["--cert", args.cert] if args.cert else []),
             "tag-build",
-            f"hyperscale{args.release}s-packages-{args.repo}-testing",
-            f"systemd-{version}-{rpmrelease}.{prefix}.el{args.release}",
-        ]
+            tag,
+            package,
+        ],
     )
 
 
@@ -383,7 +402,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
 class Verb(enum.Enum):
     build = "build"
     test = "test"
-    # publish = "publish" # perhaps should be a separate step, but we will see
+    publish = "publish"
 
     def __str__(self) -> str:
         return self.value
@@ -395,6 +414,7 @@ class Verb(enum.Enum):
         func = {
             Verb.build: do_build,
             Verb.test: do_test,
+            Verb.publish: do_publish,
         }[self]
 
         git_dir = Path.cwd()
@@ -414,6 +434,12 @@ def main() -> None:
 
     parser = argparse.ArgumentParser()
 
+    parser.add_argument(
+        "--head",
+        help="Do build using upstream HEAD. Otherwise use version in spec file",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
     parser.add_argument(
         "--release",
         help="CentOS Stream release to use (e.g 9)",
@@ -436,9 +462,10 @@ def main() -> None:
         default=None,
     )
     parser.add_argument(
-        "--publish",
-        action="store_true",
-        help="Publish results of operation (by default only a dry-run is done)",
+        "--testing",
+        help="build cmd: do non-scratch build; publish cmd: publish to 'release' repo, otherwise 'testing' repo",
+        action=argparse.BooleanOptionalAction,
+        default=True,
     )
     parser.add_argument(
         "--task-id",
