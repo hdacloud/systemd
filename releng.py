@@ -47,7 +47,11 @@ def need_verbose():
     return logging.getLogger().level == logging.DEBUG
 
 
-def run(cmd: Sequence[str], *args: Any, **kwargs: Any) -> subprocess.CompletedProcess:
+def run(cmd: Sequence[str], dry_run: bool = False, *args: Any, **kwargs: Any) -> subprocess.CompletedProcess:
+    if dry_run:
+        logging.info(f"DRY RUN: {cmd}")
+        return
+
     try:
         return subprocess.run(cmd, *args, **kwargs, check=True, text=True)
     except FileNotFoundError:
@@ -190,6 +194,7 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
             get_build_target(args),
             str(srcrpm),
         ] + (["--scratch"] if args.testing else []),
+        dry_run=args.dry_run,
     )
 
 
@@ -222,6 +227,7 @@ def do_publish(git_dir: Path, args: argparse.Namespace) -> None:
             tag,
             package,
         ],
+        dry_run=args.dry_run,
     )
 
 
@@ -365,9 +371,11 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
 
     try:
         with chdir(systemd_dir):
-            run(["mkosi", "genkey"])
-            run(["mkosi", "-f", "sandbox", "--", "meson", "setup", "--buildtype=debugoptimized", "-Dintegration-tests=true", "build"])
-            run(["mkosi", "-f", "sandbox", "--", "meson", "compile", "-C", "build", "mkosi"])
+            run(["mkosi", "genkey"], dry_run=args.dry_run)
+            run(["mkosi", "-f", "sandbox", "--", "meson", "setup", "--buildtype=debugoptimized", "-Dintegration-tests=true", "build"],
+                dry_run=args.dry_run)
+            run(["mkosi", "-f", "sandbox", "--", "meson", "compile", "-C", "build", "mkosi"],
+                dry_run=args.dry_run)
             run(
                 [
                     "mkosi",
@@ -385,6 +393,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
                     "--no-stdsplit",
                 ],
                 env=os.environ | mkosi_test_env,
+                dry_run=args.dry_run,
             )
     finally:
         # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
@@ -484,6 +493,11 @@ def main() -> None:
         help="Clean up temporary files and directories after a run",
         action=argparse.BooleanOptionalAction,
         default=True,
+    )
+    parser.add_argument(
+        "--dry-run",
+        help="Activate dry run",
+        action="store_true",
     )
     parser.add_argument(
         "--log-level",
