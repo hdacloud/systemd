@@ -1,17 +1,72 @@
-# Test locally on Fedora by doing the following:
-# - Install gitlab-runner from https://docs.gitlab.com/runner/install/linux-manually.html#using-binary-file
-# - sudo dnf install podman
-# - systemctl enable --now --user podman.socket
-# - sudo ln -s /run/user/$(id -u)/podman/podman.sock /var/run/docker.sock
-# - gitlab-runner exec docker systemd-cd --env CENTOS_CERT=/root/.centos.cert --docker-volumes "$HOME/.centos.cert:/root/.centos.cert"
-systemd-cd:
-  stage: build
-  image: quay.io/fedora/fedora:latest
-  script:
-    - env # Show variables that were passed to the job
-    - dnf install -y tar git-core python3 centos-packager mock mock-centos-sig-configs
-    - ./releng.py cd --cert $CENTOS_CERT --repo $REPO --release $RELEASE $PUBLISH
+variables:
+  HEAD:
+    description: "Do build using upstream HEAD. Otherwise use version from systemd.spec"
+    options: ["head", "no-head"]
+    value: "no-head"
+  TESTING:
+    description: "If 'testing', it does scratch build in tests stage and publishes to testing repo in publish stage"
+    options: ["testing", "no-testing"]
+    value: "testing"
+  PUBLISH:
+    description: "Publish result"
+    options: ["true", "false"]
+    value: "false"
+
+stages:
+  - setup
+
+.matrix2:
   parallel:
     matrix:
       - REPO: [main, facebook]
         RELEASE: [9, 10]
+
+.matrix3:
+  parallel:
+    matrix:
+      - REPO: [main, facebook]
+        RELEASE: [9, 10]
+        HEAD: [ 'head', 'no-head' ]
+
+# setup for merge request
+mr:
+  stage: setup
+  variables:
+    TESTING: "testing"
+    DO_TEST: "true"
+    DO_PUBLISH: "false"
+  trigger:
+    include: .gitlab-child-ci.yml
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+  extends: .matrix3
+
+# setup for nightly builds
+ni:
+  stage: setup
+  variables:
+    HEAD: "head"
+    TESTING: "testing"
+    DO_TEST: "false"
+    DO_PUBLISH: "true"
+  trigger:
+    include: .gitlab-child-ci.yml
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'schedule'
+  extends: .matrix2
+
+# setup for manual run
+mn:
+  stage: setup
+  variables:
+    # HEAD and TESTING passed from global vars
+    DO_TEST: "true"
+    DO_PUBLISH: $PUBLISH
+  trigger:
+    include: .gitlab-child-ci.yml
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'web'
+  extends: .matrix2
