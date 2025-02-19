@@ -471,8 +471,9 @@ class Verb(enum.Enum):
         return self.value
 
     def run(self, args: argparse.Namespace) -> None:
-        if not Path(".git").exists():
-            die("The verb must be run from the rpm git repository")
+        if not Path(".gitlab-ci.yml").exists():
+            # testing-fram clones repo without .git
+          die("The verb must be run from the rpm git repository")
 
         func = {
             Verb.build: do_build,
