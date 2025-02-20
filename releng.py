@@ -112,6 +112,8 @@ def get_build_tag(args: argparse.Namespace) -> str:
 
 
 def do_build(git_dir: Path, args: argparse.Namespace) -> None:
+    logging.info(f"BUILD: repo={args.repo} release={args.release} head={args.head} testing={args.testing}")
+
     systemd_spec = Path.cwd() / "systemd.spec"
     logging.info(f"Copying systemd.spec to {systemd_spec}")
     shutil.copyfile(git_dir / "systemd.spec", systemd_spec)
@@ -249,6 +251,8 @@ def do_publish(git_dir: Path, args: argparse.Namespace) -> None:
     if not args.task_id:
         die("Can't run tests without CBS build id")
 
+    logging.info(f"PUBLISH: repo={args.repo} release={args.release} testing={args.testing} task_id={args.task_id}")
+
     logging.info("Downloading source RPM")
     download_rpms(args.task_id, "src")
 
@@ -292,6 +296,8 @@ def get_mkosi_version(file: Path) -> str:
 def do_test(git_dir: Path, args: argparse.Namespace) -> None:
     if not args.task_id:
         die("Can't run tests without CBS build id")
+
+    logging.info(f"PUBLISH: repo={args.repo} release={args.release} task_id={args.task_id}")
 
     cwd = Path.cwd()
 
