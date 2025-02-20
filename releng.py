@@ -356,6 +356,11 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
     os.environ["PATH"] = f"{mkosi_dir / 'bin'}:{os.environ['PATH']}"
     logging.debug(f"Updated PATH={os.environ['PATH']}")
 
+    mkosi_version = run(["mkosi", "--version"], stdout=subprocess.PIPE).stdout.strip()
+    mkosi_version_match = re.match(r"mkosi ([0-9]+)(~devel)?", mkosi_version)
+    mkosi_dash_dash = mkosi_version_match and int(mkosi_version_match.group(1)) >= 26
+    logging.debug(f"mkosi --version = {mkosi_version}. mkosi_dash_dash={mkosi_dash_dash}")
+
     logging.info("Downloading systemd RPMs")
     packages_dir = systemd_dir / "packages"
     packages_dir.mkdir(exist_ok=True)
@@ -419,16 +424,42 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
     try:
         with chdir(systemd_dir):
             run(["mkosi", "genkey"], dry_run=args.dry_run)
-            run(["mkosi", "-f", "sandbox", "--", "meson", "setup", "--buildtype=debugoptimized", "-Dintegration-tests=true", "build"],
-                dry_run=args.dry_run)
-            run(["mkosi", "-f", "sandbox", "--", "meson", "compile", "-C", "build", "mkosi"],
-                dry_run=args.dry_run)
             run(
                 [
                     "mkosi",
                     "-f",
                     "sandbox",
-                    "--",
+                ] + (["--"] if mkosi_dash_dash else []) + [
+                    "meson",
+                    "setup",
+                    "--buildtype=debugoptimized",
+                    "-Dintegration-tests=true",
+                    "build"
+                ],
+                dry_run=args.dry_run
+            )
+
+            run(
+                [
+                    "mkosi",
+                    "-f",
+                    "sandbox",
+                ] + (["--"] if mkosi_dash_dash else []) + [
+                    "meson",
+                    "compile",
+                    "-C",
+                    "build",
+                    "mkosi"
+                ],
+                dry_run=args.dry_run
+            )
+
+            run(
+                [
+                    "mkosi",
+                    "-f",
+                    "sandbox",
+                ] + (["--"] if mkosi_dash_dash else []) + [
                     "meson",
                     "test",
                     "-C",
