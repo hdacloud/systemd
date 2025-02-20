@@ -59,14 +59,14 @@ def popen(cmd: Sequence[str], dry_run: bool = False, *args: Any, **kwargs: Any) 
         die(f"{cmd[0]} not found in PATH.")
 
 
-def run(cmd: Sequence[str], dry_run: bool = False, *args: Any, **kwargs: Any) -> subprocess.CompletedProcess:
+def run(cmd: Sequence[str], dry_run: bool = False, check: bool = True, *args: Any, **kwargs: Any) -> subprocess.CompletedProcess:
     if dry_run:
         logging.info(f"DRY RUN: {" ".join(str(s) for s in cmd)}")
         return
 
     try:
         logging.info(f"RUN: {" ".join(str(s) for s in cmd)}")
-        return subprocess.run(cmd, *args, **kwargs, check=True, text=True)
+        return subprocess.run(cmd, *args, **kwargs, check=check, text=True)
     except FileNotFoundError:
         die(f"{cmd[0]} not found in PATH.")
     except subprocess.CalledProcessError as e:
