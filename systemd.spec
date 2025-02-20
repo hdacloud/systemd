@@ -49,7 +49,7 @@ Url:            https://systemd.io
 # But don't do that on OBS, otherwise the version subst fails, and will be
 # like 257-123-gabcd257.1 instead of 257-123-gabcd
 %if %{without obs}
-Version:        %{?version_override}%{!?version_override:257.2}
+Version:        %{?version_override}%{!?version_override:257.3}
 %else
 Version:        %{?version_override}%{!?version_override:%(cat meson.version)}
 %endif
@@ -122,9 +122,6 @@ Patch:          0002-sysusers-emit-audit-events-for-user-and-group-creati.patch
 # Those are downstream-only patches, but we don't want them in packit builds:
 # https://bugzilla.redhat.com/show_bug.cgi?id=2251843
 Patch:          https://github.com/systemd/systemd/pull/30846.patch
-
-# Backport various fmf fixes to allow running the integration tests in Fedora CI.
-Patch:          https://github.com/systemd/systemd/pull/35938.patch
 %endif
 
 # Meta specific backports
@@ -168,6 +165,7 @@ BuildRequires:  libcap-devel
 BuildRequires:  libmount-devel
 BuildRequires:  libfdisk-devel
 BuildRequires:  libpwquality-devel
+BuildRequires:  libxcrypt-devel
 BuildRequires:  pam-devel
 BuildRequires:  libselinux-devel
 BuildRequires:  audit-libs-devel
@@ -791,7 +789,6 @@ CONFIGURE_OPTS=(
         -Drc-local=/etc/rc.d/rc.local
         -Dntp-servers='0.%{ntpvendor}.pool.ntp.org 1.%{ntpvendor}.pool.ntp.org 2.%{ntpvendor}.pool.ntp.org 3.%{ntpvendor}.pool.ntp.org'
         -Ddns-servers=
-        -Duser-path=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin
         -Dservice-watchdog=
         -Ddev-kvm-mode=0666
         -Dkmod=enabled
