@@ -10,6 +10,10 @@ from typing import Any, NoReturn, Optional, Sequence, Iterator
 import enum
 import contextlib
 import textwrap
+import tempfile
+import os
+import re
+import shutil
 
 SYSTEMD_REPO = "https://github.com/systemd/systemd"
 AUTHOR = "CentOS Hyperscale SIG <centos-devel@centos.org>"
@@ -39,9 +43,30 @@ class LogFormatter(logging.Formatter):
         return self.formatters[record.levelno].format(record)
 
 
-def run(cmd: Sequence[str], *args: Any, **kwargs: Any) -> subprocess.CompletedProcess:
+def need_verbose():
+    return logging.getLogger().level == logging.DEBUG
+
+
+def popen(cmd: Sequence[str], dry_run: bool = False, *args: Any, **kwargs: Any) -> subprocess.Popen:
+    if dry_run:
+        logging.info(f"DRY RUN: {" ".join(str(s) for s in cmd)}")
+        return
+
     try:
-        return subprocess.run(cmd, *args, **kwargs, check=True, text=True)
+        logging.info(f"RUN: {" ".join(str(s) for s in cmd)}")
+        return subprocess.Popen(cmd, *args, **kwargs, text=True)
+    except FileNotFoundError:
+        die(f"{cmd[0]} not found in PATH.")
+
+
+def run(cmd: Sequence[str], dry_run: bool = False, check: bool = True, *args: Any, **kwargs: Any) -> subprocess.CompletedProcess:
+    if dry_run:
+        logging.info(f"DRY RUN: {" ".join(str(s) for s in cmd)}")
+        return
+
+    try:
+        logging.info(f"RUN: {" ".join(str(s) for s in cmd)}")
+        return subprocess.run(cmd, *args, **kwargs, check=check, text=True)
     except FileNotFoundError:
         die(f"{cmd[0]} not found in PATH.")
     except subprocess.CalledProcessError as e:
@@ -57,86 +82,124 @@ def die(message: str) -> NoReturn:
 
 
 @contextlib.contextmanager
-def restore(path: Path) -> Iterator[None]:
-    old = path.read_text()
+def chdir(directory: Path) -> Iterator[None]:
+    old = Path.cwd()
+
+    if old == directory:
+        yield
+        return
+
     try:
+        os.chdir(directory)
         yield
     finally:
-        path.write_text(old)
+        os.chdir(old)
 
 
-def do_cd(args: argparse.Namespace) -> None:
-    if not Path(".git").exists():
-        die("The cd verb must be run from the rpm git repository")
+def get_build_root(args: argparse.Namespace) -> str:
+    if args.repo == "main":
+        return f"centos-stream-hyperscale-{args.release}-{os.uname().machine}"
+    else:
+        return f"centos-stream-hyperscale-{args.repo}-{args.release}-{os.uname().machine}"
+
+
+def get_build_target(args: argparse.Namespace) -> str:
+    return f"hyperscale{args.release}s-packages-{args.repo}-el{args.release}s"
+
+
+def get_build_tag(args: argparse.Namespace) -> str:
+    return f"hyperscale{args.release}s-packages-{args.repo}-{'testing' if args.testing else 'release'}"
+
+
+def do_build(git_dir: Path, args: argparse.Namespace) -> None:
+    logging.info(f"BUILD: repo={args.repo} release={args.release} head={args.head} testing={args.testing}")
+
+    systemd_spec = Path.cwd() / "systemd.spec"
+    logging.info(f"Copying systemd.spec to {systemd_spec}")
+    shutil.copyfile(git_dir / "systemd.spec", systemd_spec)
 
     logging.info("Downloading sources")
     run(
         [
             "spectool",
             "--define",
-            f"_sourcedir {Path.cwd()}",
-            "--define",
-            "branch main",
+            f"_sourcedir {git_dir}",
             "--get-files",
-            "systemd.spec",
-        ],
+            f"{systemd_spec}",
+        ] + (["--define", "branch main"] if args.head else []) +
+            (["--debug"] if need_verbose() else []),
     )
 
-    # We can't determine the version dynamically in the spec so we retrieve it
-    # up front and pass it in via a macro.
-    version = run(
-        [
-            "tar",
-            "--gunzip",
-            "--extract",
-            "--to-stdout",
-            "--file=main.tar.gz",
-            "systemd-main/meson.version",
-        ],
-        stdout=subprocess.PIPE,
-    ).stdout.strip()
+    if args.head:
+        # we're building upstream HEAD.
+        # Hence going to ignore all version/release/etc in the spec file.
 
-    # The timestamp is to ensure the release is always monotonically increasing
-    rpmrelease = datetime.now().strftime(r"%Y%m%d%H%M%S")
+        tarball_pattern = "*.tar.gz"
+        tarballs = list(Path.cwd().glob(tarball_pattern))
+        if len(tarballs) != 1:
+            die("Found no or more than one tarball with glob {tarball_pattern}")
 
-    with restore(Path("systemd.spec")):
-        Path("systemd.spec").write_text(
+        tarball = tarballs[0]
+        logging.info(f"Found tarball {tarball}")
+
+        if tarball.name == "main.tar.gz":
+            tarball_internal_dir = "systemd-main"
+        elif tarball.match("systemd-*.tar.gz"):
+            tarball_internal_dir = tarball.name.removesuffix(".tar.gz")
+        else:
+            die(f"Tarball {tarball} has unknown prefix")
+
+        # We can't determine the version dynamically in the spec so we retrieve it
+        # up front and pass it in via a macro.
+        version = run(
+            [
+                "tar",
+                "--gunzip",
+                "--extract",
+                "--to-stdout",
+                f"--file={tarball}",
+                f"{tarball_internal_dir}/meson.version",
+            ],
+            stdout=subprocess.PIPE,
+        ).stdout.strip()
+
+        # The timestamp is to ensure the release is always monotonically increasing
+        release = datetime.now().strftime(r"%Y%m%d%H%M%S")
+
+        logging.info(f"Modifing systemd.spec with version={version} release={release}")
+        systemd_spec.write_text(
             textwrap.dedent(
                 f"""\
                 %bcond upstream 1
                 %define version_override {version}
-                %define release_override {rpmrelease}
+                %define release_override {release}
                 %define branch main
                 """
             )
-            + Path("systemd.spec").read_text()
+            + systemd_spec.read_text()
         )
 
-        if args.repo == "main":
-            root = f"centos-stream-hyperscale-{args.release}-x86_64"
-        else:
-            root = f"centos-stream-hyperscale-{args.repo}-{args.release}-x86_64"
-
-        logging.info("Building src.rpm")
-        run(
-            [
-                "mock",
-                "--root",
-                root,
-                "--sources=.",
-                "--spec=systemd.spec",
-                "--enable-network",
-                "--define",
-                "%_disable_source_fetch 0",
-                "--buildsrpm",
-                "--resultdir=.",
-            ],
-        )
+    logging.info("Building systemd src.rpm")
+    run(
+        [
+            "mock",
+            "--root=" + get_build_root(args),
+            f"--sources={git_dir}",
+            "--spec=systemd.spec",
+            "--enable-network",
+            "--define",
+            "%_disable_source_fetch 0",
+            "--buildsrpm",
+            "--resultdir=.",
+        ] + (["--quiet"] if not need_verbose() else []),
+    )
 
     srcrpm = next(Path.cwd().glob("*.src.rpm"))
     logging.info(f"Wrote: {srcrpm}")
 
-    run(
+    build_target = get_build_target(args)
+    logging.info(f"Triggering CBS build for {build_target}")
+    process = popen(
         [
             "cbs",
             *(["--cert", args.cert] if args.cert else []),
@@ -144,36 +207,324 @@ def do_cd(args: argparse.Namespace) -> None:
             "--wait",
             "--fail-fast",
             "--skip-tag",
-            f"hyperscale{args.release}s-packages-{args.repo}-el{args.release}s",
+            build_target,
             str(srcrpm),
-        ],
+        ] + (["--scratch"] if args.testing else []),
+        stdout=subprocess.PIPE,
+        universal_newlines=True,
+        dry_run=args.dry_run,
     )
 
-    if not args.publish:
-        logging.info("Publishing not requested, not tagging builds in testing")
+    if args.dry_run:
         return
 
+    task_id = None
+    for line in iter(process.stdout.readline, ''):
+        if not task_id and line.startswith("Created task:"):
+            task_id = line.removeprefix("Created task:").strip()
+        print(line, end='', flush=True)  # explicetly not using logging.*
+
+    process.wait()
+    if process.returncode != 0:
+        die(f"CBS build returned non-zero exit code {process.returncode}")
+
+    if not task_id:
+        die("CBS completed but failed to found task id in CBS's output")
+
+    logging.info(f"All done. Task ID: {task_id}")
+    logging.info("")
+    logging.info(f"$ ./releng.py test --repo={args.repo} --release={args.release} --task-id={task_id}")
+    logging.info(f"$ ./releng.py publish --repo={args.repo} --release={args.release} {'--testing' if args.testing else '--no-testing'} --task-id={task_id}")
+
+    # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
+    if os.environ.get("GITLAB_CI"):
+        artifacts_dir = git_dir / "artifacts"
+        artifacts_dir.mkdir(exist_ok=True)
+
+        task_id_file = artifacts_dir / f"{build_target}{'-head' if args.head else ''}-task-id.txt"
+        logging.info("")
+        logging.info(f"Dumping task id to {task_id_file}")
+        task_id_file.write_text(task_id)
+
+
+def do_publish(git_dir: Path, args: argparse.Namespace) -> None:
+    if not args.task_id:
+        die("Can't run tests without CBS build id")
+
+    logging.info(f"PUBLISH: repo={args.repo} release={args.release} testing={args.testing} task_id={args.task_id}")
+
+    logging.info("Downloading source RPM")
+    download_rpms(args.task_id, "src")
+
+    # it's important to search using args.repo/args.release because
+    # otherwise task can be from difference environment
     prefix = "hs+fb" if args.repo == "facebook" else "hs"
+    srcrpm_pattern = f"systemd-*-*.{prefix}.el{args.release}.src.rpm"
+    srcrpms = list(Path.cwd().glob(srcrpm_pattern))
+    if len(srcrpms) != 1:
+        die(f"Found no or more than one systemd source RPM ({srcrpm_pattern})")
+
+    srcrpm = srcrpms[0]
+    logging.info(f"Found source RPM {srcrpm}")
+
+    tag = get_build_tag(args)
+    package = srcrpm.name.removesuffix(".src.rpm")
+    logging.info(f"Tag package {package} with '{tag}' tag")
 
     run(
         [
             "cbs",
-            *(["--cert", args.cert] if args.cert else []),
             "tag-build",
-            f"hyperscale{args.release}s-packages-{args.repo}-testing",
-            f"systemd-{version}-{rpmrelease}.{prefix}.el{args.release}",
-        ]
+            tag,
+            package,
+        ],
+        dry_run=args.dry_run,
     )
 
 
+def download_rpms(task_id: str, arch: str) -> None:
+    run(["cbs", "download-task", "--noprogress", "--arch", arch, str(task_id)])
+
+
+def get_mkosi_version(file: Path) -> str:
+    if m := re.search(r'uses: systemd/mkosi@([a-z0-9]+)', file.read_text()):
+        return m.group(1)
+
+    return None
+
+
+def do_test(git_dir: Path, args: argparse.Namespace) -> None:
+    if not args.task_id:
+        die("Can't run tests without CBS build id")
+
+    logging.info(f"PUBLISH: repo={args.repo} release={args.release} task_id={args.task_id}")
+
+    cwd = Path.cwd()
+
+    logging.info("Downloading source RPM")
+    download_rpms(args.task_id, "src")
+
+    # it's important to search using args.repo/args.release because
+    # otherwise task can be from difference environment
+    prefix = "hs+fb" if args.repo == "facebook" else "hs"
+    srcrpm_pattern = f"systemd-*-*.{prefix}.el{args.release}.src.rpm"
+    srcrpms = list(cwd.glob(srcrpm_pattern))
+    if len(srcrpms) != 1:
+        die(f"Found no or more than one systemd source RPM ({srcrpm_pattern})")
+
+    srcrpm = srcrpms[0]
+    logging.info(f"Found source RPM {srcrpm}")
+
+    logging.info(f"Unpacking {srcrpm}")
+    with open(f"{srcrpm}.tar", "w") as rpmtar:
+        # rpm2cpio rejects to create tar file itself when runs in a gitlab runner
+        run(["rpm2cpio", "--nocompression", f"{srcrpm}"], stdout=rpmtar)
+    run(["cpio", "--extract", "--make-directories", "--file", f"{srcrpm}.tar"] +
+        (["--verbose"] if need_verbose() else []))
+
+    tarball_pattern = "*.tar.gz"
+    tarballs = list(cwd.glob(tarball_pattern))
+    if len(tarballs) != 1:
+        die("Found no or more than one tarball with glob {tarball_pattern}")
+
+    tarball = tarballs[0]
+    logging.info(f"Found tarball {tarball}")
+
+    logging.info(f"Unpacking {tarball}")
+    run(["tar", "--gunzip", "--extract", f"--file={tarball}"] +
+        (["--verbose"] if need_verbose() else []))
+
+    systemd_dir_pattern = "systemd-*"
+    systemd_dirs = [p for p in cwd.glob(systemd_dir_pattern) if p.is_dir()]
+    if len(systemd_dirs) != 1:
+        die(f"Found no or more than one unpacked systemd directories with glob {systemd_dir_pattern}")
+
+    systemd_dir = systemd_dirs[0]
+    logging.info(f"Found unpacked tarball {systemd_dir}")
+
+    logging.info("Setting up mkosi")
+    mkosi_version_sha = get_mkosi_version(systemd_dir / ".github/workflows/mkosi.yml")
+    if not mkosi_version_sha:
+        die("Failed to extract mkosi version")
+
+    logging.info(f"Found mkosi version SHA: {mkosi_version_sha}")
+
+    mkosi_dir = cwd / "mkosi"
+    logging.info(f"Cloning mkosi ({mkosi_version_sha}) in {mkosi_dir}")
+    run(["git", "clone", "https://github.com/systemd/mkosi", f"{mkosi_dir}"] +
+        (["--quiet"] if not need_verbose() else []))
+    run(["git", "-C", f"{mkosi_dir}", "checkout", mkosi_version_sha] +
+        (["--quiet"] if not need_verbose() else []))
+
+    if not (mkosi_dir / "bin/mkosi").is_file():
+        die("Failed to find cloned mkosi")
+
+    os.environ["PATH"] = f"{mkosi_dir / 'bin'}:{os.environ['PATH']}"
+    logging.debug(f"Updated PATH={os.environ['PATH']}")
+
+    mkosi_version = run(["mkosi", "--version"], stdout=subprocess.PIPE).stdout.strip()
+    mkosi_version_match = re.match(r"mkosi ([0-9]+)(~devel)?", mkosi_version)
+    mkosi_dash_dash = mkosi_version_match and int(mkosi_version_match.group(1)) >= 26
+    logging.debug(f"mkosi --version = {mkosi_version}. mkosi_dash_dash={mkosi_dash_dash}")
+
+    logging.info("Downloading systemd RPMs")
+    packages_dir = systemd_dir / "packages"
+    packages_dir.mkdir(exist_ok=True)
+    with chdir(packages_dir):
+        download_rpms(args.task_id, "noarch")
+        download_rpms(args.task_id, os.uname().machine)
+
+    rpm_pattern = "systemd-*.rpm"
+    rpms = list(packages_dir.glob(rpm_pattern))
+    if not rpms:
+        die(f"No systemd RPMs found wih glob {rpm_pattern} in {packages_dir}")
+
+    logging.info(f"Found {len(rpms)} RPMs in {packages_dir}")
+
+    logging.info("Generating mkosi.local.conf")
+    mkosi_local_conf = systemd_dir / "mkosi.local.conf"
+    mkosi_local_conf.write_text(
+        textwrap.dedent(
+            f"""\
+            [Distribution]
+            Distribution=centos
+            Release={args.release}
+            Repositories=hyperscale-packages-main
+
+            [Build]
+            ToolsTreeDistribution=centos
+            ToolsTreeRelease={args.release}
+            BuildSourcesEphemeral=no
+            Environment=NO_BUILD=1
+            WithTests=yes
+
+            [Content]
+            PackageDirectories={packages_dir}
+            SELinuxRelabel=yes
+            """
+        )
+    )
+
+    mkosi_test_env = {
+        "NO_BUILD": "1",
+        "TEST_SKIP": "TEST-21-DFUZZER",
+    }
+
+    # TODO: drop once BTRFS regression is fixed in kernel 6.13
+    root_conf = systemd_dir / "mkosi.repart/10-root.conf"
+    if root_conf.is_file():
+        content = root_conf.read_text()
+        root_conf.write_text(content.replace("Format=btrfs", "Format=ext4"))
+
+    # Create missing mountpoint for mkosi sandbox.
+    Path('/etc/pacman.d/gnupg').mkdir(parents=True, exist_ok=True)
+
+    # some tunnings
+    run(["setenforce", "0"], check=False)
+    run(["sysctl", "fs.inotify.max_user_watches=65536"], check=False)
+    run(["sysctl", "fs.inotify.max_user_instances=1024"], check=False)
+    run(["modprobe", "kvm"], check=False)
+    if not Path('/dev/kvm').exists():
+        mkosi_test_env["TEST_NO_QEMU"] = "1"
+
+    try:
+        with chdir(systemd_dir):
+            run(["mkosi", "genkey"], dry_run=args.dry_run)
+            run(
+                [
+                    "mkosi",
+                    "-f",
+                    "sandbox",
+                ] + (["--"] if mkosi_dash_dash else []) + [
+                    "meson",
+                    "setup",
+                    "--buildtype=debugoptimized",
+                    "-Dintegration-tests=true",
+                    "build"
+                ],
+                dry_run=args.dry_run
+            )
+
+            run(
+                [
+                    "mkosi",
+                    "-f",
+                    "sandbox",
+                ] + (["--"] if mkosi_dash_dash else []) + [
+                    "meson",
+                    "compile",
+                    "-C",
+                    "build",
+                    "mkosi"
+                ],
+                dry_run=args.dry_run
+            )
+
+            run(
+                [
+                    "mkosi",
+                    "-f",
+                    "sandbox",
+                ] + (["--"] if mkosi_dash_dash else []) + [
+                    "meson",
+                    "test",
+                    "-C",
+                    "build",
+                    "--no-rebuild",
+                    "--suite",
+                    "integration-tests",
+                    "--print-errorlogs",
+                    "--no-stdsplit",
+                ],
+                env=os.environ | mkosi_test_env,
+                dry_run=args.dry_run,
+            )
+    finally:
+        # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
+        if os.environ.get("GITLAB_CI"):
+            artifacts_dir = git_dir / "artifacts"
+            artifacts_dir.mkdir(exist_ok=True)
+
+            logging.info("Collecting logs")
+            for log in (systemd_dir / "build/meson-logs").glob("*"):
+                if log.is_file():
+                    logging.info(f"Moving {log} into {artifacts_dir}")
+                    shutil.copy(log, artifacts_dir)
+
+            for log in (systemd_dir / "build/test/journal").glob("*"):
+                if log.is_file():
+                    logging.info(f"Moving {log} into {artifacts_dir}")
+                    shutil.copy(log, artifacts_dir)
+
+    logging.info("All done")
+
+
 class Verb(enum.Enum):
-    cd = "cd"
+    build = "build"
+    test = "test"
+    publish = "publish"
 
     def __str__(self) -> str:
         return self.value
 
     def run(self, args: argparse.Namespace) -> None:
-        {Verb.cd: do_cd}[self](args)
+        if not Path(".gitlab-ci.yml").exists():
+            # testing-fram clones repo without .git
+          die("The verb must be run from the rpm git repository")
+
+        func = {
+            Verb.build: do_build,
+            Verb.test: do_test,
+            Verb.publish: do_publish,
+        }[self]
+
+        git_dir = Path.cwd()
+        with tempfile.TemporaryDirectory(dir='.', prefix='systemd-releng-', delete=args.cleanup) as workdir:
+            logging.info(f"Created temporary directory {workdir}, will use it for all further work.")
+            if not args.cleanup:
+                logging.info("The temporary directory will not be removed at the end!")
+            with chdir(Path(workdir)):
+                return func(git_dir, args)
 
 
 def main() -> None:
@@ -184,6 +535,12 @@ def main() -> None:
 
     parser = argparse.ArgumentParser()
 
+    parser.add_argument(
+        "--head",
+        help="Do build using upstream HEAD. Otherwise use version in spec file",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
     parser.add_argument(
         "--release",
         help="CentOS Stream release to use (e.g 9)",
@@ -206,9 +563,32 @@ def main() -> None:
         default=None,
     )
     parser.add_argument(
-        "--publish",
+        "--testing",
+        help="build cmd: do non-scratch build; publish cmd: publish to 'release' repo, otherwise 'testing' repo",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    parser.add_argument(
+        "--task-id",
+        help="CBS's task ID to test or publish",
+        type=int, # koji: ValueError: invalid literal for int() with base 10
+    )
+    parser.add_argument(
+        "--cleanup",
+        help="Clean up temporary files and directories after a run",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    parser.add_argument(
+        "--dry-run",
+        help="Activate dry run",
         action="store_true",
-        help="Publish results of operation (by default only a dry-run is done)",
+    )
+    parser.add_argument(
+        "--log-level",
+        help="Set log level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        default="INFO",
     )
     parser.add_argument(
         "verb",
@@ -218,6 +598,7 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+    logging.getLogger().setLevel(args.log_level)
 
     if args.cert:
         args.cert = args.cert.absolute()
