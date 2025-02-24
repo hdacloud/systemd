@@ -51,6 +51,6 @@ systemd:publish:
   script:
     - export TASK_ID_FILE=$(find . -name "*$RELEASE*$REPO*-task-id.txt" -exec echo {} \;); echo "$TASK_ID_FILE"; test -n "$TASK_ID_FILE"
     - export TASK_ID=$(cat $TASK_ID_FILE); echo "$TASK_ID"; test -n "$TASK_ID"
-    - ./relend publish --repo $REPO --release $RELEASE --$TESTING --task-id $TASK_ID --dry-run
+    - ./releng.py publish --repo $REPO --release $RELEASE --$TESTING --task-id $TASK_ID
   rules:
     - if: $DO_PUBLISH == 'true'

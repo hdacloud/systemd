@@ -53,7 +53,7 @@ def popen(cmd: Sequence[str], dry_run: bool = False, *args: Any, **kwargs: Any) 
         return
 
     try:
-        logging.info(f"RUN: {" ".join(str(s) for s in cmd)}")
+        logging.info(f"$ {" ".join(str(s) for s in cmd)}")
         return subprocess.Popen(cmd, *args, **kwargs, text=True)
     except FileNotFoundError:
         die(f"{cmd[0]} not found in PATH.")
@@ -65,7 +65,7 @@ def run(cmd: Sequence[str], dry_run: bool = False, check: bool = True, *args: An
         return
 
     try:
-        logging.info(f"RUN: {" ".join(str(s) for s in cmd)}")
+        logging.info(f"$ {" ".join(str(s) for s in cmd)}")
         return subprocess.run(cmd, *args, **kwargs, check=check, text=True)
     except FileNotFoundError:
         die(f"{cmd[0]} not found in PATH.")
@@ -126,8 +126,9 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
             f"_sourcedir {git_dir}",
             "--get-files",
             f"{systemd_spec}",
-        ] + (["--define", "branch main"] if args.head else []) +
-            (["--debug"] if need_verbose() else []),
+            *(["--define", "branch main"] if args.head else []),
+            *(["--debug"] if need_verbose() else []),
+        ]
     )
 
     if args.head:
@@ -191,7 +192,8 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
             "%_disable_source_fetch 0",
             "--buildsrpm",
             "--resultdir=.",
-        ] + (["--quiet"] if not need_verbose() else []),
+            *(["--quiet"] if not need_verbose() else []),
+        ]
     )
 
     srcrpm = next(Path.cwd().glob("*.src.rpm"))
@@ -209,7 +211,8 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
             "--skip-tag",
             build_target,
             str(srcrpm),
-        ] + (["--scratch"] if args.testing else []),
+            *(["--scratch"] if args.testing else []),
+        ],
         stdout=subprocess.PIPE,
         universal_newlines=True,
         dry_run=args.dry_run,
@@ -274,6 +277,7 @@ def do_publish(git_dir: Path, args: argparse.Namespace) -> None:
     run(
         [
             "cbs",
+            *(["--cert", args.cert] if args.cert else []),
             "tag-build",
             tag,
             package,
@@ -435,7 +439,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
                     "mkosi",
                     "-f",
                     "sandbox",
-                ] + (["--"] if mkosi_dash_dash else []) + [
+                    *(["--"] if mkosi_dash_dash else []),
                     "meson",
                     "setup",
                     "--buildtype=debugoptimized",
@@ -450,7 +454,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
                     "mkosi",
                     "-f",
                     "sandbox",
-                ] + (["--"] if mkosi_dash_dash else []) + [
+                    *(["--"] if mkosi_dash_dash else []),
                     "meson",
                     "compile",
                     "-C",
@@ -465,7 +469,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
                     "mkosi",
                     "-f",
                     "sandbox",
-                ] + (["--"] if mkosi_dash_dash else []) + [
+                    *(["--"] if mkosi_dash_dash else []),
                     "meson",
                     "test",
                     "-C",

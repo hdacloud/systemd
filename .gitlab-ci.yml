@@ -1,6 +1,6 @@
 variables:
   HEAD:
-    description: "Do build using upstream HEAD. Otherwise use version from systemd.spec"
+    description: "Do build using upstream HEAD. Otherwise use sources from systemd.spec"
     options: ["head", "no-head"]
     value: "no-head"
   TESTING:
