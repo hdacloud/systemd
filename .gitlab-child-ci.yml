@@ -14,15 +14,15 @@ workflow:
     - test -n "$CENTOS_CERT"
     - test -n "$REPO"; echo "$REPO"
     - test -n "$RELEASE"; echo "$RELEASE"
-    - test -n "$HEAD"; echo "$HEAD"
-    - test -n "$TESTING"; echo "$TESTING"
     - dnf --quiet install -y tar git-core python3 centos-packager mock mock-centos-sig-configs
 
 systemd:build:
   stage: build
   extends: .fedora
   script:
-    - ./releng.py build --cert $CENTOS_CERT --repo $REPO --release $RELEASE --$HEAD --$TESTING
+    - test -n "$SOURCE"; echo "$SOURCE"
+    - export SCRATCH=$(test "$DO_PUBLISH" == "false" && echo "--scratch" || echo "--no-scratch"); echo $SCRATCH; test -n "$SCRATCH"
+    - ./releng.py --cert $CENTOS_CERT --repo $REPO --release $RELEASE build --source $SOURCE $SCRATCH
   rules:
     - when: always
   artifacts:
@@ -36,7 +36,7 @@ systemd:test:
   before_script:
     - test -n "$REPO"; echo "$REPO"
     - test -n "$RELEASE"; echo "$RELEASE"
-    - export TASK_ID_FILE=$(find . -name "*$RELEASE*$REPO*-task-id.txt" -exec echo {} \;); echo "$TASK_ID_FILE"; test -n "$TASK_ID_FILE"
+    - export TASK_ID_FILE=$(find . -name "*-task-id.txt" -exec echo {} \;); echo "$TASK_ID_FILE"; test -n "$TASK_ID_FILE"
     - export TASK_ID=$(cat $TASK_ID_FILE); echo "$TASK_ID"; test -n "$TASK_ID"
   script:
     - testing-farm request --git-ref $CI_MERGE_REQUEST_REF_PATH --git-url $CI_MERGE_REQUEST_PROJECT_URL --compose 'Fedora-Rawhide'
@@ -50,13 +50,15 @@ systemd:publish:
   dependencies:
     - systemd:build
   script:
-    - export TASK_ID_FILE=$(find . -name "*$RELEASE*$REPO*-task-id.txt" -exec echo {} \;); echo "$TASK_ID_FILE"; test -n "$TASK_ID_FILE"
+    - test -n "$DO_PUBLISH"; echo "$DO_PUBLISH"
+    - export TASK_ID_FILE=$(find . -name "*-task-id.txt" -exec echo {} \;); echo "$TASK_ID_FILE"; test -n "$TASK_ID_FILE"
     - export TASK_ID=$(cat $TASK_ID_FILE); echo "$TASK_ID"; test -n "$TASK_ID"
-    - ./releng.py publish --repo $REPO --release $RELEASE --$TESTING --task-id $TASK_ID
+    - ./releng.py --cert $CENTOS_CERT --repo $REPO --release $RELEASE publish --task-id $TASK_ID --publish-repo $DO_PUBLISH
   rules:
-    - if: $DO_PUBLISH == 'true'
+    - if: $DO_PUBLISH != 'false'
+
   artifacts:
-    paths: [ 'artifacts/systemd-*-*.{prefix}.el{args.release}-tag.txt' ]
+    paths: [ 'artifacts/*-tag.txt' ]
 
 systemd:tag:
   stage: tag
@@ -65,7 +67,7 @@ systemd:tag:
   before_script:
     - env # Show variables that were passed to the job
   script:
-    - export TAG_FILE=$(find . -name "*$RELEASE*$REPO*-tag.txt" -exec echo {} \;); echo "$TAG_FILE"; test -n "$TAG_FILE"
+    - export TAG_FILE=$(find . -name "*-tag.txt" -exec echo {} \;); echo "$TAG_FILE"; test -n "$TAG_FILE"
     - export GIT_TAG=$(cat $TAG_FILE | head -n 1); echo "$GIT_TAG"; test -n "$GIT_TAG"
     - git remote remove origin
     - git remote add origin https://$CI_PROJECT_NAME:$GIT_PUSH_TOKEN@gitlab.com/${CI_PROJECT_PATH}.git
@@ -74,4 +76,4 @@ systemd:tag:
     - git tag "$GIT_TAG"
     - git push origin tag "$GIT_TAG"
   rules:
-    - if: $DO_PUBLISH == 'true' && $TESTING == 'no-testing'
+    - if: $DO_PUBLISH != 'false'

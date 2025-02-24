@@ -1,15 +1,11 @@
 variables:
   HEAD:
     description: "Do build using upstream HEAD. Otherwise use sources from systemd.spec"
-    options: ["head", "no-head"]
-    value: "no-head"
-  TESTING:
-    description: "If 'testing', it does scratch build in tests stage and publishes to testing repo in publish stage"
-    options: ["testing", "no-testing"]
-    value: "testing"
+    options: ["head", "spec"]
+    value: "head"
   PUBLISH:
-    description: "Publish result"
-    options: ["true", "false"]
+    description: "Publish result to 'release' or 'testing' CBS repo. If false, don't publish"
+    options: ["false", "testing", "release"]
     value: "false"
 
 stages:
@@ -26,13 +22,13 @@ stages:
     matrix:
       - REPO: [main, facebook]
         RELEASE: [9, 10]
-        HEAD: [ 'head', 'no-head' ]
+        SOURCE: ['head', 'spec']
 
 # setup for merge request
 mr:
   stage: setup
   variables:
-    TESTING: "testing"
+    # REPO, RELEASE, SOURCE come from matrix
     DO_TEST: "true"
     DO_PUBLISH: "false"
   trigger:
@@ -46,10 +42,10 @@ mr:
 ni:
   stage: setup
   variables:
-    HEAD: "head"
-    TESTING: "testing"
+    # REPO, RELEASE come from matrix
+    SOURCE: "head"
     DO_TEST: "false"
-    DO_PUBLISH: "true"
+    DO_PUBLISH: "testing"
   trigger:
     include: .gitlab-child-ci.yml
     strategy: depend
@@ -61,7 +57,8 @@ ni:
 mn:
   stage: setup
   variables:
-    # HEAD and TESTING passed from global vars
+    # REPO, RELEASE come from matrix
+    # HEAD come from global vars
     DO_TEST: "true"
     DO_PUBLISH: $PUBLISH
   trigger:
