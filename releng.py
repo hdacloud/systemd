@@ -285,6 +285,17 @@ def do_publish(git_dir: Path, args: argparse.Namespace) -> None:
         dry_run=args.dry_run,
     )
 
+    # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
+    if os.environ.get("GITLAB_CI"):
+        artifacts_dir = git_dir / "artifacts"
+        artifacts_dir.mkdir(exist_ok=True)
+
+        git_tag = package.replace("~", "-") # TODO need comes up with a standard
+        tag_file = artifacts_dir / f"{git_tag}-tag.txt"
+        logging.info("")
+        logging.info(f"Dumping git_tag/cbs_tag {git_tag}/{tag} to {tag_file}")
+        tag_file.write_text(f"{git_tag}\n{tag}")
+
 
 def download_rpms(task_id: str, arch: str) -> None:
     run(["cbs", "download-task", "--noprogress", "--arch", arch, str(task_id)])
