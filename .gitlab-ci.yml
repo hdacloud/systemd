@@ -1,5 +1,5 @@
 variables:
-  HEAD:
+  SOURCE:
     description: "Do build using upstream HEAD. Otherwise use sources from systemd.spec"
     options: ["head", "spec"]
     value: "head"
@@ -60,7 +60,7 @@ mn:
   stage: setup
   variables:
     # REPO, RELEASE come from matrix
-    # HEAD come from global vars
+    # SOURCE comes from env vars
     DO_TEST: "true"
     DO_PUBLISH: $PUBLISH
     DO_TAG: $PUBLISH
