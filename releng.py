@@ -581,7 +581,7 @@ def main() -> None:
     test_parser.add_argument(
         "--task-id",
         required=True,
-        help="CBS's task ID to test or publish",
+        help="CBS's task ID to test",
         type=int,  # koji: ValueError: invalid literal for int() with base 10
     )
 
@@ -589,12 +589,12 @@ def main() -> None:
     publish_parser.add_argument(
         "--task-id",
         required=True,
-        help="CBS's task ID to test or publish",
+        help="CBS's task ID to publish",
         type=int,  # koji: ValueError: invalid literal for int() with base 10
     )
     publish_parser.add_argument(
         "--publish-repo",
-        help="build cmd: do non-scratch build; publish cmd: publish to 'release' repo, otherwise 'testing' repo",
+        help="Publish package to 'release' or 'testing' repo",
         choices=['release', 'testing'],
         default='testing',
     )
