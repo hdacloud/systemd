@@ -53,7 +53,7 @@ def popen(cmd: Sequence[str], dry_run: bool = False, *args: Any, **kwargs: Any) 
         return
 
     try:
-        logging.info(f"RUN: {" ".join(str(s) for s in cmd)}")
+        logging.info(f"$ {" ".join(str(s) for s in cmd)}")
         return subprocess.Popen(cmd, *args, **kwargs, text=True)
     except FileNotFoundError:
         die(f"{cmd[0]} not found in PATH.")
@@ -65,7 +65,7 @@ def run(cmd: Sequence[str], dry_run: bool = False, check: bool = True, *args: An
         return
 
     try:
-        logging.info(f"RUN: {" ".join(str(s) for s in cmd)}")
+        logging.info(f"$ {" ".join(str(s) for s in cmd)}")
         return subprocess.run(cmd, *args, **kwargs, check=check, text=True)
     except FileNotFoundError:
         die(f"{cmd[0]} not found in PATH.")
@@ -108,11 +108,11 @@ def get_build_target(args: argparse.Namespace) -> str:
 
 
 def get_build_tag(args: argparse.Namespace) -> str:
-    return f"hyperscale{args.release}s-packages-{args.repo}-{'testing' if args.testing else 'release'}"
+    return f"hyperscale{args.release}s-packages-{args.repo}-{args.publish_repo}"
 
 
 def do_build(git_dir: Path, args: argparse.Namespace) -> None:
-    logging.info(f"BUILD: repo={args.repo} release={args.release} head={args.head} testing={args.testing}")
+    logging.info(f"BUILD: repo={args.repo} release={args.release} source={args.source} scratch={args.scratch}")
 
     systemd_spec = Path.cwd() / "systemd.spec"
     logging.info(f"Copying systemd.spec to {systemd_spec}")
@@ -126,11 +126,12 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
             f"_sourcedir {git_dir}",
             "--get-files",
             f"{systemd_spec}",
-        ] + (["--define", "branch main"] if args.head else []) +
-            (["--debug"] if need_verbose() else []),
+            *(["--define", "branch main"] if args.source == "head" else []),
+            *(["--debug"] if need_verbose() else []),
+        ]
     )
 
-    if args.head:
+    if args.source == "head":
         # we're building upstream HEAD.
         # Hence going to ignore all version/release/etc in the spec file.
 
@@ -191,7 +192,8 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
             "%_disable_source_fetch 0",
             "--buildsrpm",
             "--resultdir=.",
-        ] + (["--quiet"] if not need_verbose() else []),
+            *(["--quiet"] if not need_verbose() else []),
+        ]
     )
 
     srcrpm = next(Path.cwd().glob("*.src.rpm"))
@@ -209,7 +211,8 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
             "--skip-tag",
             build_target,
             str(srcrpm),
-        ] + (["--scratch"] if args.testing else []),
+            *(["--scratch"] if args.scratch else []),
+        ],
         stdout=subprocess.PIPE,
         universal_newlines=True,
         dry_run=args.dry_run,
@@ -233,15 +236,15 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
 
     logging.info(f"All done. Task ID: {task_id}")
     logging.info("")
-    logging.info(f"$ ./releng.py test --repo={args.repo} --release={args.release} --task-id={task_id}")
-    logging.info(f"$ ./releng.py publish --repo={args.repo} --release={args.release} {'--testing' if args.testing else '--no-testing'} --task-id={task_id}")
+    logging.info(f"$ ./releng.py --repo={args.repo} --release={args.release} test --task-id={task_id}")
+    logging.info(f"$ ./releng.py --repo={args.repo} --release={args.release} publish --task-id={task_id}")
 
     # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
     if os.environ.get("GITLAB_CI"):
         artifacts_dir = git_dir / "artifacts"
         artifacts_dir.mkdir(exist_ok=True)
 
-        task_id_file = artifacts_dir / f"{build_target}{'-head' if args.head else ''}-task-id.txt"
+        task_id_file = artifacts_dir / f"{build_target}-{args.source}-task-id.txt"
         logging.info("")
         logging.info(f"Dumping task id to {task_id_file}")
         task_id_file.write_text(task_id)
@@ -251,7 +254,7 @@ def do_publish(git_dir: Path, args: argparse.Namespace) -> None:
     if not args.task_id:
         die("Can't run tests without CBS build id")
 
-    logging.info(f"PUBLISH: repo={args.repo} release={args.release} testing={args.testing} task_id={args.task_id}")
+    logging.info(f"PUBLISH: repo={args.repo} release={args.release} task_id={args.task_id} publish_repo={args.publish_repo}")
 
     logging.info("Downloading source RPM")
     download_rpms(args.task_id, "src")
@@ -274,12 +277,24 @@ def do_publish(git_dir: Path, args: argparse.Namespace) -> None:
     run(
         [
             "cbs",
+            *(["--cert", args.cert] if args.cert else []),
             "tag-build",
             tag,
             package,
         ],
         dry_run=args.dry_run,
     )
+
+    # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
+    if os.environ.get("GITLAB_CI"):
+        artifacts_dir = git_dir / "artifacts"
+        artifacts_dir.mkdir(exist_ok=True)
+
+        git_tag = package.replace("~", "-") # TODO need comes up with a standard
+        tag_file = artifacts_dir / f"{git_tag}-tag.txt"
+        logging.info("")
+        logging.info(f"Dumping git_tag/cbs_tag {git_tag}/{tag} to {tag_file}")
+        tag_file.write_text(f"{git_tag}\n{tag}")
 
 
 def download_rpms(task_id: str, arch: str) -> None:
@@ -435,7 +450,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
                     "mkosi",
                     "-f",
                     "sandbox",
-                ] + (["--"] if mkosi_dash_dash else []) + [
+                    *(["--"] if mkosi_dash_dash else []),
                     "meson",
                     "setup",
                     "--buildtype=debugoptimized",
@@ -450,7 +465,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
                     "mkosi",
                     "-f",
                     "sandbox",
-                ] + (["--"] if mkosi_dash_dash else []) + [
+                    *(["--"] if mkosi_dash_dash else []),
                     "meson",
                     "compile",
                     "-C",
@@ -465,7 +480,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
                     "mkosi",
                     "-f",
                     "sandbox",
-                ] + (["--"] if mkosi_dash_dash else []) + [
+                    *(["--"] if mkosi_dash_dash else []),
                     "meson",
                     "test",
                     "-C",
@@ -499,47 +514,19 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
     logging.info("All done")
 
 
-class Verb(enum.Enum):
-    build = "build"
-    test = "test"
-    publish = "publish"
-
-    def __str__(self) -> str:
-        return self.value
-
-    def run(self, args: argparse.Namespace) -> None:
-        if not Path(".gitlab-ci.yml").exists():
-            # testing-fram clones repo without .git
-          die("The verb must be run from the rpm git repository")
-
-        func = {
-            Verb.build: do_build,
-            Verb.test: do_test,
-            Verb.publish: do_publish,
-        }[self]
-
-        git_dir = Path.cwd()
-        with tempfile.TemporaryDirectory(dir='.', prefix='systemd-releng-', delete=args.cleanup) as workdir:
-            logging.info(f"Created temporary directory {workdir}, will use it for all further work.")
-            if not args.cleanup:
-                logging.info("The temporary directory will not be removed at the end!")
-            with chdir(Path(workdir)):
-                return func(git_dir, args)
-
-
 def main() -> None:
     handler = logging.StreamHandler(stream=sys.stderr)
     handler.setFormatter(LogFormatter())
     logging.getLogger().addHandler(handler)
     logging.getLogger().setLevel("INFO")
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description='releng.py CLI')
 
     parser.add_argument(
-        "--head",
-        help="Do build using upstream HEAD. Otherwise use version in spec file",
-        action=argparse.BooleanOptionalAction,
-        default=False,
+        "--repo",
+        help="Hyperscale repository to build against",
+        choices=["main", "facebook"],
+        default="main",
     )
     parser.add_argument(
         "--release",
@@ -550,28 +537,11 @@ def main() -> None:
         type=int,
     )
     parser.add_argument(
-        "--repo",
-        help="Hyperscale repository to build against",
-        choices=["main", "facebook"],
-        default="main",
-    )
-    parser.add_argument(
         "--cert",
         help="Path to the CentOS certificate to use",
         metavar="PATH",
         type=Path,
         default=None,
-    )
-    parser.add_argument(
-        "--testing",
-        help="build cmd: do non-scratch build; publish cmd: publish to 'release' repo, otherwise 'testing' repo",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-    )
-    parser.add_argument(
-        "--task-id",
-        help="CBS's task ID to test or publish",
-        type=int, # koji: ValueError: invalid literal for int() with base 10
     )
     parser.add_argument(
         "--cleanup",
@@ -590,11 +560,43 @@ def main() -> None:
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         default="INFO",
     )
-    parser.add_argument(
-        "verb",
-        type=Verb,
-        choices=list(Verb),
-        help=argparse.SUPPRESS,
+
+    subparsers = parser.add_subparsers(dest='verb')
+
+    build_parser = subparsers.add_parser('build', help='Build command')
+    build_parser.add_argument(
+        "--source",
+        choices=["head", "spec"],
+        default="head",
+        help="Do build using upstream HEAD or version from spec file",
+    )
+    build_parser.add_argument(
+        "--scratch",
+        help="Do scratch build",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
+
+    test_parser = subparsers.add_parser('test', help='Test command')
+    test_parser.add_argument(
+        "--task-id",
+        required=True,
+        help="CBS's task ID to test or publish",
+        type=int,  # koji: ValueError: invalid literal for int() with base 10
+    )
+
+    publish_parser = subparsers.add_parser('publish', help='Publish command')
+    publish_parser.add_argument(
+        "--task-id",
+        required=True,
+        help="CBS's task ID to test or publish",
+        type=int,  # koji: ValueError: invalid literal for int() with base 10
+    )
+    publish_parser.add_argument(
+        "--publish-repo",
+        help="build cmd: do non-scratch build; publish cmd: publish to 'release' repo, otherwise 'testing' repo",
+        choices=['release', 'testing'],
+        default='testing',
     )
 
     args = parser.parse_args()
@@ -603,8 +605,24 @@ def main() -> None:
     if args.cert:
         args.cert = args.cert.absolute()
 
+    if not Path(".gitlab-ci.yml").exists():
+        # testing-fram clones repo without .git
+      die("The verb must be run from the rpm git repository")
+
     try:
-        args.verb.run(args)
+        func = {
+            "build": do_build,
+            "test": do_test,
+            "publish": do_publish,
+        }[args.verb]
+
+        git_dir = Path.cwd()
+        with tempfile.TemporaryDirectory(dir='.', prefix='systemd-releng-', delete=args.cleanup) as workdir:
+            logging.info(f"Created temporary directory {workdir}, will use it for all further work.")
+            if not args.cleanup:
+                logging.info("The temporary directory will not be removed at the end!")
+            with chdir(Path(workdir)):
+                return func(git_dir, args)
     except SystemExit as e:
         sys.exit(e.code)
     except KeyboardInterrupt:

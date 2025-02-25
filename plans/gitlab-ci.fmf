@@ -10,4 +10,4 @@ prepare:
 
 duration: 2h
 execute:
-  script: /usr/bin/python3 releng.py test --repo $REPO --release $RELEASE --task-id $TASK_ID
+  script: /usr/bin/python3 releng.py --repo $REPO --release $RELEASE test --task-id $TASK_ID
