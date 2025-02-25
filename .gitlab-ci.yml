@@ -31,6 +31,7 @@ mr:
     # REPO, RELEASE, SOURCE come from matrix
     DO_TEST: "true"
     DO_PUBLISH: "false"
+    DO_TAG: "false"
   trigger:
     include: .gitlab-child-ci.yml
     strategy: depend
@@ -46,6 +47,7 @@ ni:
     SOURCE: "head"
     DO_TEST: "false"
     DO_PUBLISH: "testing"
+    DO_TAG: "false"
   trigger:
     include: .gitlab-child-ci.yml
     strategy: depend
@@ -61,6 +63,7 @@ mn:
     # HEAD come from global vars
     DO_TEST: "true"
     DO_PUBLISH: $PUBLISH
+    DO_TAG: $PUBLISH
   trigger:
     include: .gitlab-child-ci.yml
     strategy: depend

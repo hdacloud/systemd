@@ -76,4 +76,4 @@ systemd:tag:
     - git tag "$GIT_TAG"
     - git push origin tag "$GIT_TAG"
   rules:
-    - if: $DO_PUBLISH != 'false'
+    - if: $DO_TAG != 'false'
