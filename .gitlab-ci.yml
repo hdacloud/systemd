@@ -1,5 +1,5 @@
 variables:
-  HEAD:
+  SOURCE:
     description: "Do build using upstream HEAD. Otherwise use sources from systemd.spec"
     options: ["head", "spec"]
     value: "head"
@@ -31,6 +31,7 @@ mr:
     # REPO, RELEASE, SOURCE come from matrix
     DO_TEST: "true"
     DO_PUBLISH: "false"
+    DO_TAG: "false"
   trigger:
     include: .gitlab-child-ci.yml
     strategy: depend
@@ -46,6 +47,7 @@ ni:
     SOURCE: "head"
     DO_TEST: "false"
     DO_PUBLISH: "testing"
+    DO_TAG: "false"
   trigger:
     include: .gitlab-child-ci.yml
     strategy: depend
@@ -58,9 +60,10 @@ mn:
   stage: setup
   variables:
     # REPO, RELEASE come from matrix
-    # HEAD come from global vars
+    # SOURCE comes from env vars
     DO_TEST: "true"
     DO_PUBLISH: $PUBLISH
+    DO_TAG: $PUBLISH
   trigger:
     include: .gitlab-child-ci.yml
     strategy: depend
