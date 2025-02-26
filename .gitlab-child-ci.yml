@@ -36,8 +36,7 @@ systemd:test:
   before_script:
     - test -n "$REPO"; echo "$REPO"
     - test -n "$RELEASE"; echo "$RELEASE"
-    - export TASK_ID_FILE=$(find . -name "*-task-id.txt" -exec echo {} \;); echo "$TASK_ID_FILE"; test -n "$TASK_ID_FILE"
-    - export TASK_ID=$(cat $TASK_ID_FILE); echo "$TASK_ID"; test -n "$TASK_ID"
+    - export TASK_ID=$(find . -name "*-task-id.txt" -exec cat {} \; -quit); echo "$TASK_ID"; test -n "$TASK_ID"
   script:
     - testing-farm request --git-ref $CI_MERGE_REQUEST_REF_PATH --git-url $CI_MERGE_REQUEST_PROJECT_URL --compose 'Fedora-Rawhide'
       --environment REPO=$REPO --environment RELEASE=$RELEASE --environment TASK_ID=$TASK_ID --plan plans/gitlab-ci
@@ -58,8 +57,7 @@ systemd:publish:
     - systemd:build
   script:
     - test -n "$DO_PUBLISH"; echo "$DO_PUBLISH"
-    - export TASK_ID_FILE=$(find . -name "*-task-id.txt" -exec echo {} \;); echo "$TASK_ID_FILE"; test -n "$TASK_ID_FILE"
-    - export TASK_ID=$(cat $TASK_ID_FILE); echo "$TASK_ID"; test -n "$TASK_ID"
+    - export TASK_ID=$(find . -name "*-task-id.txt" -exec cat {} \; -quit); echo "$TASK_ID"; test -n "$TASK_ID"
     - ./releng.py --cert $CENTOS_CERT --repo $REPO --release $RELEASE publish --task-id $TASK_ID --publish-repo $DO_PUBLISH
   rules:
     - if: $DO_PUBLISH != 'false'
