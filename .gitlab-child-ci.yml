@@ -5,7 +5,7 @@ stages:
   - tag
 
 workflow:
-  name: "systemd-$REPO-$RELEASE-$HEAD"
+  name: "systemd-$REPO-$RELEASE-$SOURCE"
 
 .fedora:
   image: quay.io/fedora/fedora:latest
