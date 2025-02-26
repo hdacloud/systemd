@@ -7,16 +7,18 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, NoReturn, Optional, Sequence, Iterator
-import enum
+from types import FrameType
 import contextlib
 import textwrap
 import tempfile
 import os
 import re
 import shutil
+import signal
 
 SYSTEMD_REPO = "https://github.com/systemd/systemd"
 AUTHOR = "CentOS Hyperscale SIG <centos-devel@centos.org>"
+INTERRUPTED = False
 
 
 class LogFormatter(logging.Formatter):
@@ -45,18 +47,6 @@ class LogFormatter(logging.Formatter):
 
 def need_verbose():
     return logging.getLogger().level == logging.DEBUG
-
-
-def popen(cmd: Sequence[str], dry_run: bool = False, *args: Any, **kwargs: Any) -> subprocess.Popen:
-    if dry_run:
-        logging.info(f"DRY RUN: {" ".join(str(s) for s in cmd)}")
-        return
-
-    try:
-        logging.info(f"$ {" ".join(str(s) for s in cmd)}")
-        return subprocess.Popen(cmd, *args, **kwargs, text=True)
-    except FileNotFoundError:
-        die(f"{cmd[0]} not found in PATH.")
 
 
 def run(cmd: Sequence[str], dry_run: bool = False, check: bool = True, *args: Any, **kwargs: Any) -> subprocess.CompletedProcess:
@@ -109,6 +99,14 @@ def get_build_target(args: argparse.Namespace) -> str:
 
 def get_build_tag(args: argparse.Namespace) -> str:
     return f"hyperscale{args.release}s-packages-{args.repo}-{args.publish_repo}"
+
+
+def get_task_id(output: str) -> str:
+    for line in output.splitlines():
+        if line.startswith("Created task:"):
+            return line.removeprefix("Created task:").strip()
+
+    return ""
 
 
 def do_build(git_dir: Path, args: argparse.Namespace) -> None:
@@ -201,12 +199,13 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
 
     build_target = get_build_target(args)
     logging.info(f"Triggering CBS build for {build_target}")
-    process = popen(
+    cbs_build = run(
         [
             "cbs",
             *(["--cert", args.cert] if args.cert else []),
             "build",
-            "--wait",
+            "--nowait",
+            "--noprogress",
             "--fail-fast",
             "--skip-tag",
             build_target,
@@ -214,25 +213,44 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
             *(["--scratch"] if args.scratch else []),
         ],
         stdout=subprocess.PIPE,
-        universal_newlines=True,
         dry_run=args.dry_run,
     )
 
     if args.dry_run:
         return
 
-    task_id = None
-    for line in iter(process.stdout.readline, ''):
-        if not task_id and line.startswith("Created task:"):
-            task_id = line.removeprefix("Created task:").strip()
-        print(line, end='', flush=True)  # explicetly not using logging.*
+    # explicetly not using logging.*
+    print(cbs_build.stdout, end='', flush=True)
 
-    process.wait()
-    if process.returncode != 0:
-        die(f"CBS build returned non-zero exit code {process.returncode}")
-
+    task_id = get_task_id(cbs_build.stdout)
     if not task_id:
-        die("CBS completed but failed to found task id in CBS's output")
+        die("'cbs build' completed but failed to found task id in CBS's output")
+
+    try:
+        run(
+            [
+                "cbs",
+                *(["--cert", args.cert] if args.cert else []),
+                "watch-task",
+                task_id,
+            ]
+        )
+    except (subprocess.CalledProcessError, KeyboardInterrupt) as e:
+        # This logic is to cancel task id. In general, handing
+        # KeyboardInterrupt should be enough. But in some case, the child
+        # process receives and manages to exit faster then this process. As
+        # result, we see and negative exit code (-15) instead of
+        # KeyboardInterrupt.
+
+        logging.info("CBS was interrupted or exited with an error")
+        logging.info(f"Let's make sure task {task_id} has been cancelled!")
+        cancel_process = run(["cbs", *(["--cert", args.cert] if args.cert else []), "cancel", f"{task_id}"], check=False)
+        if cancel_process.returncode == 0:
+            logging.info(f"Successfully cancelled task {task_id}.")
+        else:
+            logging.info(f"Failed to cancel task {task_id}. Check logs.")
+
+        raise e
 
     logging.info(f"All done. Task ID: {task_id}")
     logging.info("")
@@ -514,7 +532,20 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
     logging.info("All done")
 
 
+def onsignal(signal: int, frame: Optional[FrameType]) -> None:
+    global INTERRUPTED
+    if INTERRUPTED:
+        return
+
+    INTERRUPTED = True
+    raise KeyboardInterrupt()
+
+
 def main() -> None:
+    signal.signal(signal.SIGINT, onsignal)
+    signal.signal(signal.SIGTERM, onsignal)
+    signal.signal(signal.SIGHUP, onsignal)
+
     handler = logging.StreamHandler(stream=sys.stderr)
     handler.setFormatter(LogFormatter())
     logging.getLogger().addHandler(handler)
@@ -581,7 +612,7 @@ def main() -> None:
     test_parser.add_argument(
         "--task-id",
         required=True,
-        help="CBS's task ID to test or publish",
+        help="CBS's task ID to test",
         type=int,  # koji: ValueError: invalid literal for int() with base 10
     )
 
@@ -589,12 +620,12 @@ def main() -> None:
     publish_parser.add_argument(
         "--task-id",
         required=True,
-        help="CBS's task ID to test or publish",
+        help="CBS's task ID to publish",
         type=int,  # koji: ValueError: invalid literal for int() with base 10
     )
     publish_parser.add_argument(
         "--publish-repo",
-        help="build cmd: do non-scratch build; publish cmd: publish to 'release' repo, otherwise 'testing' repo",
+        help="Publish package to 'release' or 'testing' repo",
         choices=['release', 'testing'],
         default='testing',
     )

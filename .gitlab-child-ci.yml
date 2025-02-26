@@ -41,6 +41,13 @@ systemd:test:
   script:
     - testing-farm request --git-ref $CI_MERGE_REQUEST_REF_PATH --git-url $CI_MERGE_REQUEST_PROJECT_URL --compose 'Fedora-Rawhide'
       --environment REPO=$REPO --environment RELEASE=$RELEASE --environment TASK_ID=$TASK_ID --plan plans/gitlab-ci
+      --no-wait > request.output
+    - export REQUEST_ID=$(grep api request.output | awk -F/ '{ print $NF }'); test -n "$REQUEST_ID"; echo "$REQUEST_ID"
+    - echo "$REQUEST_ID" > request.id
+    - testing-farm watch --id $REQUEST_ID
+  after_script:
+    - export REQUEST_ID=$(cat request.id); echo $REQUEST_ID
+    - test "$CI_JOB_STATUS" == "canceled" && test -n "$REQUEST_ID" && testing-farm cancel "$REQUEST_ID"
   rules:
     - if: $DO_TEST == 'true'
 
@@ -76,4 +83,4 @@ systemd:tag:
     - git tag "$GIT_TAG"
     - git push origin tag "$GIT_TAG"
   rules:
-    - if: $DO_PUBLISH != 'false'
+    - if: $DO_TAG != 'false'
