@@ -308,11 +308,11 @@ def do_publish(git_dir: Path, args: argparse.Namespace) -> None:
         artifacts_dir = git_dir / "artifacts"
         artifacts_dir.mkdir(exist_ok=True)
 
-        git_tag = package.replace("~", "-") # TODO need comes up with a standard
+        git_tag = package.replace("~", "-")  # TODO need comes up with a standard
         tag_file = artifacts_dir / f"{git_tag}-tag.txt"
         logging.info("")
-        logging.info(f"Dumping git_tag/cbs_tag {git_tag}/{tag} to {tag_file}")
-        tag_file.write_text(f"{git_tag}\n{tag}")
+        logging.info(f"Dumping git_tag {git_tag} to {tag_file}")
+        tag_file.write_text(git_tag)
 
 
 def download_rpms(task_id: str, arch: str) -> None:
