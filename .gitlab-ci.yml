@@ -1,9 +1,10 @@
 variables:
-  SOURCE:
+  # don't reference these variables in the child pipelines because they reset to default values
+  SOURCE_VAR:
     description: "Do build using upstream HEAD. Otherwise use sources from systemd.spec"
     options: ["head", "spec"]
     value: "head"
-  PUBLISH:
+  PUBLISH_VAR:
     description: "Publish result to 'release' or 'testing' CBS repo. If false, don't publish"
     options: ["false", "testing", "release"]
     value: "false"
@@ -58,9 +59,9 @@ mn:
   stage: setup
   variables:
     # REPO, RELEASE come from matrix
-    # SOURCE comes from env vars
+    SOURCE: $SOURCE_VAR # child pipeline receive default value otherwise
     DO_TEST: "true"
-    DO_PUBLISH: $PUBLISH
+    DO_PUBLISH: $PUBLISH_VAR
   trigger:
     include: .gitlab-child-ci.yml
     strategy: depend
