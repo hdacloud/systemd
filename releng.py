@@ -472,8 +472,18 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
     if not Path('/dev/kvm').exists():
         mkosi_test_env["TEST_NO_QEMU"] = "1"
 
+
+    if need_verbose():
+        run(["id"], check=False)
+        run(["lscpu"], check=False)
+        run(["lsmem"], check=False)
+        run(["lsmod"], check=False)
+
     try:
         with chdir(systemd_dir):
+            if need_verbose():
+                run(["mkosi", "summary"], dry_run=args.dry_run)
+
             run(["mkosi", "genkey"], dry_run=args.dry_run)
             run(
                 [
