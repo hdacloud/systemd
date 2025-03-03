@@ -450,7 +450,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
         )
     )
 
-    mkosi_test_env = {
+    mkosi_env = {
         "NO_BUILD": "1",
         "TEST_SKIP": "TEST-21-DFUZZER",
     }
@@ -470,8 +470,9 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
     run(["sysctl", "fs.inotify.max_user_instances=1024"], check=False)
     run(["modprobe", "kvm"], check=False)
     if not Path('/dev/kvm').exists():
-        mkosi_test_env["TEST_NO_QEMU"] = "1"
+        mkosi_env["TEST_NO_QEMU"] = "1"
 
+    logging.info(f"mkosi_env={mkosi_env}")
 
     if need_verbose():
         run(["id"], check=False)
@@ -497,6 +498,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
                     "-Dintegration-tests=true",
                     "build"
                 ],
+                env=os.environ | mkosi_env,
                 dry_run=args.dry_run
             )
 
@@ -512,6 +514,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
                     "build",
                     "mkosi"
                 ],
+                env=os.environ | mkosi_env,
                 dry_run=args.dry_run
             )
 
@@ -531,7 +534,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
                     "--print-errorlogs",
                     "--no-stdsplit",
                 ],
-                env=os.environ | mkosi_test_env,
+                env=os.environ | mkosi_env,
                 dry_run=args.dry_run,
             )
     finally:
