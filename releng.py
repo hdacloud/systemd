@@ -51,11 +51,11 @@ def need_verbose():
 
 def run(cmd: Sequence[str], dry_run: bool = False, check: bool = True, *args: Any, **kwargs: Any) -> subprocess.CompletedProcess:
     if dry_run:
-        logging.info(f"DRY RUN: {" ".join(str(s) for s in cmd)}")
+        logging.info(f'DRY RUN: {" ".join(str(s) for s in cmd)}')
         return
 
     try:
-        logging.info(f"$ {" ".join(str(s) for s in cmd)}")
+        logging.info(f'$ {" ".join(str(s) for s in cmd)}')
         return subprocess.run(cmd, *args, **kwargs, check=check, text=True)
     except FileNotFoundError:
         die(f"{cmd[0]} not found in PATH.")
