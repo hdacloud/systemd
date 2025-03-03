@@ -135,6 +135,8 @@ Patch: 0001-pam_systemd-Make-pam_systemd-256-backwards-compatibl.patch
 # Revert breaking changes to unstable systemd-networkd lldp interface
 Patch: https://github.com/systemd/systemd/pull/36050.patch
 
+Patch: https://github.com/systemd/systemd/pull/36585.patch#/route_flags.patch
+
 %endif
 
 # bump networkd netlink timeout to infinity
