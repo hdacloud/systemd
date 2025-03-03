@@ -11,3 +11,8 @@ prepare:
 duration: 2h
 execute:
   script: /usr/bin/python3 releng.py --repo $REPO --release $RELEASE test --task-id $TASK_ID
+
+provision:
+  hardware:
+    virtualization:
+      is-supported: true
