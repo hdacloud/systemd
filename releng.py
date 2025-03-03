@@ -15,6 +15,7 @@ import os
 import re
 import shutil
 import signal
+import multiprocessing
 
 SYSTEMD_REPO = "https://github.com/systemd/systemd"
 AUTHOR = "CentOS Hyperscale SIG <centos-devel@centos.org>"
@@ -471,6 +472,11 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
     run(["modprobe", "kvm"], check=False)
     if not Path('/dev/kvm').exists():
         mkosi_env["TEST_NO_QEMU"] = "1"
+    if (cpu_count := multiprocessing.cpu_count()) > 10:
+        mkosi_env["TEST_JOURNAL_USE_TMP"] = "1"
+        nproc = int(cpu_count / 3)
+    else:
+        nproc = int(cpu_count - 1)
 
     logging.info(f"mkosi_env={mkosi_env}")
 
@@ -533,6 +539,8 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
                     "integration-tests",
                     "--print-errorlogs",
                     "--no-stdsplit",
+                    "--num-processes",
+                    str(nproc),
                 ],
                 env=os.environ | mkosi_env,
                 dry_run=args.dry_run,
