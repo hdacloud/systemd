@@ -284,6 +284,7 @@ Requires:       %{name}-libs%{_isa} = %{version}-%{release}
 %{?fedora:Recommends:     %{name}-resolved = %{version}-%{release}}
 Recommends:     diffutils
 Requires:       (util-linux-core or util-linux)
+Requires:       (libbpf >= 1.5.0 if libbpf)
 Provides:       /bin/systemctl
 Provides:       /sbin/shutdown
 Provides:       syslog
