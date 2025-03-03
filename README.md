@@ -5,9 +5,41 @@ testing and releasing it.
 
 # CI
 
-On merge requests, CI pipelines run without specifying --publish to releng.py. On the main branch, CI
-pipelines run with the --publish argument specified to releng.py so that results are only published on the
-main branch but pipelines can still run in dry-run mode on merge requests. To make this work every script
-that is used in a pipeline should run in dry-run mode by default and accept a --publish option to disable the
-dry-run. Use the $PUBLISH variable in the pipeline configuration which will expand to an empty string on
-merge requests and to --publish when the job is run as part of the daily scheduled pipeline in gitlab.
+CI has three distinct workflows:
+
+## Merge Request
+
+On merge requests, CI pipelines trigger multiple children pipelines, one per
+combination of `REPO` (main, facebook), `RELEASE` (9, 10), and `SOURCE` (head,
+spec).  The latter is the way to test both the upstream HEAD version and the
+version defined in the spec file. To make it simple: when a patch is applied,
+you want to make sure that this patch works cleanly with systemd version in
+systemd.spec (ex: v257.2), and to the HEAD of systemd upstream
+(https://github.com/systemd/systemd).
+
+Each child pipeline performs a scratch build (using CBS) and runs upstream
+tests (using testing-farm).
+
+## Schedule (nighly builds)
+
+Scheduled pipeline execution happens at the configured schedule (Build ->
+Pipeline schedules). The pipeline builds only HEAD versions of the systemd: one
+per `REPO`, `RELEASE` (ex: systemd-258~devel-20250303020517.hs.el10). It
+doesn't perform tests. It publishes RPM using the 'testing' tag, ex,
+hyperscale10s-packages-main-testing.
+
+## Manual Run (release workflow)
+
+Manual runs primarily aim to release the official Hyperscale systemd version.
+
+To trigger it, go to `Build -> Pipelines -> New Pipeline`. Select appropriate
+values for the available variables:
+- `SOURCE`: choose "spec" to build systemd version defined in systemd.spec.
+- `PUBLISH`: choose "release" if you want to publish official release. Do
+   'testing' or 'false' for any other testing purposes.
+
+The pipeline kicks in with multiple child pipelines. Each does:
+1. Build
+2. Test
+3. Publish RPM with chosen tag
+4. Tag repo if $PUBLISH == 'release' for tracking
