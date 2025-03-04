@@ -4,9 +4,6 @@ prepare:
   - name: packages
     how: install
     package: [python3, centos-packager, git-core, coreutils, ca-certificates]
-  - name: tls
-    how: shell
-    script: ln -s /etc/pki/tls/certs/ca-bundle.crt /etc/pki/tls/certs/ca-bundle.trust.crt
 
 duration: 2h
 execute:

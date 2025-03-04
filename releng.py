@@ -351,7 +351,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
     logging.info(f"Unpacking {srcrpm}")
     with open(f"{srcrpm}.tar", "w") as rpmtar:
         # rpm2cpio rejects to create tar file itself when runs in a gitlab runner
-        run(["rpm2cpio", "--nocompression", f"{srcrpm}"], stdout=rpmtar)
+        run(["rpm2cpio", f"{srcrpm}"], stdout=rpmtar)
     run(["cpio", "--extract", "--make-directories", "--file", f"{srcrpm}.tar"] +
         (["--verbose"] if need_verbose() else []))
 
