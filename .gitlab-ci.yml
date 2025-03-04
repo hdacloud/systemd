@@ -8,6 +8,10 @@ variables:
     description: "Publish result to 'release' or 'testing' CBS repo. If false, don't publish"
     options: ["false", "testing", "release"]
     value: "false"
+  DO_TEST_VAR:
+    description: "If set to false, allows to avoid running tests (useful when testing-farm is unstable)"
+    options: ["true", "false"]
+    value: "true"
 
 stages:
   - setup
@@ -60,7 +64,7 @@ mn:
   variables:
     # REPO, RELEASE come from matrix
     SOURCE: $SOURCE_VAR # child pipeline receive default value otherwise
-    DO_TEST: "true"
+    DO_TEST: $DO_TEST_VAR
     DO_PUBLISH: $PUBLISH_VAR
   trigger:
     include: .gitlab-child-ci.yml
