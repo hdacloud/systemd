@@ -15,6 +15,7 @@ import os
 import re
 import shutil
 import signal
+import multiprocessing
 
 SYSTEMD_REPO = "https://github.com/systemd/systemd"
 AUTHOR = "CentOS Hyperscale SIG <centos-devel@centos.org>"
@@ -326,6 +327,18 @@ def get_mkosi_version(file: Path) -> str:
     return None
 
 
+def collect_build_and_test_logs(work_dir: Path, target_dir: Path):
+    for log in (work_dir / "build/meson-logs").glob("*"):
+        if log.is_file():
+            logging.info(f"Moving {log} into {target_dir}")
+            shutil.copy(log, target_dir)
+
+    for log in (work_dir / "build/test/journal").glob("*"):
+        if log.is_file():
+            logging.info(f"Moving {log} into {target_dir}")
+            shutil.copy(log, target_dir)
+
+
 def do_test(git_dir: Path, args: argparse.Namespace) -> None:
     if not args.task_id:
         die("Can't run tests without CBS build id")
@@ -351,7 +364,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
     logging.info(f"Unpacking {srcrpm}")
     with open(f"{srcrpm}.tar", "w") as rpmtar:
         # rpm2cpio rejects to create tar file itself when runs in a gitlab runner
-        run(["rpm2cpio", "--nocompression", f"{srcrpm}"], stdout=rpmtar)
+        run(["rpm2cpio", f"{srcrpm}"], stdout=rpmtar)
     run(["cpio", "--extract", "--make-directories", "--file", f"{srcrpm}.tar"] +
         (["--verbose"] if need_verbose() else []))
 
@@ -438,7 +451,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
         )
     )
 
-    mkosi_test_env = {
+    mkosi_env = {
         "NO_BUILD": "1",
         "TEST_SKIP": "TEST-21-DFUZZER",
     }
@@ -458,10 +471,26 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
     run(["sysctl", "fs.inotify.max_user_instances=1024"], check=False)
     run(["modprobe", "kvm"], check=False)
     if not Path('/dev/kvm').exists():
-        mkosi_test_env["TEST_NO_QEMU"] = "1"
+        mkosi_env["TEST_NO_QEMU"] = "1"
+    if (cpu_count := multiprocessing.cpu_count()) > 10:
+        mkosi_env["TEST_JOURNAL_USE_TMP"] = "1"
+        nproc = int(cpu_count / 3)
+    else:
+        nproc = int(cpu_count - 1)
+
+    logging.info(f"mkosi_env={mkosi_env}")
+
+    if need_verbose():
+        run(["id"], check=False)
+        run(["lscpu"], check=False)
+        run(["lsmem"], check=False)
+        run(["lsmod"], check=False)
 
     try:
         with chdir(systemd_dir):
+            if need_verbose():
+                run(["mkosi", "summary"], dry_run=args.dry_run)
+
             run(["mkosi", "genkey"], dry_run=args.dry_run)
             run(
                 [
@@ -475,6 +504,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
                     "-Dintegration-tests=true",
                     "build"
                 ],
+                env=os.environ | mkosi_env,
                 dry_run=args.dry_run
             )
 
@@ -490,6 +520,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
                     "build",
                     "mkosi"
                 ],
+                env=os.environ | mkosi_env,
                 dry_run=args.dry_run
             )
 
@@ -508,8 +539,10 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
                     "integration-tests",
                     "--print-errorlogs",
                     "--no-stdsplit",
+                    "--num-processes",
+                    str(nproc),
                 ],
-                env=os.environ | mkosi_test_env,
+                env=os.environ | mkosi_env,
                 dry_run=args.dry_run,
             )
     finally:
@@ -517,17 +550,13 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
         if os.environ.get("GITLAB_CI"):
             artifacts_dir = git_dir / "artifacts"
             artifacts_dir.mkdir(exist_ok=True)
-
-            logging.info("Collecting logs")
-            for log in (systemd_dir / "build/meson-logs").glob("*"):
-                if log.is_file():
-                    logging.info(f"Moving {log} into {artifacts_dir}")
-                    shutil.copy(log, artifacts_dir)
-
-            for log in (systemd_dir / "build/test/journal").glob("*"):
-                if log.is_file():
-                    logging.info(f"Moving {log} into {artifacts_dir}")
-                    shutil.copy(log, artifacts_dir)
+            logging.info(f"Collecting logs to {artifacts_dir}")
+            collect_build_and_test_logs(systemd_dir, artifacts_dir)
+        elif os.environ.get("TMT_TEST_DATA"):
+            test_data_dir = Path(os.environ.get("TMT_TEST_DATA"))
+            test_data_dir.mkdir(exist_ok=True)
+            logging.info(f"Collecting logs to {test_data_dir}")
+            collect_build_and_test_logs(systemd_dir, test_data_dir)
 
     logging.info("All done")
 

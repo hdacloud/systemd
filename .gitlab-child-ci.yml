@@ -38,7 +38,7 @@ systemd:test:
     - test -n "$RELEASE"; echo "$RELEASE"
     - export TASK_ID=$(find . -name "*-task-id.txt" -exec cat {} \; -quit); echo "$TASK_ID"; test -n "$TASK_ID"
   script:
-    - testing-farm request --git-ref $CI_MERGE_REQUEST_REF_PATH --git-url $CI_MERGE_REQUEST_PROJECT_URL --compose 'Fedora-Rawhide'
+    - testing-farm request --git-ref $CI_MERGE_REQUEST_REF_PATH --git-url $CI_MERGE_REQUEST_PROJECT_URL --compose "Fedora-41"
       --environment REPO=$REPO --environment RELEASE=$RELEASE --environment TASK_ID=$TASK_ID --plan plans/gitlab-ci
       --no-wait > request.output
     - export REQUEST_ID=$(grep api request.output | awk -F/ '{ print $NF }'); test -n "$REQUEST_ID"; echo "$REQUEST_ID"
