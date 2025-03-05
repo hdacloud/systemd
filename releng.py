@@ -326,6 +326,18 @@ def get_mkosi_version(file: Path) -> str:
     return None
 
 
+def collect_build_and_test_logs(work_dir: Path, target_dir: Path):
+    for log in (work_dir / "build/meson-logs").glob("*"):
+        if log.is_file():
+            logging.info(f"Moving {log} into {target_dir}")
+            shutil.copy(log, target_dir)
+
+    for log in (work_dir / "build/test/journal").glob("*"):
+        if log.is_file():
+            logging.info(f"Moving {log} into {target_dir}")
+            shutil.copy(log, target_dir)
+
+
 def do_test(git_dir: Path, args: argparse.Namespace) -> None:
     if not args.task_id:
         die("Can't run tests without CBS build id")
@@ -517,17 +529,13 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
         if os.environ.get("GITLAB_CI"):
             artifacts_dir = git_dir / "artifacts"
             artifacts_dir.mkdir(exist_ok=True)
-
-            logging.info("Collecting logs")
-            for log in (systemd_dir / "build/meson-logs").glob("*"):
-                if log.is_file():
-                    logging.info(f"Moving {log} into {artifacts_dir}")
-                    shutil.copy(log, artifacts_dir)
-
-            for log in (systemd_dir / "build/test/journal").glob("*"):
-                if log.is_file():
-                    logging.info(f"Moving {log} into {artifacts_dir}")
-                    shutil.copy(log, artifacts_dir)
+            logging.info(f"Collecting logs to {artifacts_dir}")
+            collect_build_and_test_logs(systemd_dir, artifacts_dir)
+        elif os.environ.get("TMT_TEST_DATA"):
+            test_data_dir = Path(os.environ.get("TMT_TEST_DATA"))
+            test_data_dir.mkdir(exist_ok=True)
+            logging.info(f"Collecting logs to {test_data_dir}")
+            collect_build_and_test_logs(systemd_dir, test_data_dir)
 
     logging.info("All done")
 
