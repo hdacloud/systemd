@@ -115,12 +115,154 @@ def get_task_id(output: str) -> str:
     return ""
 
 
-def do_build(args: argparse.Namespace) -> None:
-    logging.info(f"BUILD: repo={args.repo} release={args.release} source={args.source} scratch={args.scratch}")
+def update_spec_for_head_build(args: argparse.Namespace, original_systemd_spec: Path) -> Path:
+    # we're building upstream HEAD.
+    # Hence going to ignore all version/release/etc in the spec file.
 
     systemd_spec = Path.cwd() / "systemd.spec"
-    logging.info(f"Copying systemd.spec to {systemd_spec}")
-    shutil.copyfile(args.git_dir / "systemd.spec", systemd_spec)
+    logging.info(f"Copying {original_systemd_spec} to {systemd_spec}")
+    shutil.copyfile(original_systemd_spec, systemd_spec)
+
+    tarball_pattern = "*.tar.gz"
+    tarballs = list(Path.cwd().glob(tarball_pattern))
+    if len(tarballs) != 1:
+        die("Found no or more than one tarball with glob {tarball_pattern}")
+
+    tarball = tarballs[0]
+    logging.info(f"Found tarball {tarball}")
+
+    if tarball.name == "main.tar.gz":
+        tarball_internal_dir = "systemd-main"
+    elif tarball.match("systemd-*.tar.gz"):
+        tarball_internal_dir = tarball.name.removesuffix(".tar.gz")
+    else:
+        die(f"Tarball {tarball} has unknown prefix")
+
+    # We can't determine the version dynamically in the spec so we retrieve it
+    # up front and pass it in via a macro.
+    version = run(
+        [
+            "tar",
+            "--gunzip",
+            "--extract",
+            "--to-stdout",
+            f"--file={tarball}",
+            f"{tarball_internal_dir}/meson.version",
+        ],
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+
+    # The timestamp is to ensure the release is always monotonically increasing
+    release = datetime.now().strftime(r"%Y%m%d%H%M%S")
+
+    logging.info(f"Modifing {systemd_spec} with version={version} release={release}")
+    systemd_spec.write_text(
+        textwrap.dedent(
+            f"""\
+            %bcond upstream 1
+            %define version_override {version}
+            %define release_override {release}
+            %define branch main
+            """
+        )
+        + systemd_spec.read_text()
+    )
+
+    return systemd_spec
+
+
+def rpmspec_query(args: argparse.Namespace, systemd_spec: Path, query: str, undef_list=None) -> str:
+    if undef_list is None:
+        undef_list = ["dist"]
+
+    return run(
+        [
+            "rpmspec",
+            "--define",
+            f"_sourcedir {args.git_dir}",
+            "--query",
+            "--queryformat",
+            query,
+            *(sum((["--undefine", f"{item}"] for item in undef_list), [])),
+            "--srpm",
+            f"{systemd_spec}",
+        ],
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+
+
+def get_latest_build_systemd_version(output: str) -> str:
+    for line in output.splitlines():
+        if line.startswith("systemd-"):
+            return line.split()[0].strip()
+
+    return ""
+
+
+def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spec: Path) -> None:
+    # verify and potentially update release_override in systemd.spec
+
+    systemd_version = rpmspec_query(args, systemd_spec, "%{name}-%{version}-%{release}")
+    if not systemd_version:
+        die("Failed to get systemd version from systemd.spec")
+
+    logging.info(f"systemd version: {systemd_version}")
+
+    build_tag = get_build_tag(args, "release")
+    logging.info(f"Quering CBS for latest-build of {build_tag}")
+    output = run(
+        [
+            "cbs",
+            *(["--cert", args.cert] if args.cert else []),
+            "latest-build",
+            "--quiet",
+            "--all",
+            build_tag,
+        ],
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+
+    cbs_systemd_version = get_latest_build_systemd_version(output)
+    cbs_systemd_version = cbs_systemd_version.removesuffix("." + get_rpm_suffix(args))  # remove .hs+fb.el10 for 257.3-1.5.hs+fb.el10
+    if not cbs_systemd_version:
+        die("Failed to get latest systemd build from CBS")
+
+    logging.info(f"Latest systemd build: {cbs_systemd_version}")
+    vercmp_result = run(["systemd-analyze", "compare-versions", systemd_version, "==", cbs_systemd_version], check=False)
+    if vercmp_result.returncode != 0:
+        logging.info(f"systemd version in systemd.spec '{systemd_version}' doesn't match one in CBS '{cbs_systemd_version}'")
+        logging.info("Cannot do autoincrement of release_override! Continue as usual!")
+        return
+
+    logging.info(f"systemd version in systemd.spec matches one in CBS")
+
+    systemd_release = rpmspec_query(args, systemd_spec, "%{release}")
+    if not systemd_release:
+        die("Failed to get systemd release from systemd.spec")
+
+    parts = systemd_release.split(".")
+    parts[-1] = int(parts[-1]) + 1  # increment last element by 1
+    incremented_systemd_release = ".".join(map(str, parts))
+    logging.info(f"New systemd release: {incremented_systemd_release}")
+
+    logging.info("Verifing that new systemd_release is higher than old one")
+    vercmp_result = run(["systemd-analyze", "compare-versions", incremented_systemd_release, ">", systemd_release], check=False)
+    if vercmp_result.returncode != 0:
+        die(f"Failed to confirm that: {incremented_systemd_release} > {systemd_release}")
+
+    logging.info("Verification is correct!")
+    logging.info(f"Modifing {systemd_spec} with release={incremented_systemd_release}")
+    systemd_spec.write_text(
+        systemd_spec.read_text().replace(
+            "%{!?release_override:" + systemd_release + "}",
+            "%{!?release_override:" + incremented_systemd_release + "}"
+        )
+    )
+
+
+def do_build(args: argparse.Namespace) -> None:
+    logging.info(f"BUILD: repo={args.repo} release={args.release} source={args.source} scratch={args.scratch} autorelease={args.autorelease}")
+    systemd_spec = args.git_dir / "systemd.spec"
 
     logging.info("Downloading sources")
     run(
@@ -136,53 +278,9 @@ def do_build(args: argparse.Namespace) -> None:
     )
 
     if args.source == "head":
-        # we're building upstream HEAD.
-        # Hence going to ignore all version/release/etc in the spec file.
-
-        tarball_pattern = "*.tar.gz"
-        tarballs = list(Path.cwd().glob(tarball_pattern))
-        if len(tarballs) != 1:
-            die("Found no or more than one tarball with glob {tarball_pattern}")
-
-        tarball = tarballs[0]
-        logging.info(f"Found tarball {tarball}")
-
-        if tarball.name == "main.tar.gz":
-            tarball_internal_dir = "systemd-main"
-        elif tarball.match("systemd-*.tar.gz"):
-            tarball_internal_dir = tarball.name.removesuffix(".tar.gz")
-        else:
-            die(f"Tarball {tarball} has unknown prefix")
-
-        # We can't determine the version dynamically in the spec so we retrieve it
-        # up front and pass it in via a macro.
-        version = run(
-            [
-                "tar",
-                "--gunzip",
-                "--extract",
-                "--to-stdout",
-                f"--file={tarball}",
-                f"{tarball_internal_dir}/meson.version",
-            ],
-            stdout=subprocess.PIPE,
-        ).stdout.strip()
-
-        # The timestamp is to ensure the release is always monotonically increasing
-        release = datetime.now().strftime(r"%Y%m%d%H%M%S")
-
-        logging.info(f"Modifing systemd.spec with version={version} release={release}")
-        systemd_spec.write_text(
-            textwrap.dedent(
-                f"""\
-                %bcond upstream 1
-                %define version_override {version}
-                %define release_override {release}
-                %define branch main
-                """
-            )
-            + systemd_spec.read_text()
-        )
+        systemd_spec = update_spec_for_head_build(args, systemd_spec)
+    elif args.source == "spec" and not args.scratch and args.autorelease:
+        update_spec_for_spec_autorelease_build(args, systemd_spec)
 
     logging.info("Building systemd src.rpm")
     run(
@@ -190,7 +288,7 @@ def do_build(args: argparse.Namespace) -> None:
             "mock",
             "--root=" + get_build_root(args),
             f"--sources={args.git_dir}",
-            "--spec=systemd.spec",
+            f"--spec={systemd_spec}",
             "--enable-network",
             "--define",
             "%_disable_source_fetch 0",
@@ -645,6 +743,14 @@ def main() -> None:
     build_parser.add_argument(
         "--scratch",
         help="Do scratch build",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
+    build_parser.add_argument(
+        "--autorelease",
+        help="Enables autorelease mode which can increment `release_override` in systemd.spec. " +
+             "Autorelease mode leaves changes in systemd.spec which should be commited to Git. " +
+             "Noop if --scratch or --source=head.",
         action=argparse.BooleanOptionalAction,
         default=False,
     )
