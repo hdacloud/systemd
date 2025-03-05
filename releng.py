@@ -102,6 +102,11 @@ def get_build_tag(args: argparse.Namespace) -> str:
     return f"hyperscale{args.release}s-packages-{args.repo}-{args.publish_repo}"
 
 
+def get_rpm_suffix(args: argparse.Namespace) -> str:
+    prefix = "hs+fb" if args.repo == "facebook" else "hs"
+    return f"{prefix}.el{args.release}"
+
+
 def get_task_id(output: str) -> str:
     for line in output.splitlines():
         if line.startswith("Created task:"):
@@ -280,8 +285,8 @@ def do_publish(git_dir: Path, args: argparse.Namespace) -> None:
 
     # it's important to search using args.repo/args.release because
     # otherwise task can be from difference environment
-    prefix = "hs+fb" if args.repo == "facebook" else "hs"
-    srcrpm_pattern = f"systemd-*-*.{prefix}.el{args.release}.src.rpm"
+    rpm_suffix = get_rpm_suffix(args)
+    srcrpm_pattern = f"systemd-*-*.{rpm_suffix}.src.rpm"
     srcrpms = list(Path.cwd().glob(srcrpm_pattern))
     if len(srcrpms) != 1:
         die(f"Found no or more than one systemd source RPM ({srcrpm_pattern})")
@@ -352,8 +357,8 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
 
     # it's important to search using args.repo/args.release because
     # otherwise task can be from difference environment
-    prefix = "hs+fb" if args.repo == "facebook" else "hs"
-    srcrpm_pattern = f"systemd-*-*.{prefix}.el{args.release}.src.rpm"
+    rpm_suffix = get_rpm_suffix(args)
+    srcrpm_pattern = f"systemd-*-*.{rpm_suffix}.src.rpm"
     srcrpms = list(cwd.glob(srcrpm_pattern))
     if len(srcrpms) != 1:
         die(f"Found no or more than one systemd source RPM ({srcrpm_pattern})")
