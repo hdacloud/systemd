@@ -34,12 +34,12 @@ Manual runs primarily aim to release the official Hyperscale systemd version.
 
 To trigger it, go to `Build -> Pipelines -> New Pipeline`. Select appropriate
 values for the available variables:
-- `SOURCE_VAR`: choose "spec" to build systemd version defined in systemd.spec.
-- `PUBLISH_VAR`: choose "release" if you want to publish official release. Do
+- `SOURCE`: choose "spec" to build systemd version defined in systemd.spec.
+- `DO_PUBLISH`: choose "release" if you want to publish official release. Do
    "testing" or "false" for any other testing purposes.
 
 The pipeline kicks in with multiple child pipelines. Each does:
 1. Build
 2. Test
 3. Publish RPM with chosen tag
-4. Tag repo if `$PUBLISH_VAR == 'release'` for tracking
+4. Tag repo if `$DO_PUBLISH == 'release'` for tracking
