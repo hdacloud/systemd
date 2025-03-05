@@ -35,7 +35,11 @@ mr:
   trigger:
     include: .gitlab-child-ci.yml
     strategy: depend
+    forward:
+      pipeline_variables: true
   interruptible: true
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    #123
   extends: .matrix3

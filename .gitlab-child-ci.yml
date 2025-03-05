@@ -15,8 +15,9 @@ default:
 
 systemd:build:
   stage: build
-  extends: .fedora
   script:
+    - echo $SOURCE_VAR
+    - echo $PUBLISH_VAR
     - sleep 300
     - /bin/false
   rules:
