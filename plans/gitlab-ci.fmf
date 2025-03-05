@@ -4,10 +4,12 @@ prepare:
   - name: packages
     how: install
     package: [python3, centos-packager, git-core, coreutils, ca-certificates]
-  - name: tls
-    how: shell
-    script: ln -s /etc/pki/tls/certs/ca-bundle.crt /etc/pki/tls/certs/ca-bundle.trust.crt
 
 duration: 2h
 execute:
   script: /usr/bin/python3 releng.py --repo $REPO --release $RELEASE test --task-id $TASK_ID
+
+provision:
+  hardware:
+    virtualization:
+      is-supported: true
