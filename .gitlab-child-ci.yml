@@ -9,20 +9,13 @@ workflow:
 
 .fedora:
   image: quay.io/fedora/fedora:latest
-  before_script:
-    - env # Show variables that were passed to the job
-    - test -n "$CENTOS_CERT"
-    - test -n "$REPO"; echo "$REPO"
-    - test -n "$RELEASE"; echo "$RELEASE"
-    - dnf --quiet install -y tar git-core python3 centos-packager mock mock-centos-sig-configs
 
 systemd:build:
   stage: build
   extends: .fedora
   script:
-    - test -n "$SOURCE"; echo "$SOURCE"
-    - export SCRATCH=$(test "$DO_PUBLISH" == "false" && echo "--scratch" || echo "--no-scratch"); echo $SCRATCH; test -n "$SCRATCH"
-    - ./releng.py --cert $CENTOS_CERT --repo $REPO --release $RELEASE build --source $SOURCE $SCRATCH
+    - sleep 300
+    - /bin/false
   rules:
     - when: always
   artifacts:

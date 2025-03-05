@@ -21,9 +21,9 @@ stages:
 .matrix3:
   parallel:
     matrix:
-      - REPO: [main, facebook]
-        RELEASE: [9, 10]
-        SOURCE: ['head', 'spec']
+      - REPO: [main]
+        RELEASE: [9]
+        SOURCE: ['head']
 
 # setup for merge request
 mr:
@@ -38,33 +38,3 @@ mr:
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
   extends: .matrix3
-
-# setup for nightly builds
-ni:
-  stage: setup
-  variables:
-    # REPO, RELEASE come from matrix
-    SOURCE: "head"
-    DO_TEST: "false"
-    DO_PUBLISH: "testing"
-  trigger:
-    include: .gitlab-child-ci.yml
-    strategy: depend
-  rules:
-    - if: $CI_PIPELINE_SOURCE == 'schedule'
-  extends: .matrix2
-
-# setup for manual run
-mn:
-  stage: setup
-  variables:
-    # REPO, RELEASE come from matrix
-    SOURCE: $SOURCE_VAR # child pipeline receive default value otherwise
-    DO_TEST: "true"
-    DO_PUBLISH: $PUBLISH_VAR
-  trigger:
-    include: .gitlab-child-ci.yml
-    strategy: depend
-  rules:
-    - if: $CI_PIPELINE_SOURCE == 'web'
-  extends: .matrix2
