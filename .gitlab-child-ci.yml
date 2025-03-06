@@ -20,9 +20,21 @@ systemd:build:
   stage: build
   extends: .fedora
   script:
+    # build
     - test -n "$SOURCE"; echo "$SOURCE"
     - export SCRATCH=$(test "$DO_PUBLISH" == "false" && echo "--scratch" || echo "--no-scratch"); echo $SCRATCH; test -n "$SCRATCH"
-    - ./releng.py --cert $CENTOS_CERT --repo $REPO --release $RELEASE build --source $SOURCE $SCRATCH
+    - export AUTORELEASE=$(test "$DO_PUBLISH" == "release" && echo "--autorelease" || echo "--no-autorelease"); echo $AUTORELEASE; test -n "$AUTORELEASE"
+    - ./releng.py --cert $CENTOS_CERT --repo $REPO --release $RELEASE build --source $SOURCE $SCRATCH $AUTORELEASE
+
+    # commit
+    - test "$DO_PUBLISH" == "release" || exit 0 # early exit
+    - git diff --exit-code systemd.spec && exit 0 || /bin/true  # early exit
+    - git remote set-url origin "https://hyperscalebot:${GIT_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+    - git config user.email "hyperscalebot@example.com"
+    - git config user.name "hyperscalebot"
+    - git add systemd.spec
+    - git commit -m "Incremented systemd release per autorelease process"
+    - git push origin HEAD:$CI_COMMIT_REF_NAME -o ci.skip
   rules:
     - when: always
   interruptible: true
@@ -75,9 +87,9 @@ systemd:tag:
     - env # Show variables that were passed to the job
   script:
     - export GIT_TAG=$(find . -name "*-tag.txt" -exec cat {} \; -quit); echo "$GIT_TAG"; test -n "$GIT_TAG"
-    - git remote set-url origin "https://gitlab-ci-token:${GIT_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
-    - git config user.email "ci-bot@example.com"
-    - git config user.name "ci-bot"
+    - git remote set-url origin "https://hyperscalebot:${GIT_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+    - git config user.email "hyperscalebot@example.com"
+    - git config user.name "hyperscalebot"
     - git tag "$GIT_TAG"
     - git push origin tag "$GIT_TAG"
   rules:
