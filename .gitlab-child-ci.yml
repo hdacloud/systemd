@@ -25,6 +25,7 @@ systemd:build:
     - ./releng.py --cert $CENTOS_CERT --repo $REPO --release $RELEASE build --source $SOURCE $SCRATCH
   rules:
     - when: always
+  interruptible: true
   artifacts:
     paths: [ 'artifacts/*-task-id.txt' ]
 
@@ -49,6 +50,7 @@ systemd:test:
     - test "$CI_JOB_STATUS" == "canceled" && test -n "$REQUEST_ID" && testing-farm cancel "$REQUEST_ID"
   rules:
     - if: $DO_TEST == 'true'
+  interruptible: true
 
 systemd:publish:
   stage: publish
@@ -61,7 +63,7 @@ systemd:publish:
     - ./releng.py --cert $CENTOS_CERT --repo $REPO --release $RELEASE publish --task-id $TASK_ID --publish-repo $DO_PUBLISH
   rules:
     - if: $DO_PUBLISH != 'false'
-
+  interruptible: true
   artifacts:
     paths: [ 'artifacts/*-tag.txt' ]
 
@@ -80,3 +82,4 @@ systemd:tag:
     - git push origin tag "$GIT_TAG"
   rules:
     - if: $DO_PUBLISH == 'release'
+  interruptible: false # tagging should complete if results are published
