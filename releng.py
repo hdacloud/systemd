@@ -115,19 +115,19 @@ def get_task_id(output: str) -> str:
     return ""
 
 
-def do_build(git_dir: Path, args: argparse.Namespace) -> None:
+def do_build(args: argparse.Namespace) -> None:
     logging.info(f"BUILD: repo={args.repo} release={args.release} source={args.source} scratch={args.scratch}")
 
     systemd_spec = Path.cwd() / "systemd.spec"
     logging.info(f"Copying systemd.spec to {systemd_spec}")
-    shutil.copyfile(git_dir / "systemd.spec", systemd_spec)
+    shutil.copyfile(args.git_dir / "systemd.spec", systemd_spec)
 
     logging.info("Downloading sources")
     run(
         [
             "spectool",
             "--define",
-            f"_sourcedir {git_dir}",
+            f"_sourcedir {args.git_dir}",
             "--get-files",
             f"{systemd_spec}",
             *(["--define", "branch main"] if args.source == "head" else []),
@@ -189,7 +189,7 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
         [
             "mock",
             "--root=" + get_build_root(args),
-            f"--sources={git_dir}",
+            f"--sources={args.git_dir}",
             "--spec=systemd.spec",
             "--enable-network",
             "--define",
@@ -265,7 +265,7 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
 
     # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
     if os.environ.get("GITLAB_CI"):
-        artifacts_dir = git_dir / "artifacts"
+        artifacts_dir = args.git_dir / "artifacts"
         artifacts_dir.mkdir(exist_ok=True)
 
         task_id_file = artifacts_dir / f"{build_target}-{args.source}-task-id.txt"
@@ -274,7 +274,7 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
         task_id_file.write_text(task_id)
 
 
-def do_publish(git_dir: Path, args: argparse.Namespace) -> None:
+def do_publish(args: argparse.Namespace) -> None:
     if not args.task_id:
         die("Can't run tests without CBS build id")
 
@@ -311,7 +311,7 @@ def do_publish(git_dir: Path, args: argparse.Namespace) -> None:
 
     # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
     if os.environ.get("GITLAB_CI"):
-        artifacts_dir = git_dir / "artifacts"
+        artifacts_dir = args.git_dir / "artifacts"
         artifacts_dir.mkdir(exist_ok=True)
 
         git_tag = package.replace("~", "-")  # TODO need comes up with a standard
@@ -344,7 +344,7 @@ def collect_build_and_test_logs(work_dir: Path, target_dir: Path):
             shutil.copy(log, target_dir)
 
 
-def do_test(git_dir: Path, args: argparse.Namespace) -> None:
+def do_test(args: argparse.Namespace) -> None:
     if not args.task_id:
         die("Can't run tests without CBS build id")
 
@@ -553,7 +553,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
     finally:
         # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
         if os.environ.get("GITLAB_CI"):
-            artifacts_dir = git_dir / "artifacts"
+            artifacts_dir = args.git_dir / "artifacts"
             artifacts_dir.mkdir(exist_ok=True)
             logging.info(f"Collecting logs to {artifacts_dir}")
             collect_build_and_test_logs(systemd_dir, artifacts_dir)
@@ -607,6 +607,13 @@ def main() -> None:
         metavar="PATH",
         type=Path,
         default=None,
+    )
+    parser.add_argument(
+        "--git-dir",
+        help="Path to Git repo, defaults to current dir",
+        metavar="PATH",
+        type=Path,
+        default=Path.cwd(),
     )
     parser.add_argument(
         "--cleanup",
@@ -670,9 +677,9 @@ def main() -> None:
     if args.cert:
         args.cert = args.cert.absolute()
 
-    if not Path(".gitlab-ci.yml").exists():
+    if not (args.git_dir / ".gitlab-ci.yml").exists():
         # testing-fram clones repo without .git
-      die("The verb must be run from the rpm git repository")
+        die("The verb must be run from the rpm git repository")
 
     try:
         func = {
@@ -681,13 +688,12 @@ def main() -> None:
             "publish": do_publish,
         }[args.verb]
 
-        git_dir = Path.cwd()
         with tempfile.TemporaryDirectory(dir='.', prefix='systemd-releng-', delete=args.cleanup) as workdir:
             logging.info(f"Created temporary directory {workdir}, will use it for all further work.")
             if not args.cleanup:
                 logging.info("The temporary directory will not be removed at the end!")
             with chdir(Path(workdir)):
-                return func(git_dir, args)
+                return func(args)
     except SystemExit as e:
         sys.exit(e.code)
     except KeyboardInterrupt:
