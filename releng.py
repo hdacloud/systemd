@@ -98,8 +98,13 @@ def get_build_target(args: argparse.Namespace) -> str:
     return f"hyperscale{args.release}s-packages-{args.repo}-el{args.release}s"
 
 
-def get_build_tag(args: argparse.Namespace) -> str:
-    return f"hyperscale{args.release}s-packages-{args.repo}-{args.publish_repo}"
+def get_build_tag(args: argparse.Namespace, publish_repo: str = "") -> str:
+    return f"hyperscale{args.release}s-packages-{args.repo}-{publish_repo if publish_repo else args.publish_repo}"
+
+
+def get_rpm_suffix(args: argparse.Namespace) -> str:
+    prefix = "hs+fb" if args.repo == "facebook" else "hs"
+    return f"{prefix}.el{args.release}"
 
 
 def get_task_id(output: str) -> str:
@@ -110,19 +115,161 @@ def get_task_id(output: str) -> str:
     return ""
 
 
-def do_build(git_dir: Path, args: argparse.Namespace) -> None:
-    logging.info(f"BUILD: repo={args.repo} release={args.release} source={args.source} scratch={args.scratch}")
+def update_spec_for_head_build(args: argparse.Namespace, original_systemd_spec: Path) -> Path:
+    # we're building upstream HEAD.
+    # Hence going to ignore all version/release/etc in the spec file.
 
     systemd_spec = Path.cwd() / "systemd.spec"
-    logging.info(f"Copying systemd.spec to {systemd_spec}")
-    shutil.copyfile(git_dir / "systemd.spec", systemd_spec)
+    logging.info(f"Copying {original_systemd_spec} to {systemd_spec}")
+    shutil.copyfile(original_systemd_spec, systemd_spec)
+
+    tarball_pattern = "*.tar.gz"
+    tarballs = list(Path.cwd().glob(tarball_pattern))
+    if len(tarballs) != 1:
+        die("Found no or more than one tarball with glob {tarball_pattern}")
+
+    tarball = tarballs[0]
+    logging.info(f"Found tarball {tarball}")
+
+    if tarball.name == "main.tar.gz":
+        tarball_internal_dir = "systemd-main"
+    elif tarball.match("systemd-*.tar.gz"):
+        tarball_internal_dir = tarball.name.removesuffix(".tar.gz")
+    else:
+        die(f"Tarball {tarball} has unknown prefix")
+
+    # We can't determine the version dynamically in the spec so we retrieve it
+    # up front and pass it in via a macro.
+    version = run(
+        [
+            "tar",
+            "--gunzip",
+            "--extract",
+            "--to-stdout",
+            f"--file={tarball}",
+            f"{tarball_internal_dir}/meson.version",
+        ],
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+
+    # The timestamp is to ensure the release is always monotonically increasing
+    release = datetime.now().strftime(r"%Y%m%d%H%M%S")
+
+    logging.info(f"Modifing {systemd_spec} with version={version} release={release}")
+    systemd_spec.write_text(
+        textwrap.dedent(
+            f"""\
+            %bcond upstream 1
+            %define version_override {version}
+            %define release_override {release}
+            %define branch main
+            """
+        )
+        + systemd_spec.read_text()
+    )
+
+    return systemd_spec
+
+
+def rpmspec_query(args: argparse.Namespace, systemd_spec: Path, query: str, undef_list=None) -> str:
+    if undef_list is None:
+        undef_list = ["dist"]
+
+    return run(
+        [
+            "rpmspec",
+            "--define",
+            f"_sourcedir {args.git_dir}",
+            "--query",
+            "--queryformat",
+            query,
+            *(sum((["--undefine", f"{item}"] for item in undef_list), [])),
+            "--srpm",
+            f"{systemd_spec}",
+        ],
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+
+
+def get_latest_build_systemd_version(output: str) -> str:
+    for line in output.splitlines():
+        if line.startswith("systemd-"):
+            return line.split()[0].strip()
+
+    return ""
+
+
+def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spec: Path) -> None:
+    # verify and potentially update release_override in systemd.spec
+
+    systemd_version = rpmspec_query(args, systemd_spec, "%{name}-%{version}-%{release}")
+    if not systemd_version:
+        die("Failed to get systemd version from systemd.spec")
+
+    logging.info(f"systemd version: {systemd_version}")
+
+    build_tag = get_build_tag(args, "release")
+    logging.info(f"Quering CBS for latest-build of {build_tag}")
+    output = run(
+        [
+            "cbs",
+            *(["--cert", args.cert] if args.cert else []),
+            "latest-build",
+            "--quiet",
+            "--all",
+            build_tag,
+        ],
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+
+    cbs_systemd_version = get_latest_build_systemd_version(output)
+    cbs_systemd_version = cbs_systemd_version.removesuffix("." + get_rpm_suffix(args))  # remove .hs+fb.el10 for 257.3-1.5.hs+fb.el10
+    if not cbs_systemd_version:
+        die("Failed to get latest systemd build from CBS")
+
+    logging.info(f"Latest systemd build: {cbs_systemd_version}")
+    vercmp_result = run(["systemd-analyze", "compare-versions", systemd_version, "==", cbs_systemd_version], check=False)
+    if vercmp_result.returncode != 0:
+        logging.info(f"systemd version in systemd.spec '{systemd_version}' doesn't match one in CBS '{cbs_systemd_version}'")
+        logging.info("Cannot do autoincrement of release_override! Continue as usual!")
+        return
+
+    logging.info(f"systemd version in systemd.spec matches one in CBS")
+
+    systemd_release = rpmspec_query(args, systemd_spec, "%{release}")
+    if not systemd_release:
+        die("Failed to get systemd release from systemd.spec")
+
+    parts = systemd_release.split(".")
+    parts[-1] = int(parts[-1]) + 1  # increment last element by 1
+    incremented_systemd_release = ".".join(map(str, parts))
+    logging.info(f"New systemd release: {incremented_systemd_release}")
+
+    logging.info("Verifing that new systemd_release is higher than old one")
+    vercmp_result = run(["systemd-analyze", "compare-versions", incremented_systemd_release, ">", systemd_release], check=False)
+    if vercmp_result.returncode != 0:
+        die(f"Failed to confirm that: {incremented_systemd_release} > {systemd_release}")
+
+    logging.info("Verification is correct!")
+    logging.info(f"Modifing {systemd_spec} with release={incremented_systemd_release}")
+    systemd_spec.write_text(
+        systemd_spec.read_text().replace(
+            "%{!?release_override:" + systemd_release + "}",
+            "%{!?release_override:" + incremented_systemd_release + "}"
+        )
+    )
+
+
+def do_build(args: argparse.Namespace) -> None:
+    logging.info(f"BUILD: repo={args.repo} release={args.release} source={args.source} scratch={args.scratch} autorelease={args.autorelease}")
+    systemd_spec = args.git_dir / "systemd.spec"
 
     logging.info("Downloading sources")
     run(
         [
             "spectool",
             "--define",
-            f"_sourcedir {git_dir}",
+            f"_sourcedir {args.git_dir}",
             "--get-files",
             f"{systemd_spec}",
             *(["--define", "branch main"] if args.source == "head" else []),
@@ -131,61 +278,17 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
     )
 
     if args.source == "head":
-        # we're building upstream HEAD.
-        # Hence going to ignore all version/release/etc in the spec file.
-
-        tarball_pattern = "*.tar.gz"
-        tarballs = list(Path.cwd().glob(tarball_pattern))
-        if len(tarballs) != 1:
-            die("Found no or more than one tarball with glob {tarball_pattern}")
-
-        tarball = tarballs[0]
-        logging.info(f"Found tarball {tarball}")
-
-        if tarball.name == "main.tar.gz":
-            tarball_internal_dir = "systemd-main"
-        elif tarball.match("systemd-*.tar.gz"):
-            tarball_internal_dir = tarball.name.removesuffix(".tar.gz")
-        else:
-            die(f"Tarball {tarball} has unknown prefix")
-
-        # We can't determine the version dynamically in the spec so we retrieve it
-        # up front and pass it in via a macro.
-        version = run(
-            [
-                "tar",
-                "--gunzip",
-                "--extract",
-                "--to-stdout",
-                f"--file={tarball}",
-                f"{tarball_internal_dir}/meson.version",
-            ],
-            stdout=subprocess.PIPE,
-        ).stdout.strip()
-
-        # The timestamp is to ensure the release is always monotonically increasing
-        release = datetime.now().strftime(r"%Y%m%d%H%M%S")
-
-        logging.info(f"Modifing systemd.spec with version={version} release={release}")
-        systemd_spec.write_text(
-            textwrap.dedent(
-                f"""\
-                %bcond upstream 1
-                %define version_override {version}
-                %define release_override {release}
-                %define branch main
-                """
-            )
-            + systemd_spec.read_text()
-        )
+        systemd_spec = update_spec_for_head_build(args, systemd_spec)
+    elif args.source == "spec" and not args.scratch and args.autorelease:
+        update_spec_for_spec_autorelease_build(args, systemd_spec)
 
     logging.info("Building systemd src.rpm")
     run(
         [
             "mock",
             "--root=" + get_build_root(args),
-            f"--sources={git_dir}",
-            "--spec=systemd.spec",
+            f"--sources={args.git_dir}",
+            f"--spec={systemd_spec}",
             "--enable-network",
             "--define",
             "%_disable_source_fetch 0",
@@ -260,7 +363,7 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
 
     # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
     if os.environ.get("GITLAB_CI"):
-        artifacts_dir = git_dir / "artifacts"
+        artifacts_dir = args.git_dir / "artifacts"
         artifacts_dir.mkdir(exist_ok=True)
 
         task_id_file = artifacts_dir / f"{build_target}-{args.source}-task-id.txt"
@@ -269,7 +372,7 @@ def do_build(git_dir: Path, args: argparse.Namespace) -> None:
         task_id_file.write_text(task_id)
 
 
-def do_publish(git_dir: Path, args: argparse.Namespace) -> None:
+def do_publish(args: argparse.Namespace) -> None:
     if not args.task_id:
         die("Can't run tests without CBS build id")
 
@@ -280,8 +383,8 @@ def do_publish(git_dir: Path, args: argparse.Namespace) -> None:
 
     # it's important to search using args.repo/args.release because
     # otherwise task can be from difference environment
-    prefix = "hs+fb" if args.repo == "facebook" else "hs"
-    srcrpm_pattern = f"systemd-*-*.{prefix}.el{args.release}.src.rpm"
+    rpm_suffix = get_rpm_suffix(args)
+    srcrpm_pattern = f"systemd-*-*.{rpm_suffix}.src.rpm"
     srcrpms = list(Path.cwd().glob(srcrpm_pattern))
     if len(srcrpms) != 1:
         die(f"Found no or more than one systemd source RPM ({srcrpm_pattern})")
@@ -306,7 +409,7 @@ def do_publish(git_dir: Path, args: argparse.Namespace) -> None:
 
     # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
     if os.environ.get("GITLAB_CI"):
-        artifacts_dir = git_dir / "artifacts"
+        artifacts_dir = args.git_dir / "artifacts"
         artifacts_dir.mkdir(exist_ok=True)
 
         git_tag = package.replace("~", "-")  # TODO need comes up with a standard
@@ -339,7 +442,7 @@ def collect_build_and_test_logs(work_dir: Path, target_dir: Path):
             shutil.copy(log, target_dir)
 
 
-def do_test(git_dir: Path, args: argparse.Namespace) -> None:
+def do_test(args: argparse.Namespace) -> None:
     if not args.task_id:
         die("Can't run tests without CBS build id")
 
@@ -352,8 +455,8 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
 
     # it's important to search using args.repo/args.release because
     # otherwise task can be from difference environment
-    prefix = "hs+fb" if args.repo == "facebook" else "hs"
-    srcrpm_pattern = f"systemd-*-*.{prefix}.el{args.release}.src.rpm"
+    rpm_suffix = get_rpm_suffix(args)
+    srcrpm_pattern = f"systemd-*-*.{rpm_suffix}.src.rpm"
     srcrpms = list(cwd.glob(srcrpm_pattern))
     if len(srcrpms) != 1:
         die(f"Found no or more than one systemd source RPM ({srcrpm_pattern})")
@@ -548,7 +651,7 @@ def do_test(git_dir: Path, args: argparse.Namespace) -> None:
     finally:
         # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
         if os.environ.get("GITLAB_CI"):
-            artifacts_dir = git_dir / "artifacts"
+            artifacts_dir = args.git_dir / "artifacts"
             artifacts_dir.mkdir(exist_ok=True)
             logging.info(f"Collecting logs to {artifacts_dir}")
             collect_build_and_test_logs(systemd_dir, artifacts_dir)
@@ -604,6 +707,13 @@ def main() -> None:
         default=None,
     )
     parser.add_argument(
+        "--git-dir",
+        help="Path to Git repo, defaults to current dir",
+        metavar="PATH",
+        type=Path,
+        default=Path.cwd(),
+    )
+    parser.add_argument(
         "--cleanup",
         help="Clean up temporary files and directories after a run",
         action=argparse.BooleanOptionalAction,
@@ -636,6 +746,14 @@ def main() -> None:
         action=argparse.BooleanOptionalAction,
         default=False,
     )
+    build_parser.add_argument(
+        "--autorelease",
+        help="Enables autorelease mode which can increment `release_override` in systemd.spec. " +
+             "Autorelease mode leaves changes in systemd.spec which should be commited to Git. " +
+             "Noop if --scratch or --source=head.",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
 
     test_parser = subparsers.add_parser('test', help='Test command')
     test_parser.add_argument(
@@ -665,9 +783,9 @@ def main() -> None:
     if args.cert:
         args.cert = args.cert.absolute()
 
-    if not Path(".gitlab-ci.yml").exists():
+    if not (args.git_dir / ".gitlab-ci.yml").exists():
         # testing-fram clones repo without .git
-      die("The verb must be run from the rpm git repository")
+        die("The verb must be run from the rpm git repository")
 
     try:
         func = {
@@ -676,13 +794,12 @@ def main() -> None:
             "publish": do_publish,
         }[args.verb]
 
-        git_dir = Path.cwd()
         with tempfile.TemporaryDirectory(dir='.', prefix='systemd-releng-', delete=args.cleanup) as workdir:
             logging.info(f"Created temporary directory {workdir}, will use it for all further work.")
             if not args.cleanup:
                 logging.info("The temporary directory will not be removed at the end!")
             with chdir(Path(workdir)):
-                return func(git_dir, args)
+                return func(args)
     except SystemExit as e:
         sys.exit(e.code)
     except KeyboardInterrupt:
