@@ -9,8 +9,8 @@ variables:
     options: ["false", "testing", "release"]
     value: "false"
   DO_TEST:
-    description: "If set to false, allows to avoid running tests (useful when testing-farm is unstable)"
-    options: ["true", "false"]
+    description: "Setting 'false' avoids running tests (useful when testing-farm is unstable). Setting 'allow_failure' runs tests but continue pipeline execution when test fails."
+    options: ["true", "false", "allow_failure"]
     value: "true"
 
 stages:
@@ -53,7 +53,7 @@ ni:
   variables:
     # REPO, RELEASE come from matrix
     SOURCE: "head"
-    DO_TEST: "false"
+    DO_TEST: "allow_failure"
     DO_PUBLISH: "testing"
   trigger:
     include: .gitlab-child-ci.yml

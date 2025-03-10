@@ -61,7 +61,10 @@ systemd:test:
     - export REQUEST_ID=$(cat request.id); echo $REQUEST_ID
     - test "$CI_JOB_STATUS" == "canceled" && test -n "$REQUEST_ID" && testing-farm cancel "$REQUEST_ID"
   rules:
+    - if: $DO_TEST == 'allow_failure'
+      allow_failure: true
     - if: $DO_TEST == 'true'
+      allow_failure: false
   interruptible: true
 
 systemd:publish:
