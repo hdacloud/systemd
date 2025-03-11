@@ -1,0 +1,176 @@
+From 8e8a88b98c2cb2fa3743f6997092ac80462cd4fc Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Sat, 15 Mar 2025 09:38:09 +0900
+Subject: [PATCH 1/2] network: do not remove static routes on other interfaces
+ that are currently in the pending state
+
+Otherwise, even if .network file has KeepConfiguration=yes, routes on
+an interfaces may be removed on restart.
+
+Fixes a bug introduced by 8d01e44c1f0e00b414d36bd1b46ecff548242208.
+---
+ src/network/networkd-route.c | 23 +++++++++++++++--------
+ 1 file changed, 15 insertions(+), 8 deletions(-)
+
+diff --git a/src/network/networkd-route.c b/src/network/networkd-route.c
+index 9a506b1..406996c 100644
+--- a/src/network/networkd-route.c
++++ b/src/network/networkd-route.c
+@@ -1494,15 +1494,22 @@ int link_drop_routes(Link *link, bool only_static) {
+                         }
+                 }
+ 
+-                /* When we also mark foreign routes, do not mark routes assigned to other interfaces.
+-                 * Otherwise, routes assigned to unmanaged interfaces will be dropped.
+-                 * Note, route_get_link() does not provide assigned link for routes with an unreachable type
+-                 * or IPv4 multipath routes. So, the current implementation does not support managing such
+-                 * routes by other daemon or so, unless ManageForeignRoutes=no. */
+-                if (!only_static) {
+-                        Link *route_link;
++                Link *route_link = NULL;
++                if (route_get_link(link->manager, route, &route_link) >= 0 && route_link != link) {
++                        /* When we also mark foreign routes, do not mark routes assigned to other interfaces.
++                         * Otherwise, routes assigned to unmanaged interfaces will be dropped.
++                         * Note, route_get_link() does not provide assigned link for routes with an
++                         * unreachable type or IPv4 multipath routes. So, the current implementation does not
++                         * support managing such routes by other daemon or so, unless ManageForeignRoutes=no. */
++                        if (!only_static)
++                                continue;
+ 
+-                        if (route_get_link(link->manager, route, &route_link) >= 0 && route_link != link)
++                        /* When we mark only static routes, do not mark routes assigned to links that we do
++                         * not know the assignment of .network files to the interfaces. Otherwise, if an
++                         * interface is in the pending state, even if the .network file to be assigned to the
++                         * interface has KeepConfiguration=yes, routes on the interface will be removed.
++                         * This is especially important when systemd-networkd is restarted. */
++                        if (!IN_SET(route_link->state, LINK_STATE_UNMANAGED, LINK_STATE_CONFIGURING, LINK_STATE_CONFIGURED))
+                                 continue;
+                 }
+ 
+-- 
+2.48.1
+
+From 78d9c62a574a4c7908980b33469a20e97e9ad337 Mon Sep 17 00:00:00 2001
+From: Matteo Croce <teknoraver@meta.com>
+Date: Wed, 12 Mar 2025 14:36:14 +0100
+Subject: [PATCH 2/2] test-network: check that network configuration is stable
+ with KeepConfiguration=yes
+
+Check that when networkd restarts, and the network configures
+KeepConfiguration=yes, the network configuration is never changed.
+
+Ensure this by dumping the `ip monitor` output when networkd is restarting.
+
+Co-authored-by: Yu Watanabe <watanabe.yu+github@gmail.com>
+---
+ test/test-network/conf/85-static-ipv6.network | 22 +++++++
+ test/test-network/systemd-networkd-tests.py   | 57 +++++++++++++++++++
+ 2 files changed, 79 insertions(+)
+ create mode 100644 test/test-network/conf/85-static-ipv6.network
+
+diff --git a/test/test-network/conf/85-static-ipv6.network b/test/test-network/conf/85-static-ipv6.network
+new file mode 100644
+index 0000000..50322b1
+--- /dev/null
++++ b/test/test-network/conf/85-static-ipv6.network
+@@ -0,0 +1,22 @@
++# SPDX-License-Identifier: LGPL-2.1-or-later
++[Match]
++Name=dummy98
++
++[Network]
++DHCP=no
++IPv6AcceptRA=no
++KeepConfiguration=yes
++
++[Address]
++Address=2001:db8:0:f101::15/64
++PreferredLifetime=forever
++
++[Address]
++Address=2001:db8:1:f101::15/64
++PreferredLifetime=0
++
++[Route]
++Gateway=fe80::f0ca:cc1a
++Source=::/0
++Destination=::/0
++Metric=1
+diff --git a/test/test-network/systemd-networkd-tests.py b/test/test-network/systemd-networkd-tests.py
+index d0dda91..4b668c2 100755
+--- a/test/test-network/systemd-networkd-tests.py
++++ b/test/test-network/systemd-networkd-tests.py
+@@ -32,6 +32,7 @@ import socket
+ import struct
+ import subprocess
+ import sys
++import tempfile
+ import time
+ import unittest
+ 
+@@ -4849,6 +4850,62 @@ class NetworkdNetworkTests(unittest.TestCase, Utilities):
+         self.assertRegex(output, 'inet 10.1.2.3/16 scope global dummy98')
+         self.assertNotRegex(output, 'inet 10.2.3.4/16 scope global dynamic dummy98')
+ 
++    def check_keep_configuration_on_restart(self):
++        self.wait_online('dummy98:routable')
++        self.wait_online('unmanaged0:routable', setup_state='unmanaged')
++
++        print('### ip -6 address show dev dummy98')
++        output = check_output('ip -6 address show dev dummy98')
++        print(output)
++        self.assertIn('inet6 2001:db8:0:f101::15/64 scope global', output)
++        self.assertIn('inet6 2001:db8:1:f101::15/64 scope global deprecated', output)
++
++        print('### ip -6 address show dev unmanaged0')
++        output = check_output('ip -6 address show dev unmanaged0')
++        print(output)
++        self.assertIn('inet6 2001:db8:9999:f101::15/64 scope global', output)
++
++        print('### ip -6 route show default dev dummy98')
++        output = check_output('ip -6 route show default dev dummy98')
++        print(output)
++        self.assertIn('default via fe80::f0ca:cc1a proto static metric 1 pref medium', output)
++
++    def test_keep_configuration_on_restart(self):
++        # Add an unmanaged interface with an up address
++        call('ip link add unmanaged0 type dummy')
++        call('ip link set unmanaged0 up')
++        call('ip -6 addr add 2001:db8:9999:f101::15/64 dev unmanaged0')
++
++        copy_network_unit('12-dummy.netdev', '85-static-ipv6.network')
++        start_networkd()
++        self.check_keep_configuration_on_restart()
++
++        # Start `ip monitor` with output to a temporary file
++        with tempfile.TemporaryFile(mode='r+', prefix='ip_monitor') as logfile:
++            process = subprocess.Popen(['ip', 'monitor', 'dev', 'dummy98'], stdout=logfile, text=True)
++            restart_networkd()
++            self.check_keep_configuration_on_restart()
++
++            process.send_signal(signal.SIGTERM)
++            process.wait()
++
++            print('### ip monitor dev dummy98 BEGIN')
++
++            # Read the `ip monitor` output looking for network changes
++            logfile.seek(0)
++            for line in logfile:
++                print(line, end="")
++                # Check if a link went down
++                self.assertNotRegex(line, 'unmanaged0: .* state DOWN')
++                self.assertNotRegex(line, 'dummy98: .* state DOWN')
++                # Check if an address was removed
++                self.assertNotRegex(line, '^Deleted .* 2001:db8:')
++                self.assertNotRegex(line, '^Deleted 2001:db8:.*/64')
++                # Check if the default route was removed
++                self.assertNotRegex(line, '^Deleted default via fe80::f0ca:cc1a')
++
++            print('### ip monitor dev dummy98 END')
++
+     def check_nexthop(self, manage_foreign_nexthops, first):
+         self.wait_online('veth99:routable', 'veth-peer:routable', 'dummy98:routable')
+ 
+-- 
+2.48.1
+
