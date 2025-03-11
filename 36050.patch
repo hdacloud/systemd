@@ -636,3 +636,60 @@ index 75b61b7d07279..881937d456004 100644
  d$ /run/systemd/netif/leases 0755 systemd-network systemd-network -
 +d$ /run/systemd/netif/lldp   0755 systemd-network systemd-network -
  d$ /var/lib/systemd/network  0755 systemd-network systemd-network -
+
+---
+ test/test-network/systemd-networkd-tests.py | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/test/test-network/systemd-networkd-tests.py b/test/test-network/systemd-networkd-tests.py
+index 4153cf12e8..1a7b211b7d 100755
+--- a/test/test-network/systemd-networkd-tests.py
++++ b/test/test-network/systemd-networkd-tests.py
+@@ -6133,7 +6133,7 @@ class NetworkdLLDPTests(unittest.TestCase, Utilities):
+         for _ in range(20):
+             output = networkctl('lldp')
+             print(output)
+-            if re.search(r'veth99 .* veth-peer .* .......a...', output):
++            if re.search(r'veth99 .* .......a...\s*veth-peer', output):
+                 break
+             time.sleep(0.5)
+         else:
+@@ -6142,12 +6142,12 @@ class NetworkdLLDPTests(unittest.TestCase, Utilities):
+         # With interface name
+         output = networkctl('lldp', 'veth99');
+         print(output)
+-        self.assertRegex(output, r'veth99 .* veth-peer .* .......a...')
++        self.assertRegex(output, r'veth99 .* .......a...\s*veth-peer')
+
+         # With interface name pattern
+         output = networkctl('lldp', 've*9');
+         print(output)
+-        self.assertRegex(output, r'veth99 .* veth-peer .* .......a...')
++        self.assertRegex(output, r'veth99 .* .......a...\s*veth-peer')
+
+         # json format
+         output = networkctl('--json=short', 'lldp')
+@@ -6185,7 +6185,7 @@ class NetworkdLLDPTests(unittest.TestCase, Utilities):
+         for _ in range(20):
+             output = networkctl('lldp')
+             print(output)
+-            if re.search(r'veth99 .* veth-peer .* ....r......', output):
++            if re.search(r'veth99 .* ....r......\s*veth-peer', output):
+                 break
+             time.sleep(0.5)
+         else:
+@@ -6194,12 +6194,12 @@ class NetworkdLLDPTests(unittest.TestCase, Utilities):
+         # With interface name
+         output = networkctl('lldp', 'veth99');
+         print(output)
+-        self.assertRegex(output, r'veth99 .* veth-peer .* ....r......')
++        self.assertRegex(output, r'veth99 .* ....r......\s*veth-peer')
+
+         # With interface name pattern
+         output = networkctl('lldp', 've*9');
+         print(output)
+-        self.assertRegex(output, r'veth99 .* veth-peer .* ....r......')
++        self.assertRegex(output, r'veth99 .* ....r......\s*veth-peer')
+
+         # json format
+         output = networkctl('--json=short', 'lldp')
