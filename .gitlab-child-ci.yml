@@ -59,7 +59,7 @@ systemd:test:
     - testing-farm watch --id $REQUEST_ID
   after_script:
     - export REQUEST_ID=$(cat request.id); echo $REQUEST_ID
-    - test "$CI_JOB_STATUS" == "canceled" && test -n "$REQUEST_ID" && testing-farm cancel "$REQUEST_ID"
+    - test "$CI_JOB_STATUS" == "canceled" && test -n "$REQUEST_ID" && testing-farm cancel "$REQUEST_ID" || /bin/true
   rules:
     - if: $DO_TEST == 'allow_failure'
       allow_failure: true
