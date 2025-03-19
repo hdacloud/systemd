@@ -100,6 +100,15 @@ Source25:       98-default-mac-none.link
 
 Source26:       systemd-user
 
+# FB: This is a horrible hack to reinstate the pre-254 installkernel logic,
+# as the new one doesn't work properly with kernels predating
+#   https://lore.kernel.org/linux-kbuild/20240114080644.5086-1-jtornosm@redhat.com/
+# installkernel-bls comes from
+#   https://src.fedoraproject.org/rpms/grubby/c/aa9b1b454fd0c792226cefb65d744fadfaa8acda?branch=rawhide
+# and the corresponding c10s commit for reference is
+#   https://gitlab.com/redhat/centos-stream/rpms/grubby/-/commit/aa9b1b454fd0c792226cefb65d744fadfaa8acda)
+Source100:      installkernel-bls
+
 %if 0%{?fedora} < 40 && 0%{?rhel} < 10
 # Work-around for dracut issue: run generators directly when we are in initrd
 # https://bugzilla.redhat.com/show_bug.cgi?id=2164404
@@ -1078,7 +1087,11 @@ install -m 0755 -D -t %{buildroot}%{_rpmconfigdir}/ %{SOURCE24}
 install -Dm0644 -t %{buildroot}%{_prefix}/lib/systemd/network/ %{SOURCE25}
 
 %if 0%{?fedora} || 0%{?rhel} >= 10
+%if 0%{?facebook}
+install -Dpm0755 %SOURCE100 %{buildroot}%{_sbindir}/installkernel
+%else
 ln -s --relative %{buildroot}%{_bindir}/kernel-install %{buildroot}%{_sbindir}/installkernel
+%endif
 %endif
 
 %if "%{_sbindir}" == "%{_bindir}"
