@@ -150,16 +150,6 @@ Patch: https://github.com/systemd/systemd/pull/36585.patch#/route_flags.patch
 
 # bump networkd netlink timeout to infinity
 Patch: FB_only_bump_netlink_timeout_to_infinity.patch
-
-# Meta specific patches for builds from git main
-# TODO: These should be removed once they are either merged into git main
-# or upstreamed
-%if %{with upstream}
-
-# Temporary workaround: PrivateUsers=full implies DelegateNamespaces=yes
-Patch: 0001-Temporary-workaround-PrivateUsers-full-implies-Deleg.patch
-
-%endif
 %endif
 
 %ifarch %{ix86} x86_64 aarch64 riscv64
