@@ -47,13 +47,12 @@ systemd:test:
   dependencies:
     - systemd:build
   before_script:
-    - test -n "$REPO"; echo "$REPO"
     - test -n "$RELEASE"; echo "$RELEASE"
     - export TASK_ID=$(find . -name "*-task-id.txt" -exec cat {} \; -quit); echo "$TASK_ID"; test -n "$TASK_ID"
   script:
     - testing-farm request --git-ref $CI_MERGE_REQUEST_REF_PATH --git-url $CI_MERGE_REQUEST_PROJECT_URL --compose "Fedora-41"
-      --environment REPO=$REPO --environment RELEASE=$RELEASE --environment TASK_ID=$TASK_ID --plan plans/gitlab-ci
-      --no-wait > request.output
+      --environment MKOSI_DISTRIBUTION=centos --environment MKOSI_RELEASE=$RELEASE --environment CBS_TASK_ID=$TASK_ID
+      --environment MKOSI_REPOSITORIES=hyperscale-packages-main --plan plans/upstream --no-wait > request.output
     - export REQUEST_ID=$(grep api request.output | awk -F/ '{ print $NF }'); test -n "$REQUEST_ID"; echo "$REQUEST_ID"
     - echo "$REQUEST_ID" > request.id
     - testing-farm watch --id $REQUEST_ID
