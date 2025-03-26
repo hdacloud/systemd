@@ -289,6 +289,7 @@ def do_build(args: argparse.Namespace) -> None:
     run(
         [
             "spectool",
+            "--sources",
             "--define",
             f"_sourcedir {args.git_dir}",
             "--get-files",
