@@ -422,20 +422,7 @@ def do_publish(args: argparse.Namespace) -> None:
 
     logging.info(f"PUBLISH: repo={args.repo} release={args.release} task_id={args.task_id} publish_repo={args.publish_repo}")
 
-    logging.info("Downloading source RPM")
-    download_rpms(args.task_id, "src")
-
-    # it's important to search using args.repo/args.release because
-    # otherwise task can be from difference environment
-    rpm_suffix = get_rpm_suffix(args)
-    srcrpm_pattern = f"systemd-*-*.{rpm_suffix}.src.rpm"
-    srcrpms = list(Path.cwd().glob(srcrpm_pattern))
-    if len(srcrpms) != 1:
-        die(f"Found no or more than one systemd source RPM ({srcrpm_pattern})")
-
-    srcrpm = srcrpms[0]
-    logging.info(f"Found source RPM {srcrpm}")
-
+    srcrpm = download_and_validate_src_rpm(args)
     tag = get_build_tag(args)
     package = srcrpm.name.removesuffix(".src.rpm")
     logging.info(f"Tag package {package} with '{tag}' tag")
@@ -465,6 +452,22 @@ def do_publish(args: argparse.Namespace) -> None:
 
 def download_rpms(task_id: str, arch: str) -> None:
     run(["cbs", "download-task", "--noprogress", "--arch", arch, str(task_id)])
+
+
+def download_and_validate_src_rpm(args: argparse.Namespace) -> Path:
+    logging.info("Downloading source RPM")
+    download_rpms(args.task_id, "src")
+
+    # it's important to search using args.repo/args.release because
+    # otherwise task can be from difference environment
+    rpm_suffix = get_rpm_suffix(args)
+    srcrpm_pattern = f"systemd-*-*.{rpm_suffix}.src.rpm"
+    srcrpms = list(Path.cwd().glob(srcrpm_pattern))
+    if len(srcrpms) != 1:
+        die(f"Found no or more than one systemd source RPM ({srcrpm_pattern})")
+
+    logging.info(f"Found source RPM {srcrpms[0]}")
+    return srcrpms[0]
 
 
 def onsignal(signal: int, frame: Optional[FrameType]) -> None:
