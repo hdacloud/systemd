@@ -1,3 +1,11 @@
+From: Ivan Kruglov <mail@ikruglov.com>
+Date: Fri, 28 Mar 2025 13:49:12 +0100
+Subject: [PATCH 2/2] Bump netlink timeout to infinity
+
+---
+ src/libsystemd/sd-netlink/netlink-internal.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
 diff --git a/src/libsystemd/sd-netlink/netlink-internal.h b/src/libsystemd/sd-netlink/netlink-internal.h
 index 891d3e8413..0fd919407a 100644
 --- a/src/libsystemd/sd-netlink/netlink-internal.h
