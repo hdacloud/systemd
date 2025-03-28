@@ -527,7 +527,7 @@ def main() -> None:
         "--scratch",
         help="Do scratch build",
         action=argparse.BooleanOptionalAction,
-        default=False,
+        default=True,
     )
     build_parser.add_argument(
         "--autorelease",
