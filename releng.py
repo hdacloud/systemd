@@ -151,7 +151,9 @@ def update_spec_for_head_build(args: argparse.Namespace, original_systemd_spec: 
     ).stdout.strip()
 
     # The timestamp is to ensure the release is always monotonically increasing
-    release = datetime.now().strftime(r"%Y%m%d%H%M%S")
+    release_date = datetime.now().strftime(r"%Y%m%d%H%M%S")
+    release_extra = f".{args.rpm_extra_info}" if args.scratch and args.rpm_extra_info else ""
+    release = f"{release_date}{release_extra}"
 
     logging.info(f"Modifing {systemd_spec} with version={version} release={release}")
     systemd_spec.write_text(
@@ -538,7 +540,7 @@ def main() -> None:
     build_parser.add_argument(
         "--rpm-extra-info",
         help="Extra information to include into RPM name. Useful to include short MR name/number. " +
-             "This options works only with --scratch and --source=spec both present.",
+             "This options works only with --scratch present.",
     )
 
     test_parser = subparsers.add_parser('test', help='Test command')
