@@ -31,7 +31,7 @@ stages:
     matrix:
       - REPO: [main, facebook]
         RELEASE: [9, 10]
-        SOURCE: ['head', 'spec']
+        SOURCE: [head, spec]
 
 # setup for merge request
 mr:
