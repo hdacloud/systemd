@@ -169,6 +169,27 @@ def update_spec_for_head_build(args: argparse.Namespace, original_systemd_spec: 
     return systemd_spec
 
 
+def update_spec_for_spec_scratch_build(args: argparse.Namespace, original_systemd_spec: Path) -> Path:
+    # we're building from spec, but it's a scratch build.
+    # So, need to include extra info for debugability
+
+    systemd_spec = Path.cwd() / "systemd.spec"
+    logging.info(f"Copying {original_systemd_spec} to {systemd_spec}")
+    shutil.copyfile(original_systemd_spec, systemd_spec)
+
+    release_spec = rpmspec_query(args, systemd_spec, "%{release}")
+    if not release_spec:
+        die("Failed to get systemd release from systemd.spec")
+
+    release_date = datetime.now().strftime(r"%Y%m%d%H%M%S")
+    release_extra = f".{args.rpm_extra_info}" if args.rpm_extra_info else ""
+    release = f"{release_spec}~{release_date}{release_extra}"
+
+    logging.info(f"Modifing {systemd_spec} with release={release}")
+    systemd_spec.write_text(f"%define release_override {release}\n" + systemd_spec.read_text())
+    return systemd_spec
+
+
 def rpmspec_query(args: argparse.Namespace, systemd_spec: Path, query: str, undef_list=None) -> str:
     if undef_list is None:
         undef_list = ["dist"]
@@ -277,8 +298,11 @@ def do_build(args: argparse.Namespace) -> None:
 
     if args.source == "head":
         systemd_spec = update_spec_for_head_build(args, systemd_spec)
-    elif args.source == "spec" and not args.scratch and args.autorelease:
-        update_spec_for_spec_autorelease_build(args, systemd_spec)
+    elif args.source == "spec":
+        if args.scratch:
+            systemd_spec = update_spec_for_spec_scratch_build(args, systemd_spec)
+        elif args.autorelease:
+            update_spec_for_spec_autorelease_build(args, systemd_spec)
 
     logging.info("Building systemd src.rpm")
     run(
@@ -510,6 +534,11 @@ def main() -> None:
              "Noop if --scratch or --source=head.",
         action=argparse.BooleanOptionalAction,
         default=False,
+    )
+    build_parser.add_argument(
+        "--rpm-extra-info",
+        help="Extra information to include into RPM name. Useful to include short MR name/number. " +
+             "This options works only with --scratch and --source=spec both present.",
     )
 
     test_parser = subparsers.add_parser('test', help='Test command')
