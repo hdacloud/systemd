@@ -36,6 +36,7 @@ mr:
     # REPO, RELEASE, SOURCE come from matrix
     DO_TEST: "true"
     DO_PUBLISH: "false"
+    DO_RPM_EXTRA_INFO: "true"
   trigger:
     include: .gitlab-child-ci.yml
     strategy: depend
