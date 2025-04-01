@@ -24,7 +24,8 @@ systemd:build:
     - test -n "$SOURCE"; echo "$SOURCE"
     - export SCRATCH=$(test "$DO_PUBLISH" == "false" && echo "--scratch" || echo "--no-scratch"); echo $SCRATCH; test -n "$SCRATCH"
     - export AUTORELEASE=$(test "$DO_PUBLISH" == "release" && echo "--autorelease" || echo "--no-autorelease"); echo $AUTORELEASE; test -n "$AUTORELEASE"
-    - ./releng.py --cert $CENTOS_CERT --repo $REPO --release $RELEASE build --source $SOURCE $SCRATCH $AUTORELEASE
+    - export RPM_EXTRA_INFO=$(test "$DO_RPM_EXTRA_INFO" == "true" && echo "--rpm-extra-info=mr${CI_MERGE_REQUEST_IID}"); echo "$RPM_EXTRA_INFO"
+    - ./releng.py --cert $CENTOS_CERT --repo $REPO --release $RELEASE build --source $SOURCE $SCRATCH $AUTORELEASE $RPM_EXTRA_INFO
 
     # commit
     - test "$DO_PUBLISH" == "release" || exit 0 # early exit
