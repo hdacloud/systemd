@@ -16,6 +16,7 @@ import shutil
 import signal
 import urllib.request
 import time
+import re
 
 SYSTEMD_REPO = "https://github.com/systemd/systemd"
 AUTHOR = "CentOS Hyperscale SIG <centos-devel@centos.org>"
@@ -470,6 +471,99 @@ def download_and_validate_src_rpm(args: argparse.Namespace) -> Path:
     return srcrpms[0]
 
 
+def rpm_query(rpm: Path, query: str) -> str:
+    return run(
+        [
+            "rpm",
+            "--query",
+            "--queryformat",
+            query,
+            f"{rpm}",
+        ],
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+
+
+def do_unpack(args: argparse.Namespace) -> None:
+    if not args.task_id:
+        die("Can't publish rpms without CBS build id")
+
+    logging.info(f"UNPACK: repo={args.repo} release={args.release} task_id={args.task_id}")
+
+    srcrpm = download_and_validate_src_rpm(args)
+
+    logging.info("Searching for patches")
+    # here we query patches. They are ordered! Should be applied in reverse order though!
+    patches = rpm_query(srcrpm, "[%{patch}\n]").splitlines()
+    patches = list(reversed(patches))
+    if len(patches) > 0:
+        logging.info(f"Found {len(patches)} patches")
+
+        logging.info(f"Unpacking {srcrpm}")
+        with open(f"{srcrpm}.tar", "w") as rpmtar:
+            # rpm2cpio rejects to create tar file itself when runs in a gitlab runner
+            run(["rpm2cpio", f"{srcrpm}"], stdout=rpmtar)
+
+        run(["cpio", "--extract", "--make-directories", "--file", f"{srcrpm}.tar", *(["--verbose"] if need_verbose() else [])])
+
+        for i, patch in enumerate(patches):
+            patch = patches[i] = Path.cwd() / patch
+            logging.info(f"  - {patch.name}")
+            if not patch.exists():
+                die(f"Patch {patch} does not exist")
+    else:
+        logging.info("Found no patches. Still going to push to have clean tag in the unpacked repo")
+
+    logging.info("Searching for source code version")
+    output = rpm_query(srcrpm, "%{version}")
+    if not output:
+        die(f"Failed to query version from source RPM: {srcrpm}")
+
+    if "~devel" in output:
+        systemd_source_pattern = r"^systemd-[0-9a-f]+\.tar\.gz$"
+        sources = rpm_query(srcrpm, "[%{source}\n]").splitlines()
+        source = next((s for s in sources if re.match(systemd_source_pattern, s)), None)
+        if not source:
+            die(f"Failed to find file matching regexp '{systemd_source_pattern}' among spec sources")
+        git_source_tag_or_commit = source.removeprefix("systemd-").removesuffix(".tar.gz")
+    else:
+        git_source_tag_or_commit = "v" + output
+
+    logging.info(f"systemd source tag/commit to apply patches on top: {git_source_tag_or_commit}")
+
+    git_unpacked_tag = rpm_query(srcrpm, "%{name}-%{version}-%{release}")
+    git_unpacked_tag = git_unpacked_tag.replace("~", "-")
+    git_unpacked_tag_upstream = f"{git_unpacked_tag}-upstream"
+    logging.info(f"systemd unpack tags to push patches code to: {git_unpacked_tag} {git_unpacked_tag_upstream}")
+
+    with tempfile.TemporaryDirectory(dir='.', prefix='systemd-source-', delete=args.cleanup) as repodir:
+        run(["git", "clone", "https://github.com/systemd/systemd.git", str(repodir)])
+        run(["git", "config", "--global", "user.email", "hyperscalebot@example.com"])
+        run(["git", "config", "--global", "user.name", "hyperscalebot"])
+
+        with chdir(Path(repodir)):
+            run(["git", "checkout", git_source_tag_or_commit, *([] if need_verbose() else ["--quiet"])])
+            run(["git", "tag", git_unpacked_tag_upstream])
+
+            for patch in patches:
+                run(["git", "am", str(patch)])
+            run(["git", "tag", git_unpacked_tag])
+
+            if os.environ.get("GITLAB_CI"):
+                logging.info("Pushing to the unpacked repo")
+                unpack_git_token = os.environ.get("GIT_PUSH_TOKEN_SYSTEMD_UNPACKED")
+                if not unpack_git_token:
+                    die("Can't push to unpack repo without GIT_PUSH_TOKEN_SYSTEMD_UNPACKED")
+
+                # token is scrubbed by gitlab UI
+                ci_server_host = os.environ.get("CI_SERVER_HOST")
+                repo_url = f"https://hyperscalebot:{unpack_git_token}@{ci_server_host}/CentOS/Hyperscale/rpms-unpacked/systemd.git"
+                run(["git", "remote", "add", "unpack", repo_url])
+                run(["git", "push", "--force", "unpack", "tag", git_unpacked_tag, git_unpacked_tag_upstream])
+
+    logging.info("All done")
+
+
 def onsignal(signal: int, frame: Optional[FrameType]) -> None:
     global INTERRUPTED
     if INTERRUPTED:
@@ -580,6 +674,14 @@ def main() -> None:
         default='testing',
     )
 
+    unpack_parser = subparsers.add_parser('unpack', help='Unpack systemd RPMs content and, optionally, push it to https://gitlab.com/CentOS/Hyperscale/rpms-unpacked/systemd')
+    unpack_parser.add_argument(
+        "--task-id",
+        required=True,
+        help="CBS's task ID to publish",
+        type=int,  # koji: ValueError: invalid literal for int() with base 10
+    )
+
     args = parser.parse_args()
     logging.getLogger().setLevel(args.log_level)
 
@@ -594,6 +696,7 @@ def main() -> None:
         func = {
             "build": do_build,
             "publish": do_publish,
+            "unpack": do_unpack,
         }[args.verb]
 
         with tempfile.TemporaryDirectory(dir='.', prefix='systemd-releng-', delete=args.cleanup) as workdir:
