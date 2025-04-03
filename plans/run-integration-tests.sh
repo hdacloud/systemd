@@ -30,39 +30,48 @@ else
     exit 1
 fi
 
+PACKAGEDIR="$PWD"
+
 mkdir systemd
 rpm2cpio ./systemd-*.src.rpm | cpio --to-stdout --extract './*.tar.gz' | tar xz --strip-components=1 -C systemd
-pushd systemd
 
 # Now prepare mkosi at the same version required by the systemd repo.
-git clone https://github.com/systemd/mkosi
-mkosi_hash="$(grep systemd/mkosi@ .github/workflows/mkosi.yml | sed "s|.*systemd/mkosi@||g")"
-git -C mkosi checkout "$mkosi_hash"
+git clone https://github.com/systemd/mkosi /var/tmp/systemd-integration-tests-mkosi
+mkosi_hash="$(grep systemd/mkosi@ systemd/.github/workflows/mkosi.yml | sed "s|.*systemd/mkosi@||g")"
+git -C /var/tmp/systemd-integration-tests-mkosi checkout "$mkosi_hash"
 
-export PATH="$PWD/mkosi/bin:$PATH"
+export PATH="/var/tmp/systemd-integration-tests-mkosi/bin:$PATH"
+
+pushd systemd
 
 # shellcheck source=/dev/null
 . /etc/os-release || . /usr/lib/os-release
 
-tee mkosi.local.conf <<EOF
+if [[ -d mkosi ]]; then
+    LOCAL_CONF=mkosi/mkosi.local.conf
+else
+    LOCAL_CONF=mkosi.local.conf
+fi
+
+tee "$LOCAL_CONF" <<EOF
 [Distribution]
 Distribution=${MKOSI_DISTRIBUTION:-$ID}
 Release=${MKOSI_RELEASE:-${VERSION_ID:-rawhide}}
 
 [Content]
-PackageDirectories=..
+PackageDirectories=$PACKAGEDIR
 SELinuxRelabel=yes
 
 [Build]
 ToolsTreeDistribution=${MKOSI_DISTRIBUTION:-$ID}
 ToolsTreeRelease=${MKOSI_RELEASE:-${VERSION_ID:-rawhide}}
-ToolsTreePackageDirectories=..
+ToolsTreePackageDirectories=$PACKAGEDIR
 Environment=NO_BUILD=1
 WithTests=yes
 EOF
 
 if [[ -n "${MKOSI_REPOSITORIES:-}" ]]; then
-    tee --append mkosi.local.conf <<EOF
+    tee --append "$LOCAL_CONF" <<EOF
 [Distribution]
 Repositories=$MKOSI_REPOSITORIES
 
@@ -72,7 +81,7 @@ EOF
 fi
 
 if [[ -n "${TEST_SELINUX_CHECK_AVCS:-}" ]]; then
-    tee --append mkosi.local.conf <<EOF
+    tee --append "$LOCAL_CONF" <<EOF
 [Runtime]
 KernelCommandLineExtra=systemd.setenv=TEST_SELINUX_CHECK_AVCS=$TEST_SELINUX_CHECK_AVCS
 EOF
@@ -81,8 +90,13 @@ fi
 # Create missing mountpoint for mkosi sandbox.
 mkdir -p /etc/pacman.d/gnupg
 
-# TODO: drop once BTRFS regression is fixed
-sed -i "s/Format=btrfs/Format=ext4/" mkosi.repart/10-root.conf
+# We don't bother with this change if the mkosi configuration is
+# in mkosi/ as if that's the case then we know for sure that the
+# upstream has this fix as well.
+# TODO: drop once BTRFS regression is fixed.
+if [[ -f mkosi.repart/10-root.conf ]]; then
+    sed -i "s/Format=btrfs/Format=ext4/" mkosi.repart/10-root.conf
+fi
 
 # If we don't have KVM, skip running in qemu, as it's too slow. But try to load the module first.
 modprobe kvm || true
