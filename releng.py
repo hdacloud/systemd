@@ -566,14 +566,6 @@ def main() -> None:
              "This options works only with --scratch present.",
     )
 
-    test_parser = subparsers.add_parser('test', help='Test command')
-    test_parser.add_argument(
-        "--task-id",
-        required=True,
-        help="CBS's task ID to test",
-        type=int,  # koji: ValueError: invalid literal for int() with base 10
-    )
-
     publish_parser = subparsers.add_parser('publish', help='Publish command')
     publish_parser.add_argument(
         "--task-id",
