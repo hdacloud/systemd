@@ -1,6 +1,3 @@
-#global commit 1781de18ab8ebc3e42a607851d8effb3b0355c87
-%{?commit:%global shortcommit %(c=%{commit}; echo ${c:0:7})}
-
 # We ship a .pc file but don't want to have a dep on pkg-config. We
 # strip the automatically generated dep here and instead co-own the
 # directory.
@@ -62,12 +59,14 @@ License:        LGPL-2.1-or-later AND MIT AND GPL-2.0-or-later
 Summary:        System and Service Manager
 
 # download tarballs with "spectool -g systemd.spec"
-%if %{defined branch}
+# packit will always rewrite the first Source0 it finds, ignoring any conditionals so list
+# the fallback source that's used if neither %%branch nor %%commit are defined first.
+%if %{undefined branch} && %{undefined commit}
+Source0:        https://github.com/systemd/systemd/archive/v%{version}/%{name}-%{version}.tar.gz
+%elif %{defined branch}
 Source0:        https://github.com/systemd/systemd/archive/refs/heads/%{branch}.tar.gz
 %elif %{defined commit}
-Source0:        https://github.com/systemd/systemd/archive/%{commit}/%{name}-%{shortcommit}.tar.gz
-%else
-Source0:        https://github.com/systemd/systemd/archive/v%{version_no_tilde}/%{name}-%{version_no_tilde}.tar.gz
+Source0:        https://github.com/systemd/systemd/archive/%{commit}/%{name}-%{commit}.tar.gz
 %endif
 # This file must be available before %%prep.
 # It is generated during systemd build and can be found in build/src/core/.
@@ -750,7 +749,7 @@ main systemd package and is meant for use in exitrds.
 %elif %{defined commit}
 %autosetup -n %{name}-%{commit} -p1
 %else
-%autosetup -n %{name}-%{version_no_tilde} -p1
+%autosetup -n %{name}-%{version} -p1
 %endif
 
 # Disable user lockdown until rpm implements it natively.
