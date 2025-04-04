@@ -3,6 +3,7 @@ stages:
   - test
   - publish
   - tag
+  - unpack
 
 workflow:
   name: "systemd-$REPO-$RELEASE-$SOURCE"
@@ -25,7 +26,7 @@ systemd:build:
     - export SCRATCH=$(test "$DO_PUBLISH" == "false" && echo "--scratch" || echo "--no-scratch"); echo $SCRATCH; test -n "$SCRATCH"
     - export AUTORELEASE=$(test "$DO_PUBLISH" == "release" && echo "--autorelease" || echo "--no-autorelease"); echo $AUTORELEASE; test -n "$AUTORELEASE"
     - export RPM_EXTRA_INFO=$(test "$DO_RPM_EXTRA_INFO" == "true" && echo "--rpm-extra-info=mr${CI_MERGE_REQUEST_IID}"); echo "$RPM_EXTRA_INFO"
-    - ./releng.py --cert $CENTOS_CERT --repo $REPO --release $RELEASE build --source $SOURCE $SCRATCH $AUTORELEASE $RPM_EXTRA_INFO
+    - ./releng.py --cert "$CENTOS_CERT" --repo "$REPO" --release "$RELEASE" build --source "$SOURCE" $SCRATCH $AUTORELEASE $RPM_EXTRA_INFO
 
     # commit
     - test "$DO_PUBLISH" == "release" || exit 0 # early exit
@@ -75,7 +76,7 @@ systemd:publish:
   script:
     - test -n "$DO_PUBLISH"; echo "$DO_PUBLISH"
     - export TASK_ID=$(find . -name "*-task-id.txt" -exec cat {} \; -quit); echo "$TASK_ID"; test -n "$TASK_ID"
-    - ./releng.py --cert $CENTOS_CERT --repo $REPO --release $RELEASE publish --task-id $TASK_ID --publish-repo $DO_PUBLISH
+    - ./releng.py --cert "$CENTOS_CERT" --repo "$REPO" --release "$RELEASE" publish --task-id "$TASK_ID" --publish-repo "$DO_PUBLISH"
   rules:
     - if: $DO_PUBLISH != 'false'
   interruptible: true
@@ -98,3 +99,19 @@ systemd:tag:
   rules:
     - if: $DO_PUBLISH == 'release'
   interruptible: false # tagging should complete if results are published
+
+systemd:unpack:
+  stage: unpack
+  extends: .fedora
+  dependencies:
+    - systemd:build
+  script:
+    - export TASK_ID=$(find . -name "*-task-id.txt" -exec cat {} \; -quit); echo "$TASK_ID"; test -n "$TASK_ID"
+    - ./releng.py --repo "$REPO" --release "$RELEASE" unpack --task-id "$TASK_ID"
+  rules:
+    - if: $DO_UNPACK == 'true'
+      allow_failure: false
+    - if: $DO_UNPACK == 'manual'
+      when: manual
+      allow_failure: true # this is necessary to let pipeline completing without waiting for this job
+  interruptible: true

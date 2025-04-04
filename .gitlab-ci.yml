@@ -12,6 +12,10 @@ variables:
     description: "Setting 'false' avoids running tests (useful when testing-farm is unstable). Setting 'allow_failure' runs tests but continue pipeline execution when test fails."
     options: ["true", "false", "allow_failure"]
     value: "true"
+  DO_UNPACK:
+    description: "If 'true', unpacks built src.rpm into https://gitlab.com/CentOS/Hyperscale/rpms-unpacked/systemd. Setting to 'false' disables this. 'manual' creates a step in CI which one can manually run."
+    options: ["true", "false", "manual"]
+    value: "true"
 
 stages:
   - setup
@@ -27,7 +31,7 @@ stages:
     matrix:
       - REPO: [main, facebook]
         RELEASE: [9, 10]
-        SOURCE: ['head', 'spec']
+        SOURCE: [head, spec]
 
 # setup for merge request
 mr:
@@ -35,6 +39,7 @@ mr:
   variables:
     # REPO, RELEASE, SOURCE come from matrix
     DO_TEST: "true"
+    DO_UNPACK: "manual"
     DO_PUBLISH: "false"
     DO_RPM_EXTRA_INFO: "true"
   trigger:
@@ -55,6 +60,7 @@ ni:
     # REPO, RELEASE come from matrix
     SOURCE: "head"
     DO_TEST: "allow_failure"
+    DO_UNPACK: "true"
     DO_PUBLISH: "testing"
   trigger:
     include: .gitlab-child-ci.yml

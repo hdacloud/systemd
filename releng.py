@@ -14,6 +14,9 @@ import tempfile
 import os
 import shutil
 import signal
+import urllib.request
+import time
+import re
 
 SYSTEMD_REPO = "https://github.com/systemd/systemd"
 AUTHOR = "CentOS Hyperscale SIG <centos-devel@centos.org>"
@@ -113,7 +116,7 @@ def get_task_id(output: str) -> str:
     return ""
 
 
-def update_spec_for_head_build(args: argparse.Namespace, original_systemd_spec: Path) -> Path:
+def update_spec_for_head_build(args: argparse.Namespace, original_systemd_spec: Path, latest_sha: str) -> Path:
     # we're building upstream HEAD.
     # Hence going to ignore all version/release/etc in the spec file.
 
@@ -121,20 +124,9 @@ def update_spec_for_head_build(args: argparse.Namespace, original_systemd_spec: 
     logging.info(f"Copying {original_systemd_spec} to {systemd_spec}")
     shutil.copyfile(original_systemd_spec, systemd_spec)
 
-    tarball_pattern = "*.tar.gz"
-    tarballs = list(Path.cwd().glob(tarball_pattern))
-    if len(tarballs) != 1:
-        die("Found no or more than one tarball with glob {tarball_pattern}")
-
-    tarball = tarballs[0]
-    logging.info(f"Found tarball {tarball}")
-
-    if tarball.name == "main.tar.gz":
-        tarball_internal_dir = "systemd-main"
-    elif tarball.match("systemd-*.tar.gz"):
-        tarball_internal_dir = tarball.name.removesuffix(".tar.gz")
-    else:
-        die(f"Tarball {tarball} has unknown prefix")
+    tarball = Path(f"systemd-{latest_sha}.tar.gz")
+    if not tarball.exists():
+        die(f"Tarball f{tarball} does not exist")
 
     # We can't determine the version dynamically in the spec so we retrieve it
     # up front and pass it in via a macro.
@@ -145,7 +137,7 @@ def update_spec_for_head_build(args: argparse.Namespace, original_systemd_spec: 
             "--extract",
             "--to-stdout",
             f"--file={tarball}",
-            f"{tarball_internal_dir}/meson.version",
+            f"systemd-{latest_sha}/meson.version",
         ],
         stdout=subprocess.PIPE,
     ).stdout.strip()
@@ -155,14 +147,14 @@ def update_spec_for_head_build(args: argparse.Namespace, original_systemd_spec: 
     release_extra = f".{args.rpm_extra_info}" if args.scratch and args.rpm_extra_info else ""
     release = f"{release_date}{release_extra}"
 
-    logging.info(f"Modifing {systemd_spec} with version={version} release={release}")
+    logging.info(f"Modifing {systemd_spec} with version={version} release={release} commit={latest_sha}")
     systemd_spec.write_text(
         textwrap.dedent(
             f"""\
             %bcond upstream 1
             %define version_override {version}
             %define release_override {release}
-            %define branch main
+            %define commit {latest_sha}
             """
         )
         + systemd_spec.read_text()
@@ -281,25 +273,54 @@ def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spe
     )
 
 
+def get_latest_systemd_sha(branch):
+    max_retries = 3
+    retry_delay = 1  # seconds
+    for attempt in range(max_retries + 1):
+        try:
+            logging.info(f"Requesting latest SHA for branch: {branch}")
+            req = urllib.request.Request(
+                f"https://api.github.com/repos/systemd/systemd/commits/{branch}",
+                headers={"Accept": "application/vnd.github.VERSION.sha"}
+            )
+
+            with urllib.request.urlopen(req) as response:
+                if response.getcode() != 200:
+                    raise Exception(f"Failed to request latest SHA: {response.getcode()}")
+
+                latest_sha = response.read().decode()
+                logging.info(f"Latest SHA: {latest_sha}")
+                return latest_sha
+        except Exception as e:
+            if attempt < max_retries:
+                logging.warning(f"Retry {attempt + 1}/{max_retries} failed: {e}")
+                time.sleep(retry_delay)
+            else:
+                logging.error(f"Failed to request latest SHA after {max_retries} retries: {e}")
+                raise e
+
+
 def do_build(args: argparse.Namespace) -> None:
     logging.info(f"BUILD: repo={args.repo} release={args.release} source={args.source} scratch={args.scratch} autorelease={args.autorelease}")
     systemd_spec = args.git_dir / "systemd.spec"
+    latest_sha = get_latest_systemd_sha("main") if args.source == "head" else ""
 
     logging.info("Downloading sources")
     run(
         [
             "spectool",
+            "--sources",
             "--define",
             f"_sourcedir {args.git_dir}",
             "--get-files",
             f"{systemd_spec}",
-            *(["--define", "branch main"] if args.source == "head" else []),
+            *(["--define", f"commit {latest_sha}"] if args.source == "head" else []),
             *(["--debug"] if need_verbose() else []),
         ]
     )
 
     if args.source == "head":
-        systemd_spec = update_spec_for_head_build(args, systemd_spec)
+        systemd_spec = update_spec_for_head_build(args, systemd_spec, latest_sha)
     elif args.source == "spec":
         if args.scratch:
             systemd_spec = update_spec_for_spec_scratch_build(args, systemd_spec)
@@ -402,20 +423,7 @@ def do_publish(args: argparse.Namespace) -> None:
 
     logging.info(f"PUBLISH: repo={args.repo} release={args.release} task_id={args.task_id} publish_repo={args.publish_repo}")
 
-    logging.info("Downloading source RPM")
-    download_rpms(args.task_id, "src")
-
-    # it's important to search using args.repo/args.release because
-    # otherwise task can be from difference environment
-    rpm_suffix = get_rpm_suffix(args)
-    srcrpm_pattern = f"systemd-*-*.{rpm_suffix}.src.rpm"
-    srcrpms = list(Path.cwd().glob(srcrpm_pattern))
-    if len(srcrpms) != 1:
-        die(f"Found no or more than one systemd source RPM ({srcrpm_pattern})")
-
-    srcrpm = srcrpms[0]
-    logging.info(f"Found source RPM {srcrpm}")
-
+    srcrpm = download_and_validate_src_rpm(args)
     tag = get_build_tag(args)
     package = srcrpm.name.removesuffix(".src.rpm")
     logging.info(f"Tag package {package} with '{tag}' tag")
@@ -445,6 +453,115 @@ def do_publish(args: argparse.Namespace) -> None:
 
 def download_rpms(task_id: str, arch: str) -> None:
     run(["cbs", "download-task", "--noprogress", "--arch", arch, str(task_id)])
+
+
+def download_and_validate_src_rpm(args: argparse.Namespace) -> Path:
+    logging.info("Downloading source RPM")
+    download_rpms(args.task_id, "src")
+
+    # it's important to search using args.repo/args.release because
+    # otherwise task can be from difference environment
+    rpm_suffix = get_rpm_suffix(args)
+    srcrpm_pattern = f"systemd-*-*.{rpm_suffix}.src.rpm"
+    srcrpms = list(Path.cwd().glob(srcrpm_pattern))
+    if len(srcrpms) != 1:
+        die(f"Found no or more than one systemd source RPM ({srcrpm_pattern})")
+
+    logging.info(f"Found source RPM {srcrpms[0]}")
+    return srcrpms[0]
+
+
+def rpm_query(rpm: Path, query: str) -> str:
+    return run(
+        [
+            "rpm",
+            "--query",
+            "--queryformat",
+            query,
+            f"{rpm}",
+        ],
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+
+
+def do_unpack(args: argparse.Namespace) -> None:
+    if not args.task_id:
+        die("Can't publish rpms without CBS build id")
+
+    logging.info(f"UNPACK: repo={args.repo} release={args.release} task_id={args.task_id}")
+
+    srcrpm = download_and_validate_src_rpm(args)
+
+    logging.info("Searching for patches")
+    # here we query patches. They are ordered! Should be applied in reverse order though!
+    patches = rpm_query(srcrpm, "[%{patch}\n]").splitlines()
+    patches = list(reversed(patches))
+    if len(patches) > 0:
+        logging.info(f"Found {len(patches)} patches")
+
+        logging.info(f"Unpacking {srcrpm}")
+        with open(f"{srcrpm}.tar", "w") as rpmtar:
+            # rpm2cpio rejects to create tar file itself when runs in a gitlab runner
+            run(["rpm2cpio", f"{srcrpm}"], stdout=rpmtar)
+
+        run(["cpio", "--extract", "--make-directories", "--file", f"{srcrpm}.tar", *(["--verbose"] if need_verbose() else [])])
+
+        for i, patch in enumerate(patches):
+            patch = patches[i] = Path.cwd() / patch
+            logging.info(f"  - {patch.name}")
+            if not patch.exists():
+                die(f"Patch {patch} does not exist")
+    else:
+        logging.info("Found no patches. Still going to push to have clean tag in the unpacked repo")
+
+    logging.info("Searching for source code version")
+    output = rpm_query(srcrpm, "%{version}")
+    if not output:
+        die(f"Failed to query version from source RPM: {srcrpm}")
+
+    if "~devel" in output:
+        systemd_source_pattern = r"^systemd-[0-9a-f]+\.tar\.gz$"
+        sources = rpm_query(srcrpm, "[%{source}\n]").splitlines()
+        source = next((s for s in sources if re.match(systemd_source_pattern, s)), None)
+        if not source:
+            die(f"Failed to find file matching regexp '{systemd_source_pattern}' among spec sources")
+        git_source_tag_or_commit = source.removeprefix("systemd-").removesuffix(".tar.gz")
+    else:
+        git_source_tag_or_commit = "v" + output
+
+    logging.info(f"systemd source tag/commit to apply patches on top: {git_source_tag_or_commit}")
+
+    git_unpacked_tag = rpm_query(srcrpm, "%{name}-%{version}-%{release}")
+    git_unpacked_tag = git_unpacked_tag.replace("~", "-")
+    git_unpacked_tag_upstream = f"{git_unpacked_tag}-upstream"
+    logging.info(f"systemd unpack tags to push patches code to: {git_unpacked_tag} {git_unpacked_tag_upstream}")
+
+    with tempfile.TemporaryDirectory(dir='.', prefix='systemd-source-', delete=args.cleanup) as repodir:
+        run(["git", "clone", "https://github.com/systemd/systemd.git", str(repodir)])
+        run(["git", "config", "--global", "user.email", "hyperscalebot@example.com"])
+        run(["git", "config", "--global", "user.name", "hyperscalebot"])
+
+        with chdir(Path(repodir)):
+            run(["git", "checkout", git_source_tag_or_commit, *([] if need_verbose() else ["--quiet"])])
+            run(["git", "tag", git_unpacked_tag_upstream])
+
+            for patch in patches:
+                run(["git", "am", str(patch)])
+            run(["git", "tag", git_unpacked_tag])
+
+            if os.environ.get("GITLAB_CI"):
+                logging.info("Pushing to the unpacked repo")
+                unpack_git_token = os.environ.get("GIT_PUSH_TOKEN_SYSTEMD_UNPACKED")
+                if not unpack_git_token:
+                    die("Can't push to unpack repo without GIT_PUSH_TOKEN_SYSTEMD_UNPACKED")
+
+                # token is scrubbed by gitlab UI
+                ci_server_host = os.environ.get("CI_SERVER_HOST")
+                repo_url = f"https://hyperscalebot:{unpack_git_token}@{ci_server_host}/CentOS/Hyperscale/rpms-unpacked/systemd.git"
+                run(["git", "remote", "add", "unpack", repo_url])
+                run(["git", "push", "--force", "unpack", "tag", git_unpacked_tag, git_unpacked_tag_upstream])
+
+    logging.info("All done")
 
 
 def onsignal(signal: int, frame: Optional[FrameType]) -> None:
@@ -527,7 +644,7 @@ def main() -> None:
         "--scratch",
         help="Do scratch build",
         action=argparse.BooleanOptionalAction,
-        default=False,
+        default=True,
     )
     build_parser.add_argument(
         "--autorelease",
@@ -541,14 +658,6 @@ def main() -> None:
         "--rpm-extra-info",
         help="Extra information to include into RPM name. Useful to include short MR name/number. " +
              "This options works only with --scratch present.",
-    )
-
-    test_parser = subparsers.add_parser('test', help='Test command')
-    test_parser.add_argument(
-        "--task-id",
-        required=True,
-        help="CBS's task ID to test",
-        type=int,  # koji: ValueError: invalid literal for int() with base 10
     )
 
     publish_parser = subparsers.add_parser('publish', help='Publish command')
@@ -565,6 +674,14 @@ def main() -> None:
         default='testing',
     )
 
+    unpack_parser = subparsers.add_parser('unpack', help='Unpack systemd RPMs content and, optionally, push it to https://gitlab.com/CentOS/Hyperscale/rpms-unpacked/systemd')
+    unpack_parser.add_argument(
+        "--task-id",
+        required=True,
+        help="CBS's task ID to publish",
+        type=int,  # koji: ValueError: invalid literal for int() with base 10
+    )
+
     args = parser.parse_args()
     logging.getLogger().setLevel(args.log_level)
 
@@ -579,6 +696,7 @@ def main() -> None:
         func = {
             "build": do_build,
             "publish": do_publish,
+            "unpack": do_unpack,
         }[args.verb]
 
         with tempfile.TemporaryDirectory(dir='.', prefix='systemd-releng-', delete=args.cleanup) as workdir:
