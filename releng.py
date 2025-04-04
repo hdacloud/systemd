@@ -559,7 +559,7 @@ def do_unpack(args: argparse.Namespace) -> None:
                 ci_server_host = os.environ.get("CI_SERVER_HOST")
                 repo_url = f"https://hyperscalebot:{unpack_git_token}@{ci_server_host}/CentOS/Hyperscale/rpms-unpacked/systemd.git"
                 run(["git", "remote", "add", "unpack", repo_url])
-                run(["git", "push", "--force", "unpack", "tag", git_unpacked_tag, git_unpacked_tag_upstream])
+                run(["git", "push", "--force", "unpack", "tag", git_unpacked_tag, git_unpacked_tag_upstream], dry_run=args.dry_run)
 
     logging.info("All done")
 
