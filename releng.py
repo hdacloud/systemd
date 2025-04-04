@@ -247,7 +247,7 @@ def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spe
         logging.info("Cannot do autoincrement of release_override! Continue as usual!")
         return
 
-    logging.info(f"systemd version in systemd.spec matches one in CBS")
+    logging.info("systemd version in systemd.spec matches one in CBS")
 
     systemd_release = rpmspec_query(args, systemd_spec, "%{release}")
     if not systemd_release:
