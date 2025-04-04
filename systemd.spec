@@ -46,11 +46,11 @@ Url:            https://systemd.io
 # But don't do that on OBS, otherwise the version subst fails, and will be
 # like 257-123-gabcd257.1 instead of 257-123-gabcd
 %if %{without obs}
-Version:        %{?version_override}%{!?version_override:257.3}
+Version:        %{?version_override}%{!?version_override:257.4}
 %else
 Version:        %{?version_override}%{!?version_override:%(cat meson.version)}
 %endif
-Release:        %{?release_override}%{!?release_override:1.5}%{?dist}
+Release:        %{?release_override}%{!?release_override:1.1}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -143,7 +143,8 @@ Patch: 0001-pam_systemd-Make-pam_systemd-256-backwards-compatibl.patch
 # Revert breaking changes to unstable systemd-networkd lldp interface
 Patch: https://github.com/systemd/systemd/pull/36050.patch
 
-Patch: https://github.com/systemd/systemd/pull/36585.patch#/route_flags.patch
+# do not remove static routes on other interfaces that are currently in the pending state
+Patch: https://github.com/systemd/systemd/pull/36756.patch#/no-delete-static-route.patch
 
 %endif
 
