@@ -212,6 +212,44 @@ def get_latest_build_systemd_version(output: str) -> str:
     return ""
 
 
+def updated_sources_checksum_and_upload(args: argparse.Namespace, systemd_spec: Path) -> None:
+    version = rpmspec_query(args, systemd_spec, "%{version}")
+    if not version:
+        die("Failed to get systemd version from systemd.spec")
+
+    tarball = Path(f"systemd-{version}.tar.gz")
+    if not tarball.exists():
+        die(f"Tarball {tarball} does not exist")
+
+    sources_file = args.git_dir / "sources"
+    if not sources_file.exists():
+        die(f"{sources_file} does not exist")
+
+    old_checksum = sources_file.read_text().strip()
+
+    logging.info(f"Updating {sources_file} with tarball's checksum")
+    with open(sources_file, "w") as f:
+        run(["sha512sum", "--tag", str(tarball)], stdout=f)
+
+    new_checksum = sources_file.read_text().strip()
+    logging.info(f"New checksum:\n{new_checksum}")
+
+    if new_checksum == old_checksum:
+        logging.info("Checksum didn't change. No need to upload tarball")
+    else:
+        logging.info("Uploading tarball to look-aside cache")
+        run(
+            [
+                "centos-lookaside-upload-sig",
+                "-f",
+                str(tarball),
+                "-n",
+                "systemd",
+            ],
+            dry_run=args.dry_run,
+        )
+
+
 def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spec: Path) -> None:
     # verify and potentially update release_override in systemd.spec
 
@@ -325,6 +363,7 @@ def do_build(args: argparse.Namespace) -> None:
         if args.scratch:
             systemd_spec = update_spec_for_spec_scratch_build(args, systemd_spec)
         elif args.autorelease:
+            updated_sources_checksum_and_upload(args, systemd_spec)
             update_spec_for_spec_autorelease_build(args, systemd_spec)
 
     logging.info("Building systemd src.rpm")
@@ -649,6 +688,7 @@ def main() -> None:
     build_parser.add_argument(
         "--autorelease",
         help="Enables autorelease mode which can increment `release_override` in systemd.spec. " +
+             "It also uploads source tarball to CBS and updates checksum. " +
              "Autorelease mode leaves changes in systemd.spec which should be commited to Git. " +
              "Noop if --scratch or --source=head.",
         action=argparse.BooleanOptionalAction,
