@@ -38,6 +38,14 @@ rpm2cpio ./systemd-*.src.rpm | cpio --to-stdout --extract './*.tar.gz' | tar xz 
 # Now prepare mkosi at the same version required by the systemd repo.
 git clone https://github.com/systemd/mkosi /var/tmp/systemd-integration-tests-mkosi
 mkosi_hash="$(grep systemd/mkosi@ systemd/.github/workflows/mkosi.yml | sed "s|.*systemd/mkosi@||g")"
+
+# ToolsTreeRepositories= does not work on the committed sha and we cannot patch
+# the mkosi version as patches are not applied to the source tarball we use.
+# TODO: Drop when we move to 257.6
+if [[ "$mkosi_hash" == "600d847f59ca78dd04a3a4127debfb934e46fc2e" ]]; then
+    mkosi_hash="a1a7e1f63e1726d88d5770fa06b29201d73e31a3"
+fi
+
 git -C /var/tmp/systemd-integration-tests-mkosi checkout "$mkosi_hash"
 
 export PATH="/var/tmp/systemd-integration-tests-mkosi/bin:$PATH"
