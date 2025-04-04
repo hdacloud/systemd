@@ -34,8 +34,8 @@ systemd:build:
     - git remote set-url origin "https://hyperscalebot:${GIT_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
     - git config user.email "hyperscalebot@example.com"
     - git config user.name "hyperscalebot"
-    - git add systemd.spec
-    - git commit -m "Incremented systemd release per autorelease process"
+    - git add systemd.spec sources
+    - git commit -m "Changes per autorelease process"
     - git push origin HEAD:$CI_COMMIT_REF_NAME -o ci.skip
   rules:
     - when: always
