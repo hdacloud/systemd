@@ -212,6 +212,44 @@ def get_latest_build_systemd_version(output: str) -> str:
     return ""
 
 
+def updated_sources_checksum_and_upload(args: argparse.Namespace, systemd_spec: Path) -> None:
+    version = rpmspec_query(args, systemd_spec, "%{version}")
+    if not version:
+        die("Failed to get systemd version from systemd.spec")
+
+    tarball = Path(f"systemd-{version}.tar.gz")
+    if not tarball.exists():
+        die(f"Tarball {tarball} does not exist")
+
+    sources_file = args.git_dir / "sources"
+    if not sources_file.exists():
+        die(f"{sources_file} does not exist")
+
+    old_checksum = sources_file.read_text().strip()
+
+    logging.info(f"Updating {sources_file} with tarball's checksum")
+    with open(sources_file, "w") as f:
+        run(["sha512sum", "--tag", str(tarball)], stdout=f)
+
+    new_checksum = sources_file.read_text().strip()
+    logging.info(f"New checksum:\n{new_checksum}")
+
+    if new_checksum == old_checksum:
+        logging.info("Checksum didn't change. No need to upload tarball")
+    else:
+        logging.info("Uploading tarball to look-aside cache")
+        run(
+            [
+                "centos-lookaside-upload-sig",
+                "-f",
+                str(tarball),
+                "-n",
+                "systemd",
+            ],
+            dry_run=args.dry_run,
+        )
+
+
 def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spec: Path) -> None:
     # verify and potentially update release_override in systemd.spec
 
@@ -247,7 +285,7 @@ def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spe
         logging.info("Cannot do autoincrement of release_override! Continue as usual!")
         return
 
-    logging.info(f"systemd version in systemd.spec matches one in CBS")
+    logging.info("systemd version in systemd.spec matches one in CBS")
 
     systemd_release = rpmspec_query(args, systemd_spec, "%{release}")
     if not systemd_release:
@@ -325,6 +363,7 @@ def do_build(args: argparse.Namespace) -> None:
         if args.scratch:
             systemd_spec = update_spec_for_spec_scratch_build(args, systemd_spec)
         elif args.autorelease:
+            updated_sources_checksum_and_upload(args, systemd_spec)
             update_spec_for_spec_autorelease_build(args, systemd_spec)
 
     logging.info("Building systemd src.rpm")
@@ -559,7 +598,7 @@ def do_unpack(args: argparse.Namespace) -> None:
                 ci_server_host = os.environ.get("CI_SERVER_HOST")
                 repo_url = f"https://hyperscalebot:{unpack_git_token}@{ci_server_host}/CentOS/Hyperscale/rpms-unpacked/systemd.git"
                 run(["git", "remote", "add", "unpack", repo_url])
-                run(["git", "push", "--force", "unpack", "tag", git_unpacked_tag, git_unpacked_tag_upstream])
+                run(["git", "push", "--force", "unpack", "tag", git_unpacked_tag, git_unpacked_tag_upstream], dry_run=args.dry_run)
 
     logging.info("All done")
 
@@ -649,6 +688,7 @@ def main() -> None:
     build_parser.add_argument(
         "--autorelease",
         help="Enables autorelease mode which can increment `release_override` in systemd.spec. " +
+             "It also uploads source tarball to CBS and updates checksum. " +
              "Autorelease mode leaves changes in systemd.spec which should be commited to Git. " +
              "Noop if --scratch or --source=head.",
         action=argparse.BooleanOptionalAction,
