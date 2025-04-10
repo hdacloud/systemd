@@ -442,7 +442,6 @@ def do_build(args: argparse.Namespace) -> None:
 
     logging.info(f"All done. Task ID: {task_id}")
     logging.info("")
-    logging.info(f"$ ./releng.py --repo={args.repo} --release={args.release} test --task-id={task_id}")
     logging.info(f"$ ./releng.py --repo={args.repo} --release={args.release} publish --task-id={task_id}")
 
     # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
