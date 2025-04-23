@@ -1289,9 +1289,7 @@ fi
 %systemd_preun systemd-networkd.service systemd-networkd-wait-online.service
 
 %posttrans networkd
-%if %{undefined facebook}
 %systemd_posttrans_with_restart systemd-networkd.service
-%endif
 
 %post resolved
 [ $1 -eq 1 ] || exit 0
