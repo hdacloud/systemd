@@ -50,7 +50,7 @@ Version:        %{?version_override}%{!?version_override:257.5}
 %else
 Version:        %{?version_override}%{!?version_override:%(cat meson.version)}
 %endif
-Release:        %{?release_override}%{!?release_override:1.1}%{?dist}
+Release:        %{?release_override}%{!?release_override:1.2}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -1289,9 +1289,7 @@ fi
 %systemd_preun systemd-networkd.service systemd-networkd-wait-online.service
 
 %posttrans networkd
-%if %{undefined facebook}
 %systemd_posttrans_with_restart systemd-networkd.service
-%endif
 
 %post resolved
 [ $1 -eq 1 ] || exit 0
