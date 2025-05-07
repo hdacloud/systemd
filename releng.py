@@ -99,13 +99,21 @@ def get_build_target(args: argparse.Namespace) -> str:
     return f"hyperscale{args.release}s-packages-{args.repo}-el{args.release}s"
 
 
+def get_build_tag_for(release: str, repo: str, publish_repo: str = "") -> str:
+    return f"hyperscale{release}s-packages-{repo}-{publish_repo if publish_repo else publish_repo}"
+
+
 def get_build_tag(args: argparse.Namespace, publish_repo: str = "") -> str:
-    return f"hyperscale{args.release}s-packages-{args.repo}-{publish_repo if publish_repo else args.publish_repo}"
+    return get_build_tag_for(args.release, args.repo, publish_repo)
+
+
+def get_rpm_suffix_for(release: str, repo: str) -> str:
+    prefix = "hs+fb" if repo == "facebook" else "hs"
+    return f"{prefix}.el{release}"
 
 
 def get_rpm_suffix(args: argparse.Namespace) -> str:
-    prefix = "hs+fb" if args.repo == "facebook" else "hs"
-    return f"{prefix}.el{args.release}"
+    return get_rpm_suffix_for(args.release, args.repo)
 
 
 def get_task_id(output: str) -> str:
