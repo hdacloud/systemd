@@ -18,8 +18,9 @@ import urllib.request
 import time
 import re
 
-SYSTEMD_REPO = "https://github.com/systemd/systemd"
-AUTHOR = "CentOS Hyperscale SIG <centos-devel@centos.org>"
+REPOS = ["main", "facebook"]
+RELEASES = [9, 10]
+SOURCES = ["head", "spec"]
 INTERRUPTED = False
 
 
@@ -630,21 +631,6 @@ def main() -> None:
     logging.getLogger().setLevel("INFO")
 
     parser = argparse.ArgumentParser(description='releng.py CLI')
-
-    parser.add_argument(
-        "--repo",
-        help="Hyperscale repository to build against",
-        choices=["main", "facebook"],
-        default="main",
-    )
-    parser.add_argument(
-        "--release",
-        help="CentOS Stream release to use (e.g 9)",
-        metavar="RELEASE",
-        default=9,
-        choices=[9, 10],
-        type=int,
-    )
     parser.add_argument(
         "--cert",
         help="Path to the CentOS certificate to use",
@@ -677,12 +663,27 @@ def main() -> None:
         default="INFO",
     )
 
-    subparsers = parser.add_subparsers(dest='verb')
+    repo_release_parser = argparse.ArgumentParser(add_help=False)
+    repo_release_parser.add_argument(
+        "--repo",
+        help="Hyperscale repository to build against",
+        choices=REPOS,
+        default="main",
+    )
+    repo_release_parser.add_argument(
+        "--release",
+        help="CentOS Stream release to use (e.g 9)",
+        metavar="RELEASE",
+        choices=RELEASES,
+        default=9,
+        type=int,
+    )
 
-    build_parser = subparsers.add_parser('build', help='Build command')
+    subparsers = parser.add_subparsers(dest='verb')
+    build_parser = subparsers.add_parser('build', help='Build command', parents=[repo_release_parser])
     build_parser.add_argument(
         "--source",
-        choices=["head", "spec"],
+        choices=SOURCES,
         default="head",
         help="Do build using upstream HEAD or version from spec file",
     )
@@ -707,7 +708,7 @@ def main() -> None:
              "This options works only with --scratch present.",
     )
 
-    publish_parser = subparsers.add_parser('publish', help='Publish command')
+    publish_parser = subparsers.add_parser('publish', help='Publish command', parents=[repo_release_parser])
     publish_parser.add_argument(
         "--task-id",
         required=True,
@@ -721,7 +722,9 @@ def main() -> None:
         default='testing',
     )
 
-    unpack_parser = subparsers.add_parser('unpack', help='Unpack systemd RPMs content and, optionally, push it to https://gitlab.com/CentOS/Hyperscale/rpms-unpacked/systemd')
+    unpack_parser = subparsers.add_parser('unpack',
+                                          help='Unpack systemd RPMs content and, optionally, push it to https://gitlab.com/CentOS/Hyperscale/rpms-unpacked/systemd',
+                                          parents=[repo_release_parser])
     unpack_parser.add_argument(
         "--task-id",
         required=True,
