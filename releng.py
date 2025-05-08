@@ -350,6 +350,10 @@ def get_latest_systemd_sha(branch):
 def do_build(args: argparse.Namespace) -> None:
     logging.info(f"BUILD: repo={args.repo} release={args.release} source={args.source} scratch={args.scratch} autorelease={args.autorelease}")
     systemd_spec = args.git_dir / "systemd.spec"
+
+    # Fetching of sha happens per child-pipeline which will likely cause inconsistency.
+    # This is acceptable because it happens only for HEAD builds which MR or nighlty builds.
+    # So, slight inconsistency is acceptable there.
     latest_sha = get_latest_systemd_sha("main") if args.source == "head" else ""
 
     logging.info("Downloading sources")
