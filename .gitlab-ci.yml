@@ -97,6 +97,7 @@ mn:autorelease:
     - git diff --exit-code systemd.spec sources && exit 0 || /bin/true
 
     # commit
+    - test -n "$GIT_PUSH_TOKEN"
     - git remote set-url origin "https://hyperscalebot:${GIT_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
     - git config user.email "hyperscalebot@example.com"
     - git config user.name "hyperscalebot"
