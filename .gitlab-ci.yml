@@ -98,11 +98,12 @@ mn:autorelease:
 
     # commit
     - test -n "$GIT_PUSH_TOKEN"
+    - test -s git-commit-message.txt # file exists and not empty
     - git remote set-url origin "https://hyperscalebot:${GIT_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
     - git config user.email "hyperscalebot@example.com"
     - git config user.name "hyperscalebot"
     - git add systemd.spec sources
-    - git commit -m "Changes per autorelease process"
+    - git commit -F git-commit-message.txt
     - 'git push origin HEAD:$CI_COMMIT_REF_NAME
         -o ci.variable="SOURCE=$SOURCE"
         -o ci.variable="DO_PUBLISH=$DO_PUBLISH"
@@ -112,6 +113,10 @@ mn:autorelease:
 
     # notify child pipeline to do nothing.
     - echo 'SKIP_ALL=true' > autorelease.env
+
+    # human friendly message
+    - echo "FORKING ANOTHER PIPELINE! Check ${CI_PROJECT_URL}/pipelines, search for a new pipeline with the following message:"
+    - cat git-commit-message.txt
   interruptible: true # cancel child pipelines when parent cancelled
   artifacts:
     reports:
