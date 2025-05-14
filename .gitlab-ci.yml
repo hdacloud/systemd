@@ -116,7 +116,7 @@ mn:autorelease:
     reports:
       dotenv: autorelease.env
   rules:
-    - if: $CI_PIPELINE_SOURCE == 'web' && $SOURCE == 'spec' && $DO_PUBLISH == 'release' && $DO_AUTORELEASE_CI == ''
+    - if: $CI_PIPELINE_SOURCE == 'web' && $SOURCE == 'spec' && $DO_PUBLISH == 'release' && $DO_AUTORELEASE_CI == null
 
 mn:setup:
   stage: setup
@@ -134,5 +134,6 @@ mn:setup:
       pipeline_variables: true
   interruptible: true # cancel child pipelines when parent cancelled
   rules:
-    - if: $CI_PIPELINE_SOURCE == 'web' || $DO_AUTORELEASE_CI == 'true' # special condition set in mn:autorelease job
+    - if: $CI_PIPELINE_SOURCE == 'web' # run only for pipelines started via gitlab web-interface (usually a release)
+    - if: $DO_AUTORELEASE_CI == 'true' # special condition set in mn:autorelease job
   extends: .matrix2
