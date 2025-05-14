@@ -18,8 +18,9 @@ import urllib.request
 import time
 import re
 
-SYSTEMD_REPO = "https://github.com/systemd/systemd"
-AUTHOR = "CentOS Hyperscale SIG <centos-devel@centos.org>"
+REPOS = ["main", "facebook"]
+RELEASES = [9, 10]
+SOURCES = ["head", "spec"]
 INTERRUPTED = False
 
 
@@ -99,13 +100,21 @@ def get_build_target(args: argparse.Namespace) -> str:
     return f"hyperscale{args.release}s-packages-{args.repo}-el{args.release}s"
 
 
+def get_build_tag_for(release: str, repo: str, publish_repo: str = "") -> str:
+    return f"hyperscale{release}s-packages-{repo}-{publish_repo if publish_repo else publish_repo}"
+
+
 def get_build_tag(args: argparse.Namespace, publish_repo: str = "") -> str:
-    return f"hyperscale{args.release}s-packages-{args.repo}-{publish_repo if publish_repo else args.publish_repo}"
+    return get_build_tag_for(args.release, args.repo, publish_repo)
+
+
+def get_rpm_suffix_for(release: str, repo: str) -> str:
+    prefix = "hs+fb" if repo == "facebook" else "hs"
+    return f"{prefix}.el{release}"
 
 
 def get_rpm_suffix(args: argparse.Namespace) -> str:
-    prefix = "hs+fb" if args.repo == "facebook" else "hs"
-    return f"{prefix}.el{args.release}"
+    return get_rpm_suffix_for(args.release, args.repo)
 
 
 def get_task_id(output: str) -> str:
@@ -204,14 +213,6 @@ def rpmspec_query(args: argparse.Namespace, systemd_spec: Path, query: str, unde
     ).stdout.strip()
 
 
-def get_latest_build_systemd_version(output: str) -> str:
-    for line in output.splitlines():
-        if line.startswith("systemd-"):
-            return line.split()[0].strip()
-
-    return ""
-
-
 def updated_sources_checksum_and_upload(args: argparse.Namespace, systemd_spec: Path) -> None:
     version = rpmspec_query(args, systemd_spec, "%{version}")
     if not version:
@@ -250,16 +251,9 @@ def updated_sources_checksum_and_upload(args: argparse.Namespace, systemd_spec: 
         )
 
 
-def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spec: Path) -> None:
-    # verify and potentially update release_override in systemd.spec
+def get_latest_cbs_systemd_version_for(args: argparse.Namespace, release: str, repo: str) -> str:
+    build_tag = get_build_tag_for(release, repo, "release")
 
-    systemd_version = rpmspec_query(args, systemd_spec, "%{name}-%{version}-%{release}")
-    if not systemd_version:
-        die("Failed to get systemd version from systemd.spec")
-
-    logging.info(f"systemd version: {systemd_version}")
-
-    build_tag = get_build_tag(args, "release")
     logging.info(f"Quering CBS for latest-build of {build_tag}")
     output = run(
         [
@@ -267,25 +261,67 @@ def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spe
             *(["--cert", args.cert] if args.cert else []),
             "latest-build",
             "--quiet",
-            "--all",
             build_tag,
+            "systemd",
         ],
         stdout=subprocess.PIPE,
-    ).stdout.strip()
+    ).stdout.strip().split()[0].strip()
 
-    cbs_systemd_version = get_latest_build_systemd_version(output)
-    cbs_systemd_version = cbs_systemd_version.removesuffix("." + get_rpm_suffix(args))  # remove .hs+fb.el10 for 257.3-1.5.hs+fb.el10
+    rpm_suffix = get_rpm_suffix_for(release, repo)
+    cbs_systemd_version = output.removesuffix("." + rpm_suffix)  # remove .hs+fb.el10 from 257.3-1.5.hs+fb.el10
     if not cbs_systemd_version:
         die("Failed to get latest systemd build from CBS")
 
-    logging.info(f"Latest systemd build: {cbs_systemd_version}")
-    vercmp_result = run(["systemd-analyze", "compare-versions", systemd_version, "==", cbs_systemd_version], check=False)
-    if vercmp_result.returncode != 0:
-        logging.info(f"systemd version in systemd.spec '{systemd_version}' doesn't match one in CBS '{cbs_systemd_version}'")
+    logging.info(f"Latest build is {cbs_systemd_version}")
+    return cbs_systemd_version
+
+
+def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spec: Path) -> None:
+    # Verify and potentially update release_override in systemd.spec.
+
+    systemd_version = rpmspec_query(args, systemd_spec, "%{name}-%{version}-%{release}")
+    if not systemd_version:
+        die("Failed to get systemd version from systemd.spec")
+
+    logging.info(f"systemd version: {systemd_version}")
+
+    cbs_systemd_vercmp_results = {}
+    for release in RELEASES:
+        for repo in REPOS:
+            logging.info("")
+            cbs_systemd_version = get_latest_cbs_systemd_version_for(args, release, repo)
+            vercmp_result = run(["systemd-analyze", "compare-versions", systemd_version, cbs_systemd_version], check=False)
+            cbs_systemd_vercmp_results[cbs_systemd_version] = vercmp_result.returncode
+
+    if len(cbs_systemd_vercmp_results) == 0:
+        die("No cbs_systemd_version_results")
+    if len(cbs_systemd_vercmp_results) > 1:
+        # Some CBS build tags have different systemd version.
+        # There is not much what we can do. Let's just do sanity checks
+        # that we're not building something which is smaller than already built.
+        logging.info("Different CBS build tags have different latest systemd builds.")
+
+        for sv, vercmp in cbs_systemd_vercmp_results.items():
+            if vercmp == 12:  # the version of the left is smaller
+                die(f"systemd version in the spec ({systemd_version}) is smaller than one in CBS ({sv}). See logs above.")
+
         logging.info("Cannot do autoincrement of release_override! Continue as usual!")
         return
 
-    logging.info("systemd version in systemd.spec matches one in CBS")
+    # All CBS build tags have the same latest systemd version.
+    # If vercmp == 0, it means that the CBS version matches one in spec file.
+    # As result, we can go ahead and bump up 'release_override'.
+    # Otherwise, there is not much to do. We just let system to proceed without any changes.
+    cbs_systemd_version = next(iter(cbs_systemd_vercmp_results.keys()))
+    vercmp = next(iter(cbs_systemd_vercmp_results.values()))
+    if vercmp == 12:  # the version of the left is smaller
+        die(f"systemd version in the spec ({systemd_version}) is smaller than one in CBS ({cbs_systemd_version})")
+    if vercmp == 11:  # the version of the right is smaller
+        logging.info(f"systemd version in systemd.spec '{systemd_version}' is higher than one in CBS '{cbs_systemd_version}'")
+        logging.info("Cannot do autoincrement of release_override! Continue as usual!")
+        return
+
+    logging.info("systemd version in systemd.spec matches latest-builds for all build-tags in CBS")
 
     systemd_release = rpmspec_query(args, systemd_spec, "%{release}")
     if not systemd_release:
@@ -310,6 +346,24 @@ def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spe
         )
     )
 
+
+def do_autorelease(args: argparse.Namespace) -> None:
+    systemd_spec = args.git_dir / "systemd.spec"
+    logging.info("Downloading sources")
+    run(
+        [
+            "spectool",
+            "--sources",
+            "--define",
+            f"_sourcedir {args.git_dir}",
+            "--get-files",
+            f"{systemd_spec}",
+            *(["--debug"] if need_verbose() else []),
+        ]
+    )
+
+    updated_sources_checksum_and_upload(args, systemd_spec)
+    update_spec_for_spec_autorelease_build(args, systemd_spec)
 
 def get_latest_systemd_sha(branch):
     max_retries = 3
@@ -339,8 +393,12 @@ def get_latest_systemd_sha(branch):
 
 
 def do_build(args: argparse.Namespace) -> None:
-    logging.info(f"BUILD: repo={args.repo} release={args.release} source={args.source} scratch={args.scratch} autorelease={args.autorelease}")
+    logging.info(f"BUILD: repo={args.repo} release={args.release} source={args.source} scratch={args.scratch}")
     systemd_spec = args.git_dir / "systemd.spec"
+
+    # Fetching of sha happens per child-pipeline which will likely cause inconsistency.
+    # This is acceptable because it happens only for HEAD builds which MR or nighlty builds.
+    # So, slight inconsistency is acceptable there.
     latest_sha = get_latest_systemd_sha("main") if args.source == "head" else ""
 
     logging.info("Downloading sources")
@@ -359,12 +417,8 @@ def do_build(args: argparse.Namespace) -> None:
 
     if args.source == "head":
         systemd_spec = update_spec_for_head_build(args, systemd_spec, latest_sha)
-    elif args.source == "spec":
-        if args.scratch:
-            systemd_spec = update_spec_for_spec_scratch_build(args, systemd_spec)
-        elif args.autorelease:
-            updated_sources_checksum_and_upload(args, systemd_spec)
-            update_spec_for_spec_autorelease_build(args, systemd_spec)
+    elif args.source == "spec" and args.scratch:
+        systemd_spec = update_spec_for_spec_scratch_build(args, systemd_spec)
 
     logging.info("Building systemd src.rpm")
     run(
@@ -622,21 +676,6 @@ def main() -> None:
     logging.getLogger().setLevel("INFO")
 
     parser = argparse.ArgumentParser(description='releng.py CLI')
-
-    parser.add_argument(
-        "--repo",
-        help="Hyperscale repository to build against",
-        choices=["main", "facebook"],
-        default="main",
-    )
-    parser.add_argument(
-        "--release",
-        help="CentOS Stream release to use (e.g 9)",
-        metavar="RELEASE",
-        default=9,
-        choices=[9, 10],
-        type=int,
-    )
     parser.add_argument(
         "--cert",
         help="Path to the CentOS certificate to use",
@@ -669,12 +708,32 @@ def main() -> None:
         default="INFO",
     )
 
-    subparsers = parser.add_subparsers(dest='verb')
+    repo_release_parser = argparse.ArgumentParser(add_help=False)
+    repo_release_parser.add_argument(
+        "--repo",
+        help="Hyperscale repository to build against",
+        choices=REPOS,
+        default="main",
+    )
+    repo_release_parser.add_argument(
+        "--release",
+        help="CentOS Stream release to use (e.g 9)",
+        metavar="RELEASE",
+        choices=RELEASES,
+        default=9,
+        type=int,
+    )
 
-    build_parser = subparsers.add_parser('build', help='Build command')
+    subparsers = parser.add_subparsers(dest='verb')
+    subparsers.add_parser('autorelease',
+                          help="autorelease command do the following: (a) increments `release_override` in systemd.spec if systemd version in systemd.spec matches latest CBS builds. " +
+                               "(b) uploads source tarball to CBS and updates checksum. " +
+                               "(c) commits and pushes changes to Git.")
+
+    build_parser = subparsers.add_parser('build', help='Build command', parents=[repo_release_parser])
     build_parser.add_argument(
         "--source",
-        choices=["head", "spec"],
+        choices=SOURCES,
         default="head",
         help="Do build using upstream HEAD or version from spec file",
     )
@@ -685,21 +744,12 @@ def main() -> None:
         default=True,
     )
     build_parser.add_argument(
-        "--autorelease",
-        help="Enables autorelease mode which can increment `release_override` in systemd.spec. " +
-             "It also uploads source tarball to CBS and updates checksum. " +
-             "Autorelease mode leaves changes in systemd.spec which should be commited to Git. " +
-             "Noop if --scratch or --source=head.",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-    )
-    build_parser.add_argument(
         "--rpm-extra-info",
         help="Extra information to include into RPM name. Useful to include short MR name/number. " +
              "This options works only with --scratch present.",
     )
 
-    publish_parser = subparsers.add_parser('publish', help='Publish command')
+    publish_parser = subparsers.add_parser('publish', help='Publish command', parents=[repo_release_parser])
     publish_parser.add_argument(
         "--task-id",
         required=True,
@@ -713,7 +763,9 @@ def main() -> None:
         default='testing',
     )
 
-    unpack_parser = subparsers.add_parser('unpack', help='Unpack systemd RPMs content and, optionally, push it to https://gitlab.com/CentOS/Hyperscale/rpms-unpacked/systemd')
+    unpack_parser = subparsers.add_parser('unpack',
+                                          help='Unpack systemd RPMs content and, optionally, push it to https://gitlab.com/CentOS/Hyperscale/rpms-unpacked/systemd',
+                                          parents=[repo_release_parser])
     unpack_parser.add_argument(
         "--task-id",
         required=True,
@@ -736,6 +788,7 @@ def main() -> None:
             "build": do_build,
             "publish": do_publish,
             "unpack": do_unpack,
+            "autorelease": do_autorelease,
         }[args.verb]
 
         with tempfile.TemporaryDirectory(dir='.', prefix='systemd-releng-', delete=args.cleanup) as workdir:

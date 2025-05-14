@@ -1,5 +1,5 @@
 variables:
-  # don't reference these variables in the child pipelines because they reset to default values
+  # if adding/changing variables don't forget to update the list in mn:autorelease job
   SOURCE:
     description: "Do build using upstream HEAD. Otherwise use sources from systemd.spec"
     options: ["head", "spec"]
@@ -18,6 +18,7 @@ variables:
     value: "true"
 
 stages:
+  - prepare
   - setup
 
 .matrix2:
@@ -73,12 +74,59 @@ ni:
     - if: $CI_PIPELINE_SOURCE == 'schedule'
   extends: .matrix2
 
-# setup for manual run
-mn:
+# setup for manual (release) run
+mn:autorelease:
+  stage: prepare
+  image: quay.io/fedora/fedora:latest
+  before_script:
+    - env
+    - dnf --quiet install -y git-core python3 centos-packager
+  script:
+    # mn:autorelease job works in a special way
+    # 1. ./releng.py autorelease produces no changes to commit, the execution continues as normal
+    # 2. if there are changes to commit, the job creates a commit and pushes it in a special way
+    #    using '-o ci.variable="FOO=BAR"'. The DO_AUTORELEASE_CI variable triggers another
+    #    pipeline whiche uses commited changes to actually perform a build.
+
+    # autorelease logic
+    # It only make sense to run it with  $SOURCE == 'spec' && $DO_PUBLISH == 'release'
+    # which are checked in the 'rules'
+    - ./releng.py autorelease
+
+    # early exit if nothing to commit
+    - git diff --exit-code systemd.spec sources && exit 0 || /bin/true
+
+    # commit
+    - git remote set-url origin "https://hyperscalebot:${GIT_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+    - git config user.email "hyperscalebot@example.com"
+    - git config user.name "hyperscalebot"
+    - git add systemd.spec sources
+    - git commit -m "Changes per autorelease process"
+    - "git push origin HEAD:$CI_COMMIT_REF_NAME
+        -o ci.variable='SOURCE=$SOURCE'
+        -o ci.variable='DO_PUBLISH=$DO_PUBLISH'
+        -o ci.variable='DO_TEST=$DO_TEST'
+        -o ci.variable='DO_UNPACK=$DO_UNPACK'
+        -o ci.variable='DO_AUTORELEASE_CI=true'" # magical variable to trigger only mn:setup in forked pipeline
+
+    # notify child pipeline to do nothing.
+    - echo 'SKIP_ALL=true' > autorelease.env
+  interruptible: true # cancel child pipelines when parent cancelled
+  artifacts:
+    reports:
+      dotenv: autorelease.env
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'web' && $SOURCE == 'spec' && $DO_PUBLISH == 'release' && $DO_AUTORELEASE_CI == ''
+
+mn:setup:
   stage: setup
   variables:
     # REPO, RELEASE come from matrix
     # SOURCE, DO_TEST, DO_PUBLISH come from pipeline vars
+
+    # mn:autorelease sets this variable, but we propagate it to child pipeline..
+    # Unfortunatelly, variables sets via artifacts:reports:dotenv can't be used in 'rules'
+    SKIP_ALL: $SKIP_ALL
   trigger:
     include: .gitlab-child-ci.yml
     strategy: depend
@@ -86,5 +134,5 @@ mn:
       pipeline_variables: true
   interruptible: true # cancel child pipelines when parent cancelled
   rules:
-    - if: $CI_PIPELINE_SOURCE == 'web'
+    - if: $CI_PIPELINE_SOURCE == 'web' || $DO_AUTORELEASE_CI == 'true' # special condition set in mn:autorelease job
   extends: .matrix2
