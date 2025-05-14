@@ -126,7 +126,7 @@ mn:setup:
 
     # mn:autorelease sets this variable, but we propagate it to child pipeline..
     # Unfortunatelly, variables sets via artifacts:reports:dotenv can't be used in 'rules'
-    SKIP_ALL: $SKIP_ALL
+    DO_SKIP_ALL: $SKIP_ALL
   trigger:
     include: .gitlab-child-ci.yml
     strategy: depend
