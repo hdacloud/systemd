@@ -102,12 +102,12 @@ mn:autorelease:
     - git config user.name "hyperscalebot"
     - git add systemd.spec sources
     - git commit -m "Changes per autorelease process"
-    - "git push origin HEAD:$CI_COMMIT_REF_NAME
-        -o ci.variable='SOURCE=$SOURCE'
-        -o ci.variable='DO_PUBLISH=$DO_PUBLISH'
-        -o ci.variable='DO_TEST=$DO_TEST'
-        -o ci.variable='DO_UNPACK=$DO_UNPACK'
-        -o ci.variable='DO_AUTORELEASE_CI=true'" # magical variable to trigger only mn:setup in forked pipeline
+    - 'git push origin HEAD:$CI_COMMIT_REF_NAME
+        -o ci.variable="SOURCE=$SOURCE"
+        -o ci.variable="DO_PUBLISH=$DO_PUBLISH"
+        -o ci.variable="DO_TEST=$DO_TEST"
+        -o ci.variable="DO_UNPACK=$DO_UNPACK"
+        -o ci.variable="DO_AUTORELEASE_CI=true"' # magical variable to trigger only mn:setup in forked pipeline
 
     # notify child pipeline to do nothing.
     - echo 'SKIP_ALL=true' > autorelease.env
