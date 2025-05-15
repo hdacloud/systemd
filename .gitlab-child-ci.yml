@@ -8,7 +8,7 @@ stages:
 workflow:
   name: "systemd-$REPO-$RELEASE-$SOURCE"
   rules:
-    - if: $SKIP_ALL == "true" # this variable may be set in mn:autorelease job
+    - if: $DO_SKIP_ALL == "true" # this variable may be set in mn:autorelease job
       when: never
     - when: always
 

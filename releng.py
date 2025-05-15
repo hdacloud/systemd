@@ -213,7 +213,7 @@ def rpmspec_query(args: argparse.Namespace, systemd_spec: Path, query: str, unde
     ).stdout.strip()
 
 
-def updated_sources_checksum_and_upload(args: argparse.Namespace, systemd_spec: Path) -> None:
+def updated_sources_checksum_and_upload(args: argparse.Namespace, systemd_spec: Path, git_commit_message_file: Path) -> None:
     version = rpmspec_query(args, systemd_spec, "%{version}")
     if not version:
         die("Failed to get systemd version from systemd.spec")
@@ -237,18 +237,22 @@ def updated_sources_checksum_and_upload(args: argparse.Namespace, systemd_spec: 
 
     if new_checksum == old_checksum:
         logging.info("Checksum didn't change. No need to upload tarball")
-    else:
-        logging.info("Uploading tarball to look-aside cache")
-        run(
-            [
-                "centos-lookaside-upload-sig",
-                "-f",
-                str(tarball),
-                "-n",
-                "systemd",
-            ],
-            dry_run=args.dry_run,
-        )
+        return
+
+    logging.info("Uploading tarball to look-aside cache")
+    run(
+        [
+            "centos-lookaside-upload-sig",
+            "-f",
+            str(tarball),
+            "-n",
+            "systemd",
+        ],
+        dry_run=args.dry_run,
+    )
+
+    with open(git_commit_message_file, 'a+') as f:
+        f.write("autorelease: Updated tarball checksum\n")
 
 
 def get_latest_cbs_systemd_version_for(args: argparse.Namespace, release: str, repo: str) -> str:
@@ -276,7 +280,7 @@ def get_latest_cbs_systemd_version_for(args: argparse.Namespace, release: str, r
     return cbs_systemd_version
 
 
-def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spec: Path) -> None:
+def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spec: Path, git_commit_message_file: Path) -> None:
     # Verify and potentially update release_override in systemd.spec.
 
     systemd_version = rpmspec_query(args, systemd_spec, "%{name}-%{version}-%{release}")
@@ -346,6 +350,13 @@ def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spe
         )
     )
 
+    updated_systemd_version = rpmspec_query(args, systemd_spec, "%{name}-%{version}-%{release}")
+    if not updated_systemd_version:
+        die("Failed to get systemd version from systemd.spec")
+
+    with open(git_commit_message_file, 'a+') as f:
+        f.write(f"autorelease: Updated spec to {updated_systemd_version}\n")
+
 
 def do_autorelease(args: argparse.Namespace) -> None:
     systemd_spec = args.git_dir / "systemd.spec"
@@ -362,8 +373,9 @@ def do_autorelease(args: argparse.Namespace) -> None:
         ]
     )
 
-    updated_sources_checksum_and_upload(args, systemd_spec)
-    update_spec_for_spec_autorelease_build(args, systemd_spec)
+    git_commit_message_file = Path(args.git_dir / "git-commit-message.txt")
+    update_spec_for_spec_autorelease_build(args, systemd_spec, git_commit_message_file)
+    updated_sources_checksum_and_upload(args, systemd_spec, git_commit_message_file)
 
 def get_latest_systemd_sha(branch):
     max_retries = 3

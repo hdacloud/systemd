@@ -50,7 +50,7 @@ Version:        %{?version_override}%{!?version_override:257.5}
 %else
 Version:        %{?version_override}%{!?version_override:%(cat meson.version)}
 %endif
-Release:        %{?release_override}%{!?release_override:1.4}%{?dist}
+Release:        %{?release_override}%{!?release_override:1.3}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
