@@ -72,7 +72,7 @@ systemd:publish:
     - systemd:build
   script:
     - export TASK_ID=$(find . -name "*-task-id.txt" -exec cat {} \; -quit); echo "$TASK_ID"; test -n "$TASK_ID"
-    - ./releng.py --cert "$CENTOS_CERT" --repo "$REPO" --release "$RELEASE" publish --task-id "$TASK_ID" --publish-repo "$DO_PUBLISH"
+    - ./releng.py --cert "$CENTOS_CERT" publish --repo "$REPO" --release "$RELEASE" --task-id "$TASK_ID" --publish-repo "$DO_PUBLISH"
   rules:
     - if: $DO_PUBLISH != 'false'
   interruptible: true
@@ -103,7 +103,7 @@ systemd:unpack:
     - systemd:build
   script:
     - export TASK_ID=$(find . -name "*-task-id.txt" -exec cat {} \; -quit); echo "$TASK_ID"; test -n "$TASK_ID"
-    - ./releng.py --repo "$REPO" --release "$RELEASE" unpack --task-id "$TASK_ID"
+    - ./releng.py unpack --repo "$REPO" --release "$RELEASE" --task-id "$TASK_ID"
   rules:
     - if: $DO_UNPACK == 'true'
       allow_failure: false
