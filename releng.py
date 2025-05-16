@@ -100,12 +100,12 @@ def get_build_target(args: argparse.Namespace) -> str:
     return f"hyperscale{args.release}s-packages-{args.repo}-el{args.release}s"
 
 
-def get_build_tag_for(release: str, repo: str, publish_repo: str = "") -> str:
-    return f"hyperscale{release}s-packages-{repo}-{publish_repo if publish_repo else publish_repo}"
+def get_build_tag_for(release: str, repo: str, publish_repo: str) -> str:
+    return f"hyperscale{release}s-packages-{repo}-{publish_repo}"
 
 
-def get_build_tag(args: argparse.Namespace, publish_repo: str = "") -> str:
-    return get_build_tag_for(args.release, args.repo, publish_repo)
+def get_build_tag(args: argparse.Namespace) -> str:
+    return get_build_tag_for(args.release, args.repo, args.publish_repo)
 
 
 def get_rpm_suffix_for(release: str, repo: str) -> str:
