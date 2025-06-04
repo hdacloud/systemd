@@ -79,6 +79,8 @@ mn:autorelease:
   stage: prepare
   image: quay.io/fedora/fedora:latest
   before_script:
+    - test -n "$CENTOS_CERT"
+    - ln --symbolic --force "$CENTOS_CERT" ~/.centos.cert  # centos-lookaside-upload-sig has this path hardcoded
     - env
     - dnf --quiet install -y git-core python3 centos-packager
   script:
