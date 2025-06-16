@@ -147,6 +147,10 @@ Patch:          https://github.com/systemd/systemd/pull/37859.patch
 # pam_systemd: Make pam_systemd 256 backwards compatible to logind 255
 Patch: 0001-pam_systemd-Make-pam_systemd-256-backwards-compatibl.patch
 
+# Avoid blocking on writting to memory.max or memory.high
+# https://github.com/systemd/systemd/pull/37211
+Patch: https://github.com/systemd/systemd/pull/37868.patch
+
 %endif
 
 # bump networkd netlink timeout to infinity
