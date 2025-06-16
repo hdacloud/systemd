@@ -130,6 +130,12 @@ Patch:          0002-sysusers-emit-audit-events-for-user-and-group-creati.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=2251843
 Patch:          https://github.com/systemd/systemd/pull/30846.patch
 
+# Backport logic so LogLevelMax=debug can be used to enable debug logging for
+# specific units without enabling debug logging globally
+# https://github.com/systemd/systemd/pull/37040/commits/ba77798bbab2665fd9cb56bf5d32276ad39d3b4a
+# https://github.com/systemd/systemd/pull/37040/commits/6d47c16ce0b82996b575327ca9c1e361bcd251b0
+Patch:          https://github.com/systemd/systemd/pull/37859.patch
+
 %endif
 
 # Meta specific backports
