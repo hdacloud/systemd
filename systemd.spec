@@ -139,6 +139,9 @@ Patch:          https://github.com/systemd/systemd/pull/37859.patch
 # Backport systemd-networkd-varlink.socket to avoid dropping the socket when networkd restarts
 Patch:          https://github.com/systemd/systemd/pull/38067.patch
 
+# Backport DelegateNamespaces= and other relevant features
+Patch:          https://github.com/systemd/systemd/pull/38073.patch
+
 %endif
 
 # Meta specific backports

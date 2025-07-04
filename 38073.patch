@@ -1,0 +1,3540 @@
+From 7e6fee624c81478d691349a57baff8cd1cd41964 Mon Sep 17 00:00:00 2001
+From: Ryan Wilson <ryantimwilson@meta.com>
+Date: Fri, 15 Nov 2024 06:56:05 -0800
+Subject: [PATCH 01/18] core: Add PrivateUsers=full
+
+Recently, PrivateUsers=identity was added to support mapping the first
+65536 UIDs/GIDs from parent to the child namespace and mapping the other
+UID/GIDs to the nobody user.
+
+However, there are use cases where users have UIDs/GIDs > 65536 and need
+to do a similar identity mapping. Moreover, in some of those cases, users
+want a full identity mapping from 0 -> UID_MAX.
+
+Note to differentiate ourselves from the init user namespace, we need to
+set up the uid_map/gid_map like:
+```
+0 0 1
+1 1 UINT32_MAX - 1
+```
+
+as the init user namedspace uses `0 0 UINT32_MAX` and some applications -
+like systemd itself - determine if its a non-init user namespace based on
+uid_map/gid_map files. Note systemd will remove this heuristic in
+running_in_userns() in version 258 and uses namespace inode. But some users
+may be running a container image with older systemd < 258 so we keep this
+hack until version 259.
+
+To support this, we add PrivateUsers=full that does identity mapping for
+all available UID/GIDs.
+
+Fixes: #35168
+(cherry picked from commit 705cc82938b67fa110f2f6f5d28bfb9ec2f339c0)
+---
+ man/systemd.exec.xml                     |  8 +++++--
+ src/core/exec-invoke.c                   | 28 ++++++++++++++++++++++++
+ src/core/namespace.c                     |  1 +
+ src/core/namespace.h                     |  1 +
+ test/units/TEST-07-PID1.private-users.sh |  2 ++
+ 5 files changed, 38 insertions(+), 2 deletions(-)
+
+diff --git a/man/systemd.exec.xml b/man/systemd.exec.xml
+index c42f0a10009aa..80de9a685ed15 100644
+--- a/man/systemd.exec.xml
++++ b/man/systemd.exec.xml
+@@ -2009,8 +2009,8 @@ BindReadOnlyPaths=/var/lib/systemd</programlisting>
+       <varlistentry>
+         <term><varname>PrivateUsers=</varname></term>
+ 
+-        <listitem><para>Takes a boolean argument or one of <literal>self</literal> or
+-        <literal>identity</literal>. Defaults to false. If enabled, sets up a new user namespace for the
++        <listitem><para>Takes a boolean argument or one of <literal>self</literal>, <literal>identity</literal>,
++        or <literal>full</literal>. Defaults to false. If enabled, sets up a new user namespace for the
+         executed processes and configures a user and group mapping. If set to a true value or
+         <literal>self</literal>, a minimal user and group mapping is configured that maps the
+         <literal>root</literal> user and group as well as the unit's own user and group to themselves and
+@@ -2026,6 +2026,10 @@ BindReadOnlyPaths=/var/lib/systemd</programlisting>
+         since all UIDs/GIDs are chosen identically it does provide process capability isolation, and hence is
+         often a good choice if proper user namespacing with distinct UID maps is not appropriate.</para>
+ 
++        <para>If the parameter is <literal>full</literal>, user namespacing is set up with an identity
++        mapping for all UIDs/GIDs. Similar to <literal>identity</literal>, this does not provide UID/GID
++        isolation, but it does provide process capability isolation.</para>
++
+         <para>If this mode is enabled, all unit processes are run without privileges in the host user
+         namespace (regardless if the unit's own user/group is <literal>root</literal> or not). Specifically
+         this means that the process will have zero process capabilities on the host's user namespace, but
+diff --git a/src/core/exec-invoke.c b/src/core/exec-invoke.c
+index cc0a865c77d21..650858ea2d1b9 100644
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -2107,6 +2107,29 @@ static int setup_private_users(PrivateUsers private_users, uid_t ouid, gid_t ogi
+                 uid_map = strdup("0 0 65536\n");
+                 if (!uid_map)
+                         return -ENOMEM;
++        } else if (private_users == PRIVATE_USERS_FULL) {
++                /* Map all UID/GID from original to new user namespace. We can't use `0 0 UINT32_MAX` because
++                 * this is the same UID/GID map as the init user namespace and systemd's running_in_userns()
++                 * checks whether its in a user namespace by comparing uid_map/gid_map to `0 0 UINT32_MAX`.
++                 * Thus, we still map all UIDs/GIDs but do it using two extents to differentiate the new user
++                 * namespace from the init namespace:
++                 *   0 0 1
++                 *   1 1 UINT32_MAX - 1
++                 *
++                 * systemd will remove the heuristic in running_in_userns() and use namespace inodes in version 258
++                 * (PR #35382). But some users may be running a container image with older systemd < 258 so we keep
++                 * this uid_map/gid_map hack until version 259 for version N-1 compatibility.
++                 *
++                 * TODO: Switch to `0 0 UINT32_MAX` in systemd v259.
++                 *
++                 * Note the kernel defines the UID range between 0 and UINT32_MAX so we map all UIDs even though
++                 * the UID range beyond INT32_MAX (e.g. i.e. the range above the signed 32-bit range) is
++                 * icky. For example, setfsuid() returns the old UID as signed integer. But units can decide to
++                 * use these UIDs/GIDs so we need to map them. */
++                r = asprintf(&uid_map, "0 0 1\n"
++                                       "1 1 " UID_FMT "\n", (uid_t) (UINT32_MAX - 1));
++                if (r < 0)
++                        return -ENOMEM;
+         /* Can only set up multiple mappings with CAP_SETUID. */
+         } else if (have_effective_cap(CAP_SETUID) > 0 && uid != ouid && uid_is_valid(uid)) {
+                 r = asprintf(&uid_map,
+@@ -2127,6 +2150,11 @@ static int setup_private_users(PrivateUsers private_users, uid_t ouid, gid_t ogi
+                 gid_map = strdup("0 0 65536\n");
+                 if (!gid_map)
+                         return -ENOMEM;
++        } else if (private_users == PRIVATE_USERS_FULL) {
++                r = asprintf(&gid_map, "0 0 1\n"
++                                       "1 1 " GID_FMT "\n", (gid_t) (UINT32_MAX - 1));
++                if (r < 0)
++                        return -ENOMEM;
+         /* Can only set up multiple mappings with CAP_SETGID. */
+         } else if (have_effective_cap(CAP_SETGID) > 0 && gid != ogid && gid_is_valid(gid)) {
+                 r = asprintf(&gid_map,
+diff --git a/src/core/namespace.c b/src/core/namespace.c
+index ad618538471d1..2dcc365932e88 100644
+--- a/src/core/namespace.c
++++ b/src/core/namespace.c
+@@ -3376,6 +3376,7 @@ static const char* const private_users_table[_PRIVATE_USERS_MAX] = {
+         [PRIVATE_USERS_NO]       = "no",
+         [PRIVATE_USERS_SELF]     = "self",
+         [PRIVATE_USERS_IDENTITY] = "identity",
++        [PRIVATE_USERS_FULL]     = "full",
+ };
+ 
+ DEFINE_STRING_TABLE_LOOKUP_WITH_BOOLEAN(private_users, PrivateUsers, PRIVATE_USERS_SELF);
+diff --git a/src/core/namespace.h b/src/core/namespace.h
+index bd48aa31da71c..5d466a8c1c724 100644
+--- a/src/core/namespace.h
++++ b/src/core/namespace.h
+@@ -65,6 +65,7 @@ typedef enum PrivateUsers {
+         PRIVATE_USERS_NO,
+         PRIVATE_USERS_SELF,
+         PRIVATE_USERS_IDENTITY,
++        PRIVATE_USERS_FULL,
+         _PRIVATE_USERS_MAX,
+         _PRIVATE_USERS_INVALID = -EINVAL,
+ } PrivateUsers;
+diff --git a/test/units/TEST-07-PID1.private-users.sh b/test/units/TEST-07-PID1.private-users.sh
+index 2475b5d365d59..ba85248f9607e 100755
+--- a/test/units/TEST-07-PID1.private-users.sh
++++ b/test/units/TEST-07-PID1.private-users.sh
+@@ -10,3 +10,5 @@ systemd-run -p PrivateUsersEx=self --wait bash -c 'test "$(cat /proc/self/uid_ma
+ systemd-run -p PrivateUsersEx=self --wait bash -c 'test "$(cat /proc/self/gid_map)" == "         0          0          1"'
+ systemd-run -p PrivateUsersEx=identity --wait bash -c 'test "$(cat /proc/self/uid_map)" == "         0          0      65536"'
+ systemd-run -p PrivateUsersEx=identity --wait bash -c 'test "$(cat /proc/self/gid_map)" == "         0          0      65536"'
++systemd-run -p PrivateUsersEx=full --wait bash -c 'test "$(cat /proc/self/uid_map | tr -d "\n")" == "         0          0          1         1          1 4294967294"'
++systemd-run -p PrivateUsersEx=full --wait bash -c 'test "$(cat /proc/self/gid_map | tr -d "\n")" == "         0          0          1         1          1 4294967294"'
+
+From c907616a3b5f218a3af66e5d6191f9e90b591343 Mon Sep 17 00:00:00 2001
+From: Ryan Wilson <ryantimwilson@meta.com>
+Date: Sat, 30 Nov 2024 14:14:35 -0800
+Subject: [PATCH 02/18] core: Set /proc/pid/setgroups to allow for
+ PrivateUsers=full
+
+When trying to run dbus-broker in a systemd unit with PrivateUsers=full,
+we see dbus-broker fails with EPERM at `util_audit_drop_permissions`.
+
+The root cause is dbus-broker calls the setgroups() system call and this
+is disallowed via systemd's implementation of PrivateUsers= by setting
+/proc/pid/setgroups = deny. This is done to remediate potential privilege
+escalation vulnerabilities in user namespaces where an attacker can remove
+supplementary groups and gain access to resources where those groups are
+restricted.
+
+However, for OS-like containers, setgroups() is a pretty common API and
+disabling it is not feasible. So we allow setgroups() by setting
+/proc/pid/setgroups to allow in PrivateUsers=full. Note security conscious
+users can still use SystemCallFilter= to disable setgroups() if they want
+to specifically prevent this system call.
+
+Fixes: #35425
+(cherry picked from commit 2665425176f19ee26568151a3fabf3a117269b50)
+---
+ man/systemd.exec.xml                     |  7 +++++--
+ src/core/exec-invoke.c                   | 17 +++++++++++------
+ test/units/TEST-07-PID1.private-users.sh |  3 +++
+ 3 files changed, 19 insertions(+), 8 deletions(-)
+
+diff --git a/man/systemd.exec.xml b/man/systemd.exec.xml
+index 80de9a685ed15..1348ea59bdb05 100644
+--- a/man/systemd.exec.xml
++++ b/man/systemd.exec.xml
+@@ -2027,8 +2027,11 @@ BindReadOnlyPaths=/var/lib/systemd</programlisting>
+         often a good choice if proper user namespacing with distinct UID maps is not appropriate.</para>
+ 
+         <para>If the parameter is <literal>full</literal>, user namespacing is set up with an identity
+-        mapping for all UIDs/GIDs. Similar to <literal>identity</literal>, this does not provide UID/GID
+-        isolation, but it does provide process capability isolation.</para>
++        mapping for all UIDs/GIDs. In addition, for system services, <literal>full</literal> allows the unit
++        to call <function>setgroups()</function> system calls (by setting
++        <filename>/proc/<replaceable>pid</replaceable>/setgroups</filename> to <literal>allow</literal>).
++        Similar to <literal>identity</literal>, this does not provide UID/GID isolation, but it does provide
++        process capability isolation.</para>
+ 
+         <para>If this mode is enabled, all unit processes are run without privileges in the host user
+         namespace (regardless if the unit's own user/group is <literal>root</literal> or not). Specifically
+diff --git a/src/core/exec-invoke.c b/src/core/exec-invoke.c
+index 650858ea2d1b9..a09bc36f8aab5 100644
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -2081,7 +2081,7 @@ static int build_pass_environment(const ExecContext *c, char ***ret) {
+         return 0;
+ }
+ 
+-static int setup_private_users(PrivateUsers private_users, uid_t ouid, gid_t ogid, uid_t uid, gid_t gid) {
++static int setup_private_users(PrivateUsers private_users, uid_t ouid, gid_t ogid, uid_t uid, gid_t gid, bool allow_setgroups) {
+         _cleanup_free_ char *uid_map = NULL, *gid_map = NULL;
+         _cleanup_close_pair_ int errno_pipe[2] = EBADF_PAIR;
+         _cleanup_close_ int unshare_ready_fd = -EBADF;
+@@ -2200,7 +2200,8 @@ static int setup_private_users(PrivateUsers private_users, uid_t ouid, gid_t ogi
+                 if (read(unshare_ready_fd, &c, sizeof(c)) < 0)
+                         report_errno_and_exit(errno_pipe[1], -errno);
+ 
+-                /* Disable the setgroups() system call in the child user namespace, for good. */
++                /* Disable the setgroups() system call in the child user namespace, for good, unless PrivateUsers=full
++                 * and using the system service manager. */
+                 a = procfs_file_alloca(ppid, "setgroups");
+                 fd = open(a, O_WRONLY|O_CLOEXEC);
+                 if (fd < 0) {
+@@ -2211,8 +2212,9 @@ static int setup_private_users(PrivateUsers private_users, uid_t ouid, gid_t ogi
+ 
+                         /* If the file is missing the kernel is too old, let's continue anyway. */
+                 } else {
+-                        if (write(fd, "deny\n", 5) < 0) {
+-                                r = log_debug_errno(errno, "Failed to write \"deny\" to %s: %m", a);
++                        const char *setgroups = allow_setgroups ? "allow\n" : "deny\n";
++                        if (write(fd, setgroups, strlen(setgroups)) < 0) {
++                                r = log_debug_errno(errno, "Failed to write '%s' to %s: %m", setgroups, a);
+                                 report_errno_and_exit(errno_pipe[1], r);
+                         }
+ 
+@@ -5018,7 +5020,9 @@ int exec_invoke(
+                 if (pu == PRIVATE_USERS_NO)
+                         pu = PRIVATE_USERS_SELF;
+ 
+-                r = setup_private_users(pu, saved_uid, saved_gid, uid, gid);
++                /* The kernel requires /proc/pid/setgroups be set to "deny" prior to writing /proc/pid/gid_map in
++                 * unprivileged user namespaces. */
++                r = setup_private_users(pu, saved_uid, saved_gid, uid, gid, /* allow_setgroups= */ false);
+                 /* If it was requested explicitly and we can't set it up, fail early. Otherwise, continue and let
+                  * the actual requested operations fail (or silently continue). */
+                 if (r < 0 && context->private_users != PRIVATE_USERS_NO) {
+@@ -5187,7 +5191,8 @@ int exec_invoke(
+          * different user namespace). */
+ 
+         if (needs_sandboxing && !userns_set_up) {
+-                r = setup_private_users(context->private_users, saved_uid, saved_gid, uid, gid);
++                r = setup_private_users(context->private_users, saved_uid, saved_gid, uid, gid,
++                                        /* allow_setgroups= */ context->private_users == PRIVATE_USERS_FULL);
+                 if (r < 0) {
+                         *exit_status = EXIT_USER;
+                         return log_exec_error_errno(context, params, r, "Failed to set up user namespacing: %m");
+diff --git a/test/units/TEST-07-PID1.private-users.sh b/test/units/TEST-07-PID1.private-users.sh
+index ba85248f9607e..e788f52a2f73f 100755
+--- a/test/units/TEST-07-PID1.private-users.sh
++++ b/test/units/TEST-07-PID1.private-users.sh
+@@ -6,9 +6,12 @@ set -o pipefail
+ 
+ systemd-run -p PrivateUsers=yes --wait bash -c 'test "$(cat /proc/self/uid_map)" == "         0          0          1"'
+ systemd-run -p PrivateUsers=yes --wait bash -c 'test "$(cat /proc/self/gid_map)" == "         0          0          1"'
++systemd-run -p PrivateUsersEx=yes --wait bash -c 'test "$(cat /proc/self/setgroups)" == "deny"'
+ systemd-run -p PrivateUsersEx=self --wait bash -c 'test "$(cat /proc/self/uid_map)" == "         0          0          1"'
+ systemd-run -p PrivateUsersEx=self --wait bash -c 'test "$(cat /proc/self/gid_map)" == "         0          0          1"'
++systemd-run -p PrivateUsersEx=self --wait bash -c 'test "$(cat /proc/self/setgroups)" == "deny"'
+ systemd-run -p PrivateUsersEx=identity --wait bash -c 'test "$(cat /proc/self/uid_map)" == "         0          0      65536"'
+ systemd-run -p PrivateUsersEx=identity --wait bash -c 'test "$(cat /proc/self/gid_map)" == "         0          0      65536"'
+ systemd-run -p PrivateUsersEx=full --wait bash -c 'test "$(cat /proc/self/uid_map | tr -d "\n")" == "         0          0          1         1          1 4294967294"'
+ systemd-run -p PrivateUsersEx=full --wait bash -c 'test "$(cat /proc/self/gid_map | tr -d "\n")" == "         0          0          1         1          1 4294967294"'
++systemd-run -p PrivateUsersEx=full --wait bash -c 'test "$(cat /proc/self/setgroups)" == "allow"'
+
+From 23a98ab18ee181ecce2e9af3930a5374f7c53c9c Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Tue, 18 Feb 2025 12:25:16 +0100
+Subject: [PATCH 03/18] exec-invoke: Move KSM logic up
+
+Let's move it up to be located together with other resource logic
+instead of having it stuffed inbetween the sandboxing logic.
+
+(cherry picked from commit 0ea00396fd2cb017d4866c82072fe6883f06daaa)
+---
+ src/core/exec-invoke.c | 26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
+
+diff --git a/src/core/exec-invoke.c b/src/core/exec-invoke.c
+index a09bc36f8aab5..2d39a2095b106 100644
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -4757,6 +4757,19 @@ int exec_invoke(
+                 }
+         }
+ 
++        if (context->memory_ksm >= 0)
++                if (prctl(PR_SET_MEMORY_MERGE, context->memory_ksm, 0, 0, 0) < 0) {
++                        if (ERRNO_IS_NOT_SUPPORTED(errno))
++                                log_exec_debug_errno(context,
++                                                     params,
++                                                     errno,
++                                                     "KSM support not available, ignoring.");
++                        else {
++                                *exit_status = EXIT_KSM;
++                                return log_exec_error_errno(context, params, errno, "Failed to set KSM: %m");
++                        }
++                }
++
+ #if ENABLE_UTMP
+         if (context->utmp_id) {
+                 _cleanup_free_ char *username_alloc = NULL;
+@@ -5145,19 +5158,6 @@ int exec_invoke(
+                         return r;
+         }
+ 
+-        if (context->memory_ksm >= 0)
+-                if (prctl(PR_SET_MEMORY_MERGE, context->memory_ksm, 0, 0, 0) < 0) {
+-                        if (ERRNO_IS_NOT_SUPPORTED(errno))
+-                                log_exec_debug_errno(context,
+-                                                     params,
+-                                                     errno,
+-                                                     "KSM support not available, ignoring.");
+-                        else {
+-                                *exit_status = EXIT_KSM;
+-                                return log_exec_error_errno(context, params, errno, "Failed to set KSM: %m");
+-                        }
+-                }
+-
+         /* Drop groups as early as possible.
+          * This needs to be done after PrivateDevices=yes setup as device nodes should be owned by the host's root.
+          * For non-root in a userns, devices will be owned by the user/group before the group change, and nobody. */
+
+From c2601566b1e3226ff84842e75400bc4e2306151a Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Thu, 27 Feb 2025 09:24:04 +0100
+Subject: [PATCH 04/18] exec-invoke: Simplify logic
+
+(cherry picked from commit 4fea4f8295b12110d1d17f4e622535aea99dc854)
+---
+ src/core/exec-invoke.c | 20 +++++++++++---------
+ 1 file changed, 11 insertions(+), 9 deletions(-)
+
+diff --git a/src/core/exec-invoke.c b/src/core/exec-invoke.c
+index 2d39a2095b106..ae9a2dede4ab7 100644
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -5113,15 +5113,17 @@ int exec_invoke(
+                  * We need to check prior to entering the user namespace because if we're running unprivileged or in a
+                  * system without CAP_SYS_ADMIN, then we can have CAP_SYS_ADMIN in the current user namespace but not
+                  * once we unshare a mount namespace. */
+-                r = has_cap_sys_admin ? 1 : can_mount_proc(context, params);
+-                if (r < 0) {
+-                        *exit_status = EXIT_NAMESPACE;
+-                        return log_exec_error_errno(context, params, r, "Failed to detect if /proc/ can be remounted: %m");
+-                }
+-                if (r == 0) {
+-                        *exit_status = EXIT_NAMESPACE;
+-                        return log_exec_error_errno(context, params, SYNTHETIC_ERRNO(EPERM),
+-                                                    "PrivatePIDs=yes is configured, but /proc/ cannot be re-mounted due to lack of privileges, refusing.");
++                if (!has_cap_sys_admin) {
++                        r = can_mount_proc(context, params);
++                        if (r < 0) {
++                                *exit_status = EXIT_NAMESPACE;
++                                return log_exec_error_errno(context, params, r, "Failed to detect if /proc/ can be remounted: %m");
++                        }
++                        if (r == 0) {
++                                *exit_status = EXIT_NAMESPACE;
++                                return log_exec_error_errno(context, params, SYNTHETIC_ERRNO(EPERM),
++                                                            "PrivatePIDs=yes is configured, but /proc/ cannot be re-mounted due to lack of privileges, refusing.");
++                        }
+                 }
+ 
+                 r = setup_private_pids(context, params);
+
+From 9e9fb5596937440febf8035877ae285c7ac0db1d Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Thu, 27 Feb 2025 09:28:15 +0100
+Subject: [PATCH 05/18] exec-invoke: Introduce setup_delegated_namespaces()
+
+No functional change, just refactoring.
+
+(cherry picked from commit 7904c1dbe69518efc4da7bc56a5663bf3315412d)
+---
+ src/core/exec-invoke.c | 255 +++++++++++++++++++++++------------------
+ 1 file changed, 146 insertions(+), 109 deletions(-)
+
+diff --git a/src/core/exec-invoke.c b/src/core/exec-invoke.c
+index ae9a2dede4ab7..ee4462411dddb 100644
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -4097,6 +4097,139 @@ static bool exec_context_need_unprivileged_private_users(
+                !strv_isempty(context->no_exec_paths);
+ }
+ 
++static int setup_delegated_namespaces(
++                const ExecContext *context,
++                ExecParameters *params,
++                ExecRuntime *runtime,
++                const char *memory_pressure_path,
++                uid_t uid,
++                uid_t gid,
++                const ExecCommand *command,
++                bool needs_sandboxing,
++                bool has_cap_sys_admin,
++                int *reterr_exit_status) {
++
++        int r;
++
++        assert(context);
++        assert(params);
++        assert(reterr_exit_status);
++
++        if (exec_needs_network_namespace(context) &&
++            runtime && runtime->shared && runtime->shared->netns_storage_socket[0] >= 0) {
++
++                /* Try to enable network namespacing if network namespacing is available and we have
++                 * CAP_NET_ADMIN. We need CAP_NET_ADMIN to be able to configure the loopback device in the
++                 * new network namespace. And if we don't have that, then we could only create a network
++                 * namespace without the ability to set up "lo". Hence gracefully skip things then. */
++                if (ns_type_supported(NAMESPACE_NET) && have_effective_cap(CAP_NET_ADMIN) > 0) {
++                        r = setup_shareable_ns(runtime->shared->netns_storage_socket, CLONE_NEWNET);
++                        if (ERRNO_IS_NEG_PRIVILEGE(r))
++                                log_exec_notice_errno(context, params, r,
++                                                      "PrivateNetwork=yes is configured, but network namespace setup not permitted, proceeding without: %m");
++                        else if (r < 0) {
++                                *reterr_exit_status = EXIT_NETWORK;
++                                return log_exec_error_errno(context, params, r, "Failed to set up network namespacing: %m");
++                        }
++                } else if (context->network_namespace_path) {
++                        *reterr_exit_status = EXIT_NETWORK;
++                        return log_exec_error_errno(context, params, SYNTHETIC_ERRNO(EOPNOTSUPP),
++                                                    "NetworkNamespacePath= is not supported, refusing.");
++                } else
++                        log_exec_notice(context, params, "PrivateNetwork=yes is configured, but the kernel does not support or we lack privileges for network namespace, proceeding without.");
++        }
++
++        if (exec_needs_ipc_namespace(context) && runtime &&
++            runtime->shared && runtime->shared->ipcns_storage_socket[0] >= 0) {
++
++                if (ns_type_supported(NAMESPACE_IPC)) {
++                        r = setup_shareable_ns(runtime->shared->ipcns_storage_socket, CLONE_NEWIPC);
++                        if (ERRNO_IS_NEG_PRIVILEGE(r))
++                                log_exec_warning_errno(context, params, r,
++                                                       "PrivateIPC=yes is configured, but IPC namespace setup failed, ignoring: %m");
++                        else if (r < 0) {
++                                *reterr_exit_status = EXIT_NAMESPACE;
++                                return log_exec_error_errno(context, params, r, "Failed to set up IPC namespacing: %m");
++                        }
++                } else if (context->ipc_namespace_path) {
++                        *reterr_exit_status = EXIT_NAMESPACE;
++                        return log_exec_error_errno(context, params, SYNTHETIC_ERRNO(EOPNOTSUPP),
++                                                    "IPCNamespacePath= is not supported, refusing.");
++                } else
++                        log_exec_warning(context, params, "PrivateIPC=yes is configured, but the kernel does not support IPC namespaces, ignoring.");
++        }
++
++        if (needs_sandboxing && exec_needs_cgroup_namespace(context, params)) {
++                if (unshare(CLONE_NEWCGROUP) < 0) {
++                        *reterr_exit_status = EXIT_NAMESPACE;
++                        return log_exec_error_errno(context, params, errno, "Failed to set up cgroup namespacing: %m");
++                }
++        }
++
++        /* Unshare a new PID namespace before setting up mounts to ensure /proc/ is mounted with only processes in PID namespace visible.
++         * Note PrivatePIDs=yes implies MountAPIVFS=yes so we'll always ensure procfs is remounted. */
++        if (needs_sandboxing && exec_needs_pid_namespace(context)) {
++                if (params->pidref_transport_fd < 0) {
++                        *reterr_exit_status = EXIT_NAMESPACE;
++                        return log_exec_error_errno(context, params, SYNTHETIC_ERRNO(ENOTCONN), "PidRef socket is not set up: %m");
++                }
++
++                /* If we had CAP_SYS_ADMIN prior to joining the user namespace, then we are privileged and don't need
++                 * to check if we can mount /proc/.
++                 *
++                 * We need to check prior to entering the user namespace because if we're running unprivileged or in a
++                 * system without CAP_SYS_ADMIN, then we can have CAP_SYS_ADMIN in the current user namespace but not
++                 * once we unshare a mount namespace. */
++                if (!has_cap_sys_admin) {
++                        r = can_mount_proc(context, params);
++                        if (r < 0) {
++                                *reterr_exit_status = EXIT_NAMESPACE;
++                                return log_exec_error_errno(context, params, r, "Failed to detect if /proc/ can be remounted: %m");
++                        }
++                        if (r == 0) {
++                                *reterr_exit_status = EXIT_NAMESPACE;
++                                return log_exec_error_errno(context, params, SYNTHETIC_ERRNO(EPERM),
++                                                            "PrivatePIDs=yes is configured, but /proc/ cannot be re-mounted due to lack of privileges, refusing.");
++                        }
++                }
++
++                r = setup_private_pids(context, params);
++                if (r < 0) {
++                        *reterr_exit_status = EXIT_NAMESPACE;
++                        return log_exec_error_errno(context, params, r, "Failed to set up pid namespace: %m");
++                }
++        }
++
++        /* If PrivatePIDs= yes is configured, we're now running as pid 1 in a pid namespace! */
++
++        if (exec_needs_mount_namespace(context, params, runtime)) {
++                _cleanup_free_ char *error_path = NULL;
++
++                r = apply_mount_namespace(command->flags,
++                                          context,
++                                          params,
++                                          runtime,
++                                          memory_pressure_path,
++                                          needs_sandboxing,
++                                          &error_path,
++                                          uid,
++                                          gid);
++                if (r < 0) {
++                        *reterr_exit_status = EXIT_NAMESPACE;
++                        return log_exec_error_errno(context, params, r, "Failed to set up mount namespacing%s%s: %m",
++                                                    error_path ? ": " : "", strempty(error_path));
++                }
++        }
++
++        if (needs_sandboxing) {
++                r = apply_protect_hostname(context, params, reterr_exit_status);
++                if (r < 0)
++                        return r;
++        }
++
++        return 0;
++}
++
+ static bool exec_context_shall_confirm_spawn(const ExecContext *context) {
+         assert(context);
+ 
+@@ -5050,115 +5183,19 @@ int exec_invoke(
+                 }
+         }
+ 
+-        if (exec_needs_network_namespace(context) && runtime && runtime->shared && runtime->shared->netns_storage_socket[0] >= 0) {
+-
+-                /* Try to enable network namespacing if network namespacing is available and we have
+-                 * CAP_NET_ADMIN. We need CAP_NET_ADMIN to be able to configure the loopback device in the
+-                 * new network namespace. And if we don't have that, then we could only create a network
+-                 * namespace without the ability to set up "lo". Hence gracefully skip things then. */
+-                if (ns_type_supported(NAMESPACE_NET) && have_effective_cap(CAP_NET_ADMIN) > 0) {
+-                        r = setup_shareable_ns(runtime->shared->netns_storage_socket, CLONE_NEWNET);
+-                        if (ERRNO_IS_NEG_PRIVILEGE(r))
+-                                log_exec_notice_errno(context, params, r,
+-                                                      "PrivateNetwork=yes is configured, but network namespace setup not permitted, proceeding without: %m");
+-                        else if (r < 0) {
+-                                *exit_status = EXIT_NETWORK;
+-                                return log_exec_error_errno(context, params, r, "Failed to set up network namespacing: %m");
+-                        }
+-                } else if (context->network_namespace_path) {
+-                        *exit_status = EXIT_NETWORK;
+-                        return log_exec_error_errno(context, params, SYNTHETIC_ERRNO(EOPNOTSUPP),
+-                                                    "NetworkNamespacePath= is not supported, refusing.");
+-                } else
+-                        log_exec_notice(context, params, "PrivateNetwork=yes is configured, but the kernel does not support or we lack privileges for network namespace, proceeding without.");
+-        }
+-
+-        if (exec_needs_ipc_namespace(context) && runtime && runtime->shared && runtime->shared->ipcns_storage_socket[0] >= 0) {
+-
+-                if (ns_type_supported(NAMESPACE_IPC)) {
+-                        r = setup_shareable_ns(runtime->shared->ipcns_storage_socket, CLONE_NEWIPC);
+-                        if (ERRNO_IS_NEG_PRIVILEGE(r))
+-                                log_exec_warning_errno(context, params, r,
+-                                                       "PrivateIPC=yes is configured, but IPC namespace setup failed, ignoring: %m");
+-                        else if (r < 0) {
+-                                *exit_status = EXIT_NAMESPACE;
+-                                return log_exec_error_errno(context, params, r, "Failed to set up IPC namespacing: %m");
+-                        }
+-                } else if (context->ipc_namespace_path) {
+-                        *exit_status = EXIT_NAMESPACE;
+-                        return log_exec_error_errno(context, params, SYNTHETIC_ERRNO(EOPNOTSUPP),
+-                                                    "IPCNamespacePath= is not supported, refusing.");
+-                } else
+-                        log_exec_warning(context, params, "PrivateIPC=yes is configured, but the kernel does not support IPC namespaces, ignoring.");
+-        }
+-
+-        if (needs_sandboxing && exec_needs_cgroup_namespace(context, params)) {
+-                if (unshare(CLONE_NEWCGROUP) < 0) {
+-                        *exit_status = EXIT_NAMESPACE;
+-                        return log_exec_error_errno(context, params, errno, "Failed to set up cgroup namespacing: %m");
+-                }
+-        }
+-
+-        /* Unshare a new PID namespace before setting up mounts to ensure /proc/ is mounted with only processes in PID namespace visible.
+-         * Note PrivatePIDs=yes implies MountAPIVFS=yes so we'll always ensure procfs is remounted. */
+-        if (needs_sandboxing && exec_needs_pid_namespace(context)) {
+-                if (params->pidref_transport_fd < 0) {
+-                        *exit_status = EXIT_NAMESPACE;
+-                        return log_exec_error_errno(context, params, SYNTHETIC_ERRNO(ENOTCONN), "PidRef socket is not set up: %m");
+-                }
+-
+-                /* If we had CAP_SYS_ADMIN prior to joining the user namespace, then we are privileged and don't need
+-                 * to check if we can mount /proc/.
+-                 *
+-                 * We need to check prior to entering the user namespace because if we're running unprivileged or in a
+-                 * system without CAP_SYS_ADMIN, then we can have CAP_SYS_ADMIN in the current user namespace but not
+-                 * once we unshare a mount namespace. */
+-                if (!has_cap_sys_admin) {
+-                        r = can_mount_proc(context, params);
+-                        if (r < 0) {
+-                                *exit_status = EXIT_NAMESPACE;
+-                                return log_exec_error_errno(context, params, r, "Failed to detect if /proc/ can be remounted: %m");
+-                        }
+-                        if (r == 0) {
+-                                *exit_status = EXIT_NAMESPACE;
+-                                return log_exec_error_errno(context, params, SYNTHETIC_ERRNO(EPERM),
+-                                                            "PrivatePIDs=yes is configured, but /proc/ cannot be re-mounted due to lack of privileges, refusing.");
+-                        }
+-                }
+-
+-                r = setup_private_pids(context, params);
+-                if (r < 0) {
+-                        *exit_status = EXIT_NAMESPACE;
+-                        return log_exec_error_errno(context, params, r, "Failed to set up pid namespace: %m");
+-                }
+-        }
+-
+-        /* If PrivatePIDs= yes is configured, we're now running as pid 1 in a pid namespace! */
+-
+-        if (needs_mount_namespace) {
+-                _cleanup_free_ char *error_path = NULL;
+-
+-                r = apply_mount_namespace(command->flags,
+-                                          context,
+-                                          params,
+-                                          runtime,
+-                                          memory_pressure_path,
+-                                          needs_sandboxing,
+-                                          &error_path,
+-                                          uid,
+-                                          gid);
+-                if (r < 0) {
+-                        *exit_status = EXIT_NAMESPACE;
+-                        return log_exec_error_errno(context, params, r, "Failed to set up mount namespacing%s%s: %m",
+-                                                    error_path ? ": " : "", strempty(error_path));
+-                }
+-        }
+-
+-        if (needs_sandboxing) {
+-                r = apply_protect_hostname(context, params, exit_status);
+-                if (r < 0)
+-                        return r;
+-        }
++        r = setup_delegated_namespaces(
++                        context,
++                        params,
++                        runtime,
++                        memory_pressure_path,
++                        uid,
++                        gid,
++                        command,
++                        needs_sandboxing,
++                        has_cap_sys_admin,
++                        exit_status);
++        if (r < 0)
++                return r;
+ 
+         /* Drop groups as early as possible.
+          * This needs to be done after PrivateDevices=yes setup as device nodes should be owned by the host's root.
+
+From acdb46d6803191bb79120ba623f0b9fb035896d1 Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Tue, 4 Feb 2025 15:48:36 +0100
+Subject: [PATCH 06/18] core: Add DelegateNamespaces=
+
+This delegates one or more namespaces to the service. Concretely,
+this setting influences in which order we unshare namespaces. Delegated
+namespaces are unshared *after* the user namespace is unshared. Other
+namespaces are unshared *before* the user namespace is unshared.
+
+Fixes #35369
+
+(cherry picked from commit 8234cd9989d3834bf5c06e2b597ec097b985e1e8)
+---
+ man/org.freedesktop.systemd1.xml              |  44 +++++--
+ man/systemd.exec.xml                          |  37 ++++++
+ src/core/dbus-execute.c                       |   4 +
+ src/core/exec-invoke.c                        | 123 +++++++++++++++---
+ src/core/execute-serialize.c                  |  10 ++
+ src/core/execute.c                            |   1 +
+ src/core/execute.h                            |   1 +
+ src/core/load-fragment-gperf.gperf.in         |   3 +-
+ src/core/load-fragment.c                      |  30 +++--
+ src/core/load-fragment.h                      |   2 +-
+ src/shared/bus-unit-util.c                    |   3 +-
+ .../units/TEST-07-PID1.delegate-namespaces.sh |  80 ++++++++++++
+ 12 files changed, 297 insertions(+), 41 deletions(-)
+ create mode 100755 test/units/TEST-07-PID1.delegate-namespaces.sh
+
+diff --git a/man/org.freedesktop.systemd1.xml b/man/org.freedesktop.systemd1.xml
+index dd945a32b2fb6..f4625214106be 100644
+--- a/man/org.freedesktop.systemd1.xml
++++ b/man/org.freedesktop.systemd1.xml
+@@ -3339,6 +3339,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly t RestrictNamespaces = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
++      readonly t DelegateNamespaces = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly (bas) RestrictFileSystems = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly a(ssbt) BindPaths = [...];
+@@ -3940,6 +3942,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+ 
+     <!--property RestrictNamespaces is not documented!-->
+ 
++    <!--property DelegateNamespaces is not documented!-->
++
+     <!--property RestrictFileSystems is not documented!-->
+ 
+     <!--property BindPaths is not documented!-->
+@@ -4662,6 +4666,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="RestrictNamespaces"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="DelegateNamespaces"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="RestrictFileSystems"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="BindPaths"/>
+@@ -5525,6 +5531,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly t RestrictNamespaces = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
++      readonly t DelegateNamespaces = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly (bas) RestrictFileSystems = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly a(ssbt) BindPaths = [...];
+@@ -6138,6 +6146,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
+ 
+     <!--property RestrictNamespaces is not documented!-->
+ 
++    <!--property DelegateNamespaces is not documented!-->
++
+     <!--property RestrictFileSystems is not documented!-->
+ 
+     <!--property BindPaths is not documented!-->
+@@ -6832,6 +6842,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="RestrictNamespaces"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="DelegateNamespaces"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="RestrictFileSystems"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="BindPaths"/>
+@@ -7532,6 +7544,8 @@ node /org/freedesktop/systemd1/unit/home_2emount {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly t RestrictNamespaces = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
++      readonly t DelegateNamespaces = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly (bas) RestrictFileSystems = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly a(ssbt) BindPaths = [...];
+@@ -8071,6 +8085,8 @@ node /org/freedesktop/systemd1/unit/home_2emount {
+ 
+     <!--property RestrictNamespaces is not documented!-->
+ 
++    <!--property DelegateNamespaces is not documented!-->
++
+     <!--property RestrictFileSystems is not documented!-->
+ 
+     <!--property BindPaths is not documented!-->
+@@ -8677,6 +8693,8 @@ node /org/freedesktop/systemd1/unit/home_2emount {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="RestrictNamespaces"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="DelegateNamespaces"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="RestrictFileSystems"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="BindPaths"/>
+@@ -9506,6 +9524,8 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly t RestrictNamespaces = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
++      readonly t DelegateNamespaces = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly (bas) RestrictFileSystems = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly a(ssbt) BindPaths = [...];
+@@ -10031,6 +10051,8 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
+ 
+     <!--property RestrictNamespaces is not documented!-->
+ 
++    <!--property DelegateNamespaces is not documented!-->
++
+     <!--property RestrictFileSystems is not documented!-->
+ 
+     <!--property BindPaths is not documented!-->
+@@ -10623,6 +10645,8 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="RestrictNamespaces"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="DelegateNamespaces"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="RestrictFileSystems"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="BindPaths"/>
+@@ -12304,8 +12328,9 @@ $ gdbus introspect --system --dest org.freedesktop.systemd1 \
+       <varname>ManagedOOMMemoryPressureDurationUSec</varname>,
+       <varname>BindLogSockets</varname>,
+       <varname>ProtectControlGroupsEx</varname>,
+-      <varname>PrivateUsersEx</varname>, and
+-      <varname>PrivatePIDs</varname> were added in version 257.</para>
++      <varname>PrivateUsersEx</varname>,
++      <varname>PrivatePIDs</varname> and
++      <varname>DelegateNamespaces</varname> were added in version 257.</para>
+     </refsect2>
+     <refsect2>
+       <title>Socket Unit Objects</title>
+@@ -12347,8 +12372,9 @@ $ gdbus introspect --system --dest org.freedesktop.systemd1 \
+       <varname>BindLogSockets</varname>,
+       <varname>PrivateUsersEx</varname>,
+       <varname>ManagedOOMMemoryPressureDurationUSec</varname>,
+-      <varname>ProtectControlGroupsEx</varname>, and
+-      <varname>PrivatePIDs</varname> were added in version 257.</para>
++      <varname>ProtectControlGroupsEx</varname>,
++      <varname>PrivatePIDs</varname>, and
++      <varname>DelegateNamespaces</varname> were added in version 257.</para>
+     </refsect2>
+     <refsect2>
+       <title>Mount Unit Objects</title>
+@@ -12387,8 +12413,9 @@ $ gdbus introspect --system --dest org.freedesktop.systemd1 \
+       <varname>BindLogSockets</varname>,
+       <varname>PrivateUsersEx</varname>,
+       <varname>ManagedOOMMemoryPressureDurationUSec</varname>,
+-      <varname>ProtectControlGroupsEx</varname>, and
+-      <varname>PrivatePIDs</varname> were added in version 257.</para>
++      <varname>ProtectControlGroupsEx</varname>,
++      <varname>PrivatePIDs</varname>, and
++      <varname>DelegateNamespaces</varname> were added in version 257.</para>
+     </refsect2>
+     <refsect2>
+       <title>Swap Unit Objects</title>
+@@ -12427,8 +12454,9 @@ $ gdbus introspect --system --dest org.freedesktop.systemd1 \
+       <varname>BindLogSockets</varname>,
+       <varname>PrivateUsersEx</varname>,
+       <varname>ManagedOOMMemoryPressureDurationUSec</varname>,
+-      <varname>ProtectControlGroupsEx</varname>, and
+-      <varname>PrivatePIDs</varname> were added in version 257.</para>
++      <varname>ProtectControlGroupsEx</varname>,
++      <varname>PrivatePIDs</varname>, and
++      <varname>DelegateNamespaces</varname> were added in version 257.</para>
+     </refsect2>
+     <refsect2>
+       <title>Slice Unit Objects</title>
+diff --git a/man/systemd.exec.xml b/man/systemd.exec.xml
+index 1348ea59bdb05..495f17d395310 100644
+--- a/man/systemd.exec.xml
++++ b/man/systemd.exec.xml
+@@ -2366,6 +2366,43 @@ RestrictNamespaces=~cgroup net</programlisting>
+         <xi:include href="version-info.xml" xpointer="v233"/></listitem>
+       </varlistentry>
+ 
++      <varlistentry>
++        <term><varname>DelegateNamespaces=</varname></term>
++
++        <listitem><para>Delegates ownership of the given namespace types to the user namespace of the
++        processes of this unit. For details about Linux namespaces, see <citerefentry
++        project='man-pages'><refentrytitle>namespaces</refentrytitle><manvolnum>7</manvolnum></citerefentry>.
++        Either takes a boolean argument, or a space-separated list of namespace type identifiers. If false
++        (the default), the unit's processes' user namespace will not have ownership over any namespaces
++        created during setup of the unit's sandboxed environment. If true, ownership of all namespace types
++        (except for user namespaces, where the concept doesn't apply) created during setup of the unit's
++        sandboxed environment is delegated to the unit's processes' user namespace. Otherwise, a
++        space-separated list of namespace type identifiers must be specified, consisting of any combination
++        of: <constant>cgroup</constant>, <constant>ipc</constant>, <constant>net</constant>,
++        <constant>mnt</constant>, <constant>pid</constant>, and <constant>uts</constant>. All namespaces of
++        the listed types will be owned by the unit's processes' user namespace if they are created during
++        setup of the unit's sandboxed environment (allow-listing). By prepending the list with a single tilde
++        character (<literal>~</literal>) the effect may be inverted: all namespaces of types not listed and
++        created during setup of the unit's sandboxed environment will be owned by the unit's processes' user
++        namespace (deny-listing). If the empty string is assigned, the default namespace ownership is
++        applied, which is equivalent to false. This option may appear more than once, in which case the
++        namespace types are merged by <constant>OR</constant>, or by <constant>AND</constant> if the lines
++        are prefixed with <literal>~</literal> (see examples below). Internally, this setting controls the
++        order in which namespaces are unshared by systemd. Namespace types that should be owned by the unit's
++        processes' user namespace will be unshared after unsharing the user namespace. Internally, this
++        setting controls the order in which namespaces are unshared. Delegated namespaces will be unshared
++        after the user namespace is unshared. Other namespaces will be unshared before the user namespace is
++        unshared.</para>
++
++        <para>Delegating any namespace with <varname>DelegateNamespaces=</varname> implies
++        <varname>PrivateUsers=self</varname> unless <varname>PrivateUsers=</varname> is explicitly enabled
++        already by the unit. Delegating a namespace does not imply that the namespace is unshared, that is
++        done with the namespace specific unit setting such as <varname>PrivateNetwork=</varname> or
++        <varname>PrivateMounts=</varname>.</para>
++
++        <xi:include href="version-info.xml" xpointer="v258"/></listitem>
++      </varlistentry>
++
+       <varlistentry>
+         <term><varname>LockPersonality=</varname></term>
+ 
+diff --git a/src/core/dbus-execute.c b/src/core/dbus-execute.c
+index e3c3c8b5b171e..a8c3755b073c4 100644
+--- a/src/core/dbus-execute.c
++++ b/src/core/dbus-execute.c
+@@ -1250,6 +1250,7 @@ const sd_bus_vtable bus_exec_vtable[] = {
+         SD_BUS_PROPERTY("RestrictRealtime", "b", bus_property_get_bool, offsetof(ExecContext, restrict_realtime), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("RestrictSUIDSGID", "b", bus_property_get_bool, offsetof(ExecContext, restrict_suid_sgid), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("RestrictNamespaces", "t", bus_property_get_ulong, offsetof(ExecContext, restrict_namespaces), SD_BUS_VTABLE_PROPERTY_CONST),
++        SD_BUS_PROPERTY("DelegateNamespaces", "t", bus_property_get_ulong, offsetof(ExecContext, delegate_namespaces), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("RestrictFileSystems", "(bas)", property_get_restrict_filesystems, 0, SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("BindPaths", "a(ssbt)", property_get_bind_paths, 0, SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("BindReadOnlyPaths", "a(ssbt)", property_get_bind_paths, 0, SD_BUS_VTABLE_PROPERTY_CONST),
+@@ -2139,6 +2140,9 @@ int bus_exec_context_set_transient_property(
+         if (streq(name, "RestrictNamespaces"))
+                 return bus_set_transient_namespace_flag(u, name, &c->restrict_namespaces, message, flags, error);
+ 
++        if (streq(name, "DelegateNamespaces"))
++                return bus_set_transient_namespace_flag(u, name, &c->delegate_namespaces, message, flags, error);
++
+         if (streq(name, "RestrictFileSystems")) {
+                 int allow_list;
+                 _cleanup_strv_free_ char **l = NULL;
+diff --git a/src/core/exec-invoke.c b/src/core/exec-invoke.c
+index ee4462411dddb..5910de001dc43 100644
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -4094,13 +4094,56 @@ static bool exec_context_need_unprivileged_private_users(
+                !strv_isempty(context->read_only_paths) ||
+                !strv_isempty(context->inaccessible_paths) ||
+                !strv_isempty(context->exec_paths) ||
+-               !strv_isempty(context->no_exec_paths);
++               !strv_isempty(context->no_exec_paths) ||
++               context->delegate_namespaces != NAMESPACE_FLAGS_INITIAL;
++}
++
++static PrivateUsers exec_context_get_effective_private_users(
++                const ExecContext *context,
++                const ExecParameters *params) {
++
++        assert(context);
++        assert(params);
++
++        if (context->private_users != PRIVATE_USERS_NO)
++                return context->private_users;
++
++        if (exec_context_need_unprivileged_private_users(context, params))
++                return PRIVATE_USERS_SELF;
++
++        /* If any namespace is delegated with DelegateNamespaces=, always set up a user namespace. */
++        if (context->delegate_namespaces != NAMESPACE_FLAGS_INITIAL)
++                return PRIVATE_USERS_SELF;
++
++        return PRIVATE_USERS_NO;
++}
++
++static bool exec_namespace_is_delegated(
++                const ExecContext *context,
++                const ExecParameters *params,
++                unsigned long namespace) {
++
++        assert(context);
++        assert(params);
++        assert(namespace != CLONE_NEWUSER);
++
++        /* If we need unprivileged private users, we've already unshared a user namespace by the time we call
++         * setup_delegated_namespaces() for the first time so let's make sure we do all other namespace
++         * unsharing in the first call to setup_delegated_namespaces() by returning false here. */
++        if (exec_context_need_unprivileged_private_users(context, params))
++                return false;
++
++        if (context->delegate_namespaces == NAMESPACE_FLAGS_INITIAL)
++                return false;
++
++        return FLAGS_SET(context->delegate_namespaces, namespace);
+ }
+ 
+ static int setup_delegated_namespaces(
+                 const ExecContext *context,
+                 ExecParameters *params,
+                 ExecRuntime *runtime,
++                bool delegate,
+                 const char *memory_pressure_path,
+                 uid_t uid,
+                 uid_t gid,
+@@ -4111,16 +4154,25 @@ static int setup_delegated_namespaces(
+ 
+         int r;
+ 
++        /* This function is called twice, once before unsharing the user namespace, and once after unsharing
++         * the user namespace. When called before unsharing the user namespace, "delegate" is set to "false".
++         * When called after unsharing the user namespace, "delegate" is set to "true". The net effect is
++         * that all namespaces that should not be delegated are unshared when this function is called the
++         * first time and all namespaces that should be delegated are unshared when this function is called
++         * the second time. */
++
+         assert(context);
+         assert(params);
+         assert(reterr_exit_status);
+ 
+         if (exec_needs_network_namespace(context) &&
++            exec_namespace_is_delegated(context, params, CLONE_NEWNET) == delegate &&
+             runtime && runtime->shared && runtime->shared->netns_storage_socket[0] >= 0) {
+ 
+                 /* Try to enable network namespacing if network namespacing is available and we have
+-                 * CAP_NET_ADMIN. We need CAP_NET_ADMIN to be able to configure the loopback device in the
+-                 * new network namespace. And if we don't have that, then we could only create a network
++                 * CAP_NET_ADMIN in the current user namespace (either the system manager one or the unit's
++                 * own user namespace). We need CAP_NET_ADMIN to be able to configure the loopback device in
++                 * the new network namespace. And if we don't have that, then we could only create a network
+                  * namespace without the ability to set up "lo". Hence gracefully skip things then. */
+                 if (ns_type_supported(NAMESPACE_NET) && have_effective_cap(CAP_NET_ADMIN) > 0) {
+                         r = setup_shareable_ns(runtime->shared->netns_storage_socket, CLONE_NEWNET);
+@@ -4130,7 +4182,8 @@ static int setup_delegated_namespaces(
+                         else if (r < 0) {
+                                 *reterr_exit_status = EXIT_NETWORK;
+                                 return log_exec_error_errno(context, params, r, "Failed to set up network namespacing: %m");
+-                        }
++                        } else
++                                log_exec_debug(context, params, "Set up %snetwork namespace", delegate ? "delegated " : "");
+                 } else if (context->network_namespace_path) {
+                         *reterr_exit_status = EXIT_NETWORK;
+                         return log_exec_error_errno(context, params, SYNTHETIC_ERRNO(EOPNOTSUPP),
+@@ -4139,8 +4192,9 @@ static int setup_delegated_namespaces(
+                         log_exec_notice(context, params, "PrivateNetwork=yes is configured, but the kernel does not support or we lack privileges for network namespace, proceeding without.");
+         }
+ 
+-        if (exec_needs_ipc_namespace(context) && runtime &&
+-            runtime->shared && runtime->shared->ipcns_storage_socket[0] >= 0) {
++        if (exec_needs_ipc_namespace(context) &&
++            exec_namespace_is_delegated(context, params, CLONE_NEWIPC) == delegate &&
++            runtime && runtime->shared && runtime->shared->ipcns_storage_socket[0] >= 0) {
+ 
+                 if (ns_type_supported(NAMESPACE_IPC)) {
+                         r = setup_shareable_ns(runtime->shared->ipcns_storage_socket, CLONE_NEWIPC);
+@@ -4150,7 +4204,8 @@ static int setup_delegated_namespaces(
+                         else if (r < 0) {
+                                 *reterr_exit_status = EXIT_NAMESPACE;
+                                 return log_exec_error_errno(context, params, r, "Failed to set up IPC namespacing: %m");
+-                        }
++                        } else
++                                log_exec_debug(context, params, "Set up %sIPC namespace", delegate ? "delegated " : "");
+                 } else if (context->ipc_namespace_path) {
+                         *reterr_exit_status = EXIT_NAMESPACE;
+                         return log_exec_error_errno(context, params, SYNTHETIC_ERRNO(EOPNOTSUPP),
+@@ -4159,16 +4214,20 @@ static int setup_delegated_namespaces(
+                         log_exec_warning(context, params, "PrivateIPC=yes is configured, but the kernel does not support IPC namespaces, ignoring.");
+         }
+ 
+-        if (needs_sandboxing && exec_needs_cgroup_namespace(context, params)) {
++        if (needs_sandboxing && exec_needs_cgroup_namespace(context, params) &&
++            exec_namespace_is_delegated(context, params, CLONE_NEWCGROUP) == delegate) {
+                 if (unshare(CLONE_NEWCGROUP) < 0) {
+                         *reterr_exit_status = EXIT_NAMESPACE;
+                         return log_exec_error_errno(context, params, errno, "Failed to set up cgroup namespacing: %m");
+                 }
++
++                log_exec_debug(context, params, "Set up %scgroup namespace", delegate ? "delegated " : "");
+         }
+ 
+         /* Unshare a new PID namespace before setting up mounts to ensure /proc/ is mounted with only processes in PID namespace visible.
+          * Note PrivatePIDs=yes implies MountAPIVFS=yes so we'll always ensure procfs is remounted. */
+-        if (needs_sandboxing && exec_needs_pid_namespace(context)) {
++        if (needs_sandboxing && exec_needs_pid_namespace(context) &&
++            exec_namespace_is_delegated(context, params, CLONE_NEWPID) == delegate) {
+                 if (params->pidref_transport_fd < 0) {
+                         *reterr_exit_status = EXIT_NAMESPACE;
+                         return log_exec_error_errno(context, params, SYNTHETIC_ERRNO(ENOTCONN), "PidRef socket is not set up: %m");
+@@ -4198,11 +4257,14 @@ static int setup_delegated_namespaces(
+                         *reterr_exit_status = EXIT_NAMESPACE;
+                         return log_exec_error_errno(context, params, r, "Failed to set up pid namespace: %m");
+                 }
++
++                log_exec_debug(context, params, "Set up %spid namespace", delegate ? "delegated " : "");
+         }
+ 
+         /* If PrivatePIDs= yes is configured, we're now running as pid 1 in a pid namespace! */
+ 
+-        if (exec_needs_mount_namespace(context, params, runtime)) {
++        if (exec_needs_mount_namespace(context, params, runtime) &&
++            exec_namespace_is_delegated(context, params, CLONE_NEWNS) == delegate) {
+                 _cleanup_free_ char *error_path = NULL;
+ 
+                 r = apply_mount_namespace(command->flags,
+@@ -4219,12 +4281,16 @@ static int setup_delegated_namespaces(
+                         return log_exec_error_errno(context, params, r, "Failed to set up mount namespacing%s%s: %m",
+                                                     error_path ? ": " : "", strempty(error_path));
+                 }
++
++                log_exec_debug(context, params, "Set up %smount namespace", delegate ? "delegated " : "");
+         }
+ 
+-        if (needs_sandboxing) {
++        if (needs_sandboxing && exec_namespace_is_delegated(context, params, CLONE_NEWUTS) == delegate) {
+                 r = apply_protect_hostname(context, params, reterr_exit_status);
+                 if (r < 0)
+                         return r;
++
++                log_exec_debug(context, params, "Set up %sUTS namespace", delegate ? "delegated " : "");
+         }
+ 
+         return 0;
+@@ -4416,7 +4482,6 @@ int exec_invoke(
+         char **final_argv = NULL;
+         dev_t journal_stream_dev = 0;
+         ino_t journal_stream_ino = 0;
+-        bool userns_set_up = false;
+         bool needs_sandboxing,          /* Do we need to set up full sandboxing? (i.e. all namespacing, all MAC stuff, caps, yadda yadda */
+                 needs_setuid,           /* Do we need to do the actual setresuid()/setresgid() calls? */
+                 needs_mount_namespace,  /* Do we need to set up a mount namespace for this kernel? */
+@@ -5162,9 +5227,7 @@ int exec_invoke(
+                 /* If we're unprivileged, set up the user namespace first to enable use of the other namespaces.
+                  * Users with CAP_SYS_ADMIN can set up user namespaces last because they will be able to
+                  * set up all of the other namespaces (i.e. network, mount, UTS) without a user namespace. */
+-                PrivateUsers pu = context->private_users;
+-                if (pu == PRIVATE_USERS_NO)
+-                        pu = PRIVATE_USERS_SELF;
++                PrivateUsers pu = exec_context_get_effective_private_users(context, params);
+ 
+                 /* The kernel requires /proc/pid/setgroups be set to "deny" prior to writing /proc/pid/gid_map in
+                  * unprivileged user namespaces. */
+@@ -5179,14 +5242,16 @@ int exec_invoke(
+                         log_exec_info_errno(context, params, r, "Failed to set up user namespacing for unprivileged user, ignoring: %m");
+                 else {
+                         assert(r > 0);
+-                        userns_set_up = true;
++                        log_debug("Set up unprivileged user namespace");
+                 }
+         }
+ 
++        /* Call setup_delegated_namespaces() the first time to unshare all non-delegated namespaces. */
+         r = setup_delegated_namespaces(
+                         context,
+                         params,
+                         runtime,
++                        /* delegate= */ false,
+                         memory_pressure_path,
+                         uid,
+                         gid,
+@@ -5229,15 +5294,35 @@ int exec_invoke(
+          * case of mount namespaces being less privileged when the mount point list is copied from a
+          * different user namespace). */
+ 
+-        if (needs_sandboxing && !userns_set_up) {
+-                r = setup_private_users(context->private_users, saved_uid, saved_gid, uid, gid,
+-                                        /* allow_setgroups= */ context->private_users == PRIVATE_USERS_FULL);
++        if (needs_sandboxing && !exec_context_need_unprivileged_private_users(context, params)) {
++                PrivateUsers pu = exec_context_get_effective_private_users(context, params);
++
++                r = setup_private_users(pu, saved_uid, saved_gid, uid, gid,
++                                        /* allow_setgroups= */ pu == PRIVATE_USERS_FULL);
+                 if (r < 0) {
+                         *exit_status = EXIT_USER;
+                         return log_exec_error_errno(context, params, r, "Failed to set up user namespacing: %m");
+                 }
++
++                log_debug("Set up privileged user namespace");
+         }
+ 
++        /* Call setup_delegated_namespaces() the second time to unshare all delegated namespaces. */
++        r = setup_delegated_namespaces(
++                        context,
++                        params,
++                        runtime,
++                        /* delegate= */ true,
++                        memory_pressure_path,
++                        uid,
++                        gid,
++                        command,
++                        needs_sandboxing,
++                        has_cap_sys_admin,
++                        exit_status);
++        if (r < 0)
++                return r;
++
+         /* Now that the mount namespace has been set up and privileges adjusted, let's look for the thing we
+          * shall execute. */
+ 
+diff --git a/src/core/execute-serialize.c b/src/core/execute-serialize.c
+index bf6592faedcd2..01c974623c815 100644
+--- a/src/core/execute-serialize.c
++++ b/src/core/execute-serialize.c
+@@ -2470,6 +2470,12 @@ static int exec_context_serialize(const ExecContext *c, FILE *f) {
+                         return r;
+         }
+ 
++        if (c->delegate_namespaces != NAMESPACE_FLAGS_INITIAL) {
++                r = serialize_item_format(f, "exec-context-delegate-namespaces", "%lu", c->delegate_namespaces);
++                if (r < 0)
++                        return r;
++        }
++
+ #if HAVE_LIBBPF
+         if (exec_context_restrict_filesystems_set(c)) {
+                 char *fs;
+@@ -3529,6 +3535,10 @@ static int exec_context_deserialize(ExecContext *c, FILE *f) {
+                         r = safe_atolu(val, &c->restrict_namespaces);
+                         if (r < 0)
+                                 return r;
++                } else if ((val = startswith(l, "exec-context-delegate-namespaces="))) {
++                        r = safe_atolu(val, &c->delegate_namespaces);
++                        if (r < 0)
++                                return r;
+                 } else if ((val = startswith(l, "exec-context-restrict-filesystems="))) {
+                         r = set_ensure_allocated(&c->restrict_filesystems, &string_hash_ops);
+                         if (r < 0)
+diff --git a/src/core/execute.c b/src/core/execute.c
+index 3d55b0b772ece..6b7fc32aca0cc 100644
+--- a/src/core/execute.c
++++ b/src/core/execute.c
+@@ -587,6 +587,7 @@ void exec_context_init(ExecContext *c) {
+                 .timeout_clean_usec = USEC_INFINITY,
+                 .capability_bounding_set = CAP_MASK_UNSET,
+                 .restrict_namespaces = NAMESPACE_FLAGS_INITIAL,
++                .delegate_namespaces = NAMESPACE_FLAGS_INITIAL,
+                 .log_level_max = -1,
+ #if HAVE_SECCOMP
+                 .syscall_errno = SECCOMP_ERROR_NUMBER_KILL,
+diff --git a/src/core/execute.h b/src/core/execute.h
+index 32dabf177f44a..00b8c74ccc005 100644
+--- a/src/core/execute.h
++++ b/src/core/execute.h
+@@ -349,6 +349,7 @@ struct ExecContext {
+         unsigned long personality;
+ 
+         unsigned long restrict_namespaces; /* The CLONE_NEWxyz flags permitted to the unit's processes */
++        unsigned long delegate_namespaces; /* The CLONE_NEWxyz flags delegated to the unit's processes */
+ 
+         Set *restrict_filesystems;
+         bool restrict_filesystems_allow_list:1;
+diff --git a/src/core/load-fragment-gperf.gperf.in b/src/core/load-fragment-gperf.gperf.in
+index d7564b3767a06..25c8ef1e322df 100644
+--- a/src/core/load-fragment-gperf.gperf.in
++++ b/src/core/load-fragment-gperf.gperf.in
+@@ -73,7 +73,8 @@
+ {{type}}.SystemCallErrorNumber,               config_parse_syscall_errno,                         0,                                  offsetof({{type}}, exec_context)
+ {{type}}.SystemCallLog,                       config_parse_syscall_log,                           0,                                  offsetof({{type}}, exec_context)
+ {{type}}.MemoryDenyWriteExecute,              config_parse_bool,                                  0,                                  offsetof({{type}}, exec_context.memory_deny_write_execute)
+-{{type}}.RestrictNamespaces,                  config_parse_restrict_namespaces,                   0,                                  offsetof({{type}}, exec_context)
++{{type}}.RestrictNamespaces,                  config_parse_namespace_flags,                       0,                                  offsetof({{type}}, exec_context.restrict_namespaces)
++{{type}}.DelegateNamespaces,                  config_parse_namespace_flags,                       0,                                  offsetof({{type}}, exec_context.delegate_namespaces)
+ {{type}}.RestrictRealtime,                    config_parse_bool,                                  0,                                  offsetof({{type}}, exec_context.restrict_realtime)
+ {{type}}.RestrictSUIDSGID,                    config_parse_bool,                                  0,                                  offsetof({{type}}, exec_context.restrict_suid_sgid)
+ {{type}}.RestrictAddressFamilies,             config_parse_address_families,                      0,                                  offsetof({{type}}, exec_context)
+diff --git a/src/core/load-fragment.c b/src/core/load-fragment.c
+index f34c930f4e4e0..1c7300fc4c72b 100644
+--- a/src/core/load-fragment.c
++++ b/src/core/load-fragment.c
+@@ -3556,7 +3556,7 @@ int config_parse_address_families(
+         }
+ }
+ 
+-int config_parse_restrict_namespaces(
++int config_parse_namespace_flags(
+                 const char *unit,
+                 const char *filename,
+                 unsigned line,
+@@ -3568,24 +3568,25 @@ int config_parse_restrict_namespaces(
+                 void *data,
+                 void *userdata) {
+ 
+-        ExecContext *c = data;
+-        unsigned long flags;
++        unsigned long *flags = data;
++        unsigned long all = UPDATE_FLAG(NAMESPACE_FLAGS_ALL, CLONE_NEWUSER, !streq(lvalue, "DelegateNamespaces"));
++        unsigned long f;
+         bool invert = false;
+         int r;
+ 
+         if (isempty(rvalue)) {
+                 /* Reset to the default. */
+-                c->restrict_namespaces = NAMESPACE_FLAGS_INITIAL;
++                *flags = NAMESPACE_FLAGS_INITIAL;
+                 return 0;
+         }
+ 
+         /* Boolean parameter ignores the previous settings */
+         r = parse_boolean(rvalue);
+         if (r > 0) {
+-                c->restrict_namespaces = 0;
++                *flags = 0;
+                 return 0;
+         } else if (r == 0) {
+-                c->restrict_namespaces = NAMESPACE_FLAGS_ALL;
++                *flags = all;
+                 return 0;
+         }
+ 
+@@ -3595,18 +3596,25 @@ int config_parse_restrict_namespaces(
+         }
+ 
+         /* Not a boolean argument, in this case it's a list of namespace types. */
+-        r = namespace_flags_from_string(rvalue, &flags);
++        r = namespace_flags_from_string(rvalue, &f);
+         if (r < 0) {
+                 log_syntax(unit, LOG_WARNING, filename, line, r, "Failed to parse namespace type string, ignoring: %s", rvalue);
+                 return 0;
+         }
+ 
+-        if (c->restrict_namespaces == NAMESPACE_FLAGS_INITIAL)
++        if (*flags == NAMESPACE_FLAGS_INITIAL)
+                 /* Initial assignment. Just set the value. */
+-                c->restrict_namespaces = invert ? (~flags) & NAMESPACE_FLAGS_ALL : flags;
++                f = invert ? (~f) & all : f;
+         else
+                 /* Merge the value with the previous one. */
+-                SET_FLAG(c->restrict_namespaces, flags, !invert);
++                f = UPDATE_FLAG(*flags, f, !invert);
++
++        if (FLAGS_SET(f, CLONE_NEWUSER) && streq(lvalue, "DelegateNamespaces")) {
++                log_syntax(unit, LOG_WARNING, filename, line, r, "The user namespace cannot be delegated with DelegateNamespaces=, ignoring: %s", rvalue);
++                return 0;
++        }
++
++        *flags = f;
+ 
+         return 0;
+ }
+@@ -6349,7 +6357,7 @@ void unit_dump_config_items(FILE *f) {
+                 { config_parse_syscall_errno,         "ERRNO" },
+                 { config_parse_syscall_log,           "SYSCALLS" },
+                 { config_parse_address_families,      "FAMILIES" },
+-                { config_parse_restrict_namespaces,   "NAMESPACES"  },
++                { config_parse_namespace_flags,       "NAMESPACES" },
+ #endif
+                 { config_parse_restrict_filesystems,  "FILESYSTEMS"  },
+                 { config_parse_cpu_shares,            "SHARES" },
+diff --git a/src/core/load-fragment.h b/src/core/load-fragment.h
+index 8ac962a94bd14..4637dda10ea4f 100644
+--- a/src/core/load-fragment.h
++++ b/src/core/load-fragment.h
+@@ -126,7 +126,7 @@ CONFIG_PARSER_PROTOTYPE(config_parse_working_directory);
+ CONFIG_PARSER_PROTOTYPE(config_parse_fdname);
+ CONFIG_PARSER_PROTOTYPE(config_parse_user_group_compat);
+ CONFIG_PARSER_PROTOTYPE(config_parse_user_group_strv_compat);
+-CONFIG_PARSER_PROTOTYPE(config_parse_restrict_namespaces);
++CONFIG_PARSER_PROTOTYPE(config_parse_namespace_flags);
+ CONFIG_PARSER_PROTOTYPE(config_parse_restrict_filesystems);
+ CONFIG_PARSER_PROTOTYPE(config_parse_bind_paths);
+ CONFIG_PARSER_PROTOTYPE(config_parse_exec_keyring_mode);
+diff --git a/src/shared/bus-unit-util.c b/src/shared/bus-unit-util.c
+index 06bfb90c8fa5d..bb498b552de0b 100644
+--- a/src/shared/bus-unit-util.c
++++ b/src/shared/bus-unit-util.c
+@@ -1659,7 +1659,8 @@ static int bus_append_execute_property(sd_bus_message *m, const char *field, con
+                 return 1;
+         }
+ 
+-        if (streq(field, "RestrictNamespaces")) {
++        if (STR_IN_SET(field, "RestrictNamespaces",
++                              "DelegateNamespaces")) {
+                 bool invert = false;
+                 unsigned long flags;
+ 
+diff --git a/test/units/TEST-07-PID1.delegate-namespaces.sh b/test/units/TEST-07-PID1.delegate-namespaces.sh
+new file mode 100755
+index 0000000000000..fe0defaeb6567
+--- /dev/null
++++ b/test/units/TEST-07-PID1.delegate-namespaces.sh
+@@ -0,0 +1,80 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: LGPL-2.1-or-later
++# shellcheck disable=SC2016
++set -eux
++set -o pipefail
++
++# shellcheck source=test/units/test-control.sh
++. "$(dirname "$0")"/test-control.sh
++# shellcheck source=test/units/util.sh
++. "$(dirname "$0")"/util.sh
++
++testcase_mount() {
++    (! systemd-run -p PrivateUsersEx=self -p PrivateMounts=yes --wait --pipe -- mount --bind /usr /home)
++    systemd-run -p PrivateUsersEx=self -p PrivateMounts=yes -p DelegateNamespaces=mnt --wait --pipe -- mount --bind /usr /home
++}
++
++testcase_network() {
++    (! systemd-run -p PrivateUsersEx=self -p PrivateNetwork=yes --wait --pipe -- ip link add veth1 type veth peer name veth2)
++    systemd-run -p PrivateUsersEx=self -p PrivateMounts=yes -p DelegateNamespaces=mnt --wait --pipe -- ip link add veth1 type veth peer name veth2
++}
++
++testcase_cgroup() {
++    (! systemd-run -p PrivateUsersEx=self -p ProtectControlGroupsEx=private --wait --pipe -- sh -c 'echo 0 >/sys/fs/cgroup/cgroup.pressure')
++    systemd-run -p PrivateUsersEx=self -p ProtectControlGroupsEx=private -p DelegateNamespaces=cgroup --wait --pipe -- sh -c 'echo 0 >/sys/fs/cgroup/cgroup.pressure'
++}
++
++testcase_pid() {
++    (! systemd-run -p PrivateUsersEx=self -p PrivatePIDs=yes --wait --pipe -- sh -c 'echo 5 >/proc/sys/kernel/ns_last_pid')
++    systemd-run -p PrivateUsersEx=self -p PrivatePIDs=yes -p DelegateNamespaces=pid --wait --pipe -- sh -c 'echo 5 >/proc/sys/kernel/ns_last_pid'
++}
++
++testcase_uts() {
++    (! systemd-run -p PrivateUsersEx=self -p ProtectHostnameEx=private --wait --pipe -- hostname abc)
++    systemd-run -p PrivateUsersEx=self -p ProtectHostnameEx=private -p DelegateNamespaces=uts --wait --pipe -- hostname abc
++}
++
++testcase_implied_private_users_self() {
++    # If not explicitly set PrivateUsers=self is implied.
++    systemd-run -p PrivateMounts=yes -p DelegateNamespaces=mnt --wait --pipe -- mount --bind /usr /home
++    # If explicitly set it PrivateUsers= is not overridden.
++    systemd-run -p PrivateUsersEx=identity -p PrivateMounts=yes -p DelegateNamespaces=mnt --wait --pipe -- mount --bind /usr /home
++    systemd-run -p PrivateUsersEx=identity -p PrivateMounts=yes -p DelegateNamespaces=mnt --wait bash -c 'test "$(cat /proc/self/uid_map)" == "         0          0      65536"'
++}
++
++testcase_multiple_features() {
++    unsquashfs -no-xattrs -d /tmp/TEST-07-PID1-delegate-namespaces-root /usr/share/minimal_0.raw
++
++    systemd-run \
++        -p PrivatePIDs=yes \
++        -p RootDirectory=/tmp/TEST-07-PID1-delegate-namespaces-root \
++        -p ProcSubset=pid \
++        -p BindReadOnlyPaths=/usr/share \
++        -p NoNewPrivileges=yes \
++        -p ProtectSystem=strict \
++        -p User=testuser\
++        -p Group=testuser \
++        -p RuntimeDirectory=abc \
++        -p StateDirectory=qed \
++        -p InaccessiblePaths=/usr/include \
++        -p TemporaryFileSystem=/home \
++        -p PrivateTmp=yes \
++        -p PrivateDevices=yes \
++        -p PrivateNetwork=yes \
++        -p PrivateUsersEx=self \
++        -p PrivateIPC=yes \
++        -p ProtectHostname=yes \
++        -p ProtectClock=yes \
++        -p ProtectKernelTunables=yes \
++        -p ProtectKernelModules=yes \
++        -p ProtectKernelLogs=yes \
++        -p ProtectControlGroupsEx=private \
++        -p LockPersonality=yes \
++        -p Environment=ABC=QED \
++        -p DelegateNamespaces=yes \
++        --wait \
++        --pipe \
++        grep MARKER=1 /etc/os-release
++
++    rm -rf /tmp/TEST-07-PID1-delegate-namespaces-root
++}
+
+From 361a14ead377b80e20052933bc109a78029bf755 Mon Sep 17 00:00:00 2001
+From: Steve Ramage <gitcommits@sjrx.net>
+Date: Sun, 2 Mar 2025 11:23:36 -0800
+Subject: [PATCH 07/18] core: DelegateNamespaces= does not depend on seccomp
+ (#36580)
+
+(cherry picked from commit 241a0f6e0a4abecc8b0ef4cb76e0687895d97fb9)
+---
+ src/core/load-fragment-gperf.gperf.in | 2 +-
+ src/core/load-fragment.c              | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/core/load-fragment-gperf.gperf.in b/src/core/load-fragment-gperf.gperf.in
+index 25c8ef1e322df..211e5c543972c 100644
+--- a/src/core/load-fragment-gperf.gperf.in
++++ b/src/core/load-fragment-gperf.gperf.in
+@@ -74,7 +74,6 @@
+ {{type}}.SystemCallLog,                       config_parse_syscall_log,                           0,                                  offsetof({{type}}, exec_context)
+ {{type}}.MemoryDenyWriteExecute,              config_parse_bool,                                  0,                                  offsetof({{type}}, exec_context.memory_deny_write_execute)
+ {{type}}.RestrictNamespaces,                  config_parse_namespace_flags,                       0,                                  offsetof({{type}}, exec_context.restrict_namespaces)
+-{{type}}.DelegateNamespaces,                  config_parse_namespace_flags,                       0,                                  offsetof({{type}}, exec_context.delegate_namespaces)
+ {{type}}.RestrictRealtime,                    config_parse_bool,                                  0,                                  offsetof({{type}}, exec_context.restrict_realtime)
+ {{type}}.RestrictSUIDSGID,                    config_parse_bool,                                  0,                                  offsetof({{type}}, exec_context.restrict_suid_sgid)
+ {{type}}.RestrictAddressFamilies,             config_parse_address_families,                      0,                                  offsetof({{type}}, exec_context)
+@@ -91,6 +90,7 @@
+ {{type}}.RestrictAddressFamilies,             config_parse_warn_compat,                           DISABLED_CONFIGURATION,             0
+ {{type}}.LockPersonality,                     config_parse_warn_compat,                           DISABLED_CONFIGURATION,             0
+ {% endif %}
++{{type}}.DelegateNamespaces,                  config_parse_namespace_flags,                       0,                                  offsetof({{type}}, exec_context.delegate_namespaces)
+ {{type}}.RestrictFileSystems,                 config_parse_restrict_filesystems,                  0,                                  offsetof({{type}}, exec_context)
+ {{type}}.LimitCPU,                            config_parse_rlimit,                                RLIMIT_CPU,                         offsetof({{type}}, exec_context.rlimit)
+ {{type}}.LimitFSIZE,                          config_parse_rlimit,                                RLIMIT_FSIZE,                       offsetof({{type}}, exec_context.rlimit)
+diff --git a/src/core/load-fragment.c b/src/core/load-fragment.c
+index 1c7300fc4c72b..eba6dd02493ef 100644
+--- a/src/core/load-fragment.c
++++ b/src/core/load-fragment.c
+@@ -3555,6 +3555,7 @@ int config_parse_address_families(
+                         set_remove(c->address_families, INT_TO_PTR(af));
+         }
+ }
++#endif
+ 
+ int config_parse_namespace_flags(
+                 const char *unit,
+@@ -3618,7 +3619,6 @@ int config_parse_namespace_flags(
+ 
+         return 0;
+ }
+-#endif
+ 
+ int config_parse_restrict_filesystems(
+                 const char *unit,
+@@ -6357,8 +6357,8 @@ void unit_dump_config_items(FILE *f) {
+                 { config_parse_syscall_errno,         "ERRNO" },
+                 { config_parse_syscall_log,           "SYSCALLS" },
+                 { config_parse_address_families,      "FAMILIES" },
+-                { config_parse_namespace_flags,       "NAMESPACES" },
+ #endif
++                { config_parse_namespace_flags,       "NAMESPACES" },
+                 { config_parse_restrict_filesystems,  "FILESYSTEMS"  },
+                 { config_parse_cpu_shares,            "SHARES" },
+                 { config_parse_cg_weight,             "WEIGHT" },
+
+From 6a126e14106cb1e76cf4fff9b02fd507f76cc615 Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Thu, 6 Mar 2025 14:15:34 +0100
+Subject: [PATCH 08/18] load-fragment: Fix config_parse_namespace_flags() for
+ DelegateNamespaces=
+
+Boolean values have to be handled separately for RestrictNamespaces= because
+they get stored in a field with reverse meaning (which namespaces are retained),
+so let's check which field we're parsing and set the proper value accordingly.
+
+(cherry picked from commit 11b982053bdc31806e571ea0771d7f10cb276d69)
+---
+ src/core/load-fragment.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/src/core/load-fragment.c b/src/core/load-fragment.c
+index eba6dd02493ef..d992622562a60 100644
+--- a/src/core/load-fragment.c
++++ b/src/core/load-fragment.c
+@@ -3584,10 +3584,13 @@ int config_parse_namespace_flags(
+         /* Boolean parameter ignores the previous settings */
+         r = parse_boolean(rvalue);
+         if (r > 0) {
+-                *flags = 0;
++                /* RestrictNamespaces= value gets stored into a field with reverse semantics (the namespaces
++                 * which are retained), so RestrictNamespaces=true means we retain no access to any
++                 * namespaces and vice-versa. */
++                *flags = streq(lvalue, "RestrictNamespaces") ? 0 : all;
+                 return 0;
+         } else if (r == 0) {
+-                *flags = all;
++                *flags = streq(lvalue, "RestrictNamespaces") ? all : 0;
+                 return 0;
+         }
+ 
+
+From a26a79854ee5e7f784ae72b36c6976dff189a99a Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Thu, 6 Mar 2025 14:17:14 +0100
+Subject: [PATCH 09/18] portable: Set DelegateNamespaces=no for all portable
+ profiles
+
+We don't want to delegate any namespaces to portable services, so
+let's explicitly set DelegateNamespaces=no in the portable profiles.
+
+(cherry picked from commit e533610375cf0d42de7af8c5ec16cc6b27cb4913)
+---
+ src/portable/profile/default/service.conf   | 1 +
+ src/portable/profile/nonetwork/service.conf | 1 +
+ src/portable/profile/strict/service.conf    | 1 +
+ 3 files changed, 3 insertions(+)
+
+diff --git a/src/portable/profile/default/service.conf b/src/portable/profile/default/service.conf
+index 35dfd778f2864..2cb54d84c3c9a 100644
+--- a/src/portable/profile/default/service.conf
++++ b/src/portable/profile/default/service.conf
+@@ -24,6 +24,7 @@ LockPersonality=yes
+ MemoryDenyWriteExecute=yes
+ RestrictRealtime=yes
+ RestrictNamespaces=yes
++DelegateNamespaces=no
+ SystemCallFilter=@system-service
+ SystemCallErrorNumber=EPERM
+ SystemCallArchitectures=native
+diff --git a/src/portable/profile/nonetwork/service.conf b/src/portable/profile/nonetwork/service.conf
+index e8d2a9bb1a1e5..29b7d6f62209e 100644
+--- a/src/portable/profile/nonetwork/service.conf
++++ b/src/portable/profile/nonetwork/service.conf
+@@ -22,6 +22,7 @@ LockPersonality=yes
+ MemoryDenyWriteExecute=yes
+ RestrictRealtime=yes
+ RestrictNamespaces=yes
++DelegateNamespaces=no
+ SystemCallFilter=@system-service
+ SystemCallErrorNumber=EPERM
+ SystemCallArchitectures=native
+diff --git a/src/portable/profile/strict/service.conf b/src/portable/profile/strict/service.conf
+index aa5bcfbb08e60..8e7d3300e2e5a 100644
+--- a/src/portable/profile/strict/service.conf
++++ b/src/portable/profile/strict/service.conf
+@@ -20,6 +20,7 @@ NoNewPrivileges=yes
+ MemoryDenyWriteExecute=yes
+ RestrictRealtime=yes
+ RestrictNamespaces=yes
++DelegateNamespaces=no
+ SystemCallFilter=@system-service
+ SystemCallErrorNumber=EPERM
+ SystemCallArchitectures=native
+
+From 12f740ccdf980ed1e069649468120b1bbefa8f52 Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Mon, 17 Mar 2025 11:29:48 +0100
+Subject: [PATCH 10/18] bus-unit-util: Fix DelegateNamespaces= parser
+
+Similarly to the config file parse method, let's fix the systemd-run
+parser as well.
+
+Follow up for 11b982053bdc31806e571ea0771d7f10cb276d69
+
+(cherry picked from commit ad9b5d4732ec2131aec12fcfed8d141fb720fd95)
+---
+ src/shared/bus-unit-util.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/src/shared/bus-unit-util.c b/src/shared/bus-unit-util.c
+index bb498b552de0b..c42f70b88e4a8 100644
+--- a/src/shared/bus-unit-util.c
++++ b/src/shared/bus-unit-util.c
+@@ -1662,13 +1662,17 @@ static int bus_append_execute_property(sd_bus_message *m, const char *field, con
+         if (STR_IN_SET(field, "RestrictNamespaces",
+                               "DelegateNamespaces")) {
+                 bool invert = false;
++                unsigned long all = UPDATE_FLAG(NAMESPACE_FLAGS_ALL, CLONE_NEWUSER, !streq(field, "DelegateNamespaces"));
+                 unsigned long flags;
+ 
+                 r = parse_boolean(eq);
+                 if (r > 0)
+-                        flags = 0;
++                        /* RestrictNamespaces= value gets stored into a field with reverse semantics (the
++                         * namespaces which are retained), so RestrictNamespaces=true means we retain no
++                         * access to any namespaces and vice-versa. */
++                        flags = streq(field, "RestrictNamespaces") ? 0 : all;
+                 else if (r == 0)
+-                        flags = NAMESPACE_FLAGS_ALL;
++                        flags = streq(field, "RestrictNamespaces") ? all : 0;
+                 else {
+                         if (eq[0] == '~') {
+                                 invert = true;
+@@ -1681,7 +1685,7 @@ static int bus_append_execute_property(sd_bus_message *m, const char *field, con
+                 }
+ 
+                 if (invert)
+-                        flags = (~flags) & NAMESPACE_FLAGS_ALL;
++                        flags = (~flags) & all;
+ 
+                 r = sd_bus_message_append(m, "(sv)", field, "t", (uint64_t) flags);
+                 if (r < 0)
+
+From 035e0d28bae5c3c42e8d9b1e479f11442894906b Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Wed, 19 Feb 2025 04:46:08 +0900
+Subject: [PATCH 11/18] exec-invoke: add missing assertions and drop
+ unnecessary conditions
+
+Fixes CID#1534358.
+
+(cherry picked from commit 059d23c966e285fcc05162001e66a31c28785f81)
+---
+ src/core/exec-invoke.c | 71 ++++++++++++++++++++++++++++--------------
+ 1 file changed, 48 insertions(+), 23 deletions(-)
+
+diff --git a/src/core/exec-invoke.c b/src/core/exec-invoke.c
+index 5910de001dc43..3007354cf82a9 100644
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -648,6 +648,7 @@ static int setup_confirm_stdio(
+         _cleanup_close_ int fd = -EBADF, saved_stdin = -EBADF, saved_stdout = -EBADF;
+         int r;
+ 
++        assert(context);
+         assert(ret_saved_stdin);
+         assert(ret_saved_stdout);
+ 
+@@ -1017,9 +1018,11 @@ static int enforce_user(
+                 const ExecContext *context,
+                 uid_t uid,
+                 uint64_t capability_ambient_set) {
+-        assert(context);
++
+         int r;
+ 
++        assert(context);
++
+         if (!uid_is_valid(uid))
+                 return 0;
+ 
+@@ -1338,6 +1341,8 @@ static bool context_has_syscall_logs(const ExecContext *c) {
+ }
+ 
+ static bool context_has_seccomp(const ExecContext *c) {
++        assert(c);
++
+         /* We need NNP if we have any form of seccomp and are unprivileged */
+         return c->lock_personality ||
+                 c->memory_deny_write_execute ||
+@@ -1399,7 +1404,10 @@ static bool seccomp_allows_drop_privileges(const ExecContext *c) {
+                 return !(has_capget || has_capset || has_prctl);
+ }
+ 
+-static bool skip_seccomp_unavailable(const ExecContext *c, const ExecParameters *p, const char* msg) {
++static bool skip_seccomp_unavailable(const ExecContext *c, const ExecParameters *p, const char *msg) {
++        assert(c);
++        assert(p);
++        assert(msg);
+ 
+         if (is_seccomp_available())
+                 return false;
+@@ -1702,6 +1710,7 @@ static int apply_restrict_filesystems(const ExecContext *c, const ExecParameters
+ static int apply_protect_hostname(const ExecContext *c, const ExecParameters *p, int *ret_exit_status) {
+         assert(c);
+         assert(p);
++        assert(ret_exit_status);
+ 
+         if (!c->protect_hostname)
+                 return 0;
+@@ -1805,6 +1814,7 @@ static int build_environment(
+ 
+         assert(c);
+         assert(p);
++        assert(cgroup_context);
+         assert(ret);
+ 
+ #define N_ENV_VARS 19
+@@ -2025,7 +2035,7 @@ static int build_environment(
+ 
+                 our_env[n_env++] = x;
+ 
+-                if (cgroup_context && !path_equal(memory_pressure_path, "/dev/null")) {
++                if (!path_equal(memory_pressure_path, "/dev/null")) {
+                         _cleanup_free_ char *b = NULL, *e = NULL;
+ 
+                         if (asprintf(&b, "%s " USEC_FMT " " USEC_FMT,
+@@ -2058,6 +2068,9 @@ static int build_pass_environment(const ExecContext *c, char ***ret) {
+         _cleanup_strv_free_ char **pass_env = NULL;
+         size_t n_env = 0;
+ 
++        assert(c);
++        assert(ret);
++
+         STRV_FOREACH(i, c->pass_environment) {
+                 _cleanup_free_ char *x = NULL;
+                 char *v;
+@@ -2077,7 +2090,6 @@ static int build_pass_environment(const ExecContext *c, char ***ret) {
+         }
+ 
+         *ret = TAKE_PTR(pass_env);
+-
+         return 0;
+ }
+ 
+@@ -2282,7 +2294,7 @@ static int setup_private_users(PrivateUsers private_users, uid_t ouid, gid_t ogi
+         return 1;
+ }
+ 
+-static int can_mount_proc(const ExecContext *c, ExecParameters *p) {
++static int can_mount_proc(const ExecContext *c, const ExecParameters *p) {
+         _cleanup_close_pair_ int errno_pipe[2] = EBADF_PAIR;
+         _cleanup_(sigkill_waitp) pid_t pid = 0;
+         ssize_t n;
+@@ -2784,11 +2796,12 @@ static int setup_exec_directory(
+ 
+ #if ENABLE_SMACK
+ static int setup_smack(
+-                const ExecParameters *params,
+                 const ExecContext *context,
++                const ExecParameters *params,
+                 int executable_fd) {
+         int r;
+ 
++        assert(context);
+         assert(params);
+         assert(executable_fd >= 0);
+ 
+@@ -3056,13 +3069,14 @@ static int setup_ephemeral(
+         int r;
+ 
+         assert(context);
++        assert(runtime);
+         assert(root_image);
+         assert(root_directory);
+ 
+         if (!*root_image && !*root_directory)
+                 return 0;
+ 
+-        if (!runtime || !runtime->ephemeral_copy)
++        if (!runtime->ephemeral_copy)
+                 return 0;
+ 
+         assert(runtime->ephemeral_storage_socket[0] >= 0);
+@@ -3274,6 +3288,8 @@ static int apply_mount_namespace(
+         int r;
+ 
+         assert(context);
++        assert(params);
++        assert(runtime);
+ 
+         CLEANUP_ARRAY(bind_mounts, n_bind_mounts, bind_mount_free_many);
+ 
+@@ -3321,7 +3337,7 @@ static int apply_mount_namespace(
+                  * to world users. Inside of it there's a /tmp that is sticky, and that's the one we want to
+                  * use here.  This does not apply when we are using /run/systemd/empty as fallback. */
+ 
+-                if (context->private_tmp == PRIVATE_TMP_CONNECTED && runtime && runtime->shared) {
++                if (context->private_tmp == PRIVATE_TMP_CONNECTED && runtime->shared) {
+                         if (streq_ptr(runtime->shared->tmp_dir, RUN_SYSTEMD_EMPTY))
+                                 tmp_dir = runtime->shared->tmp_dir;
+                         else if (runtime->shared->tmp_dir)
+@@ -3511,6 +3527,8 @@ static int apply_working_directory(
+         int r;
+ 
+         assert(context);
++        assert(params);
++        assert(runtime);
+ 
+         if (context->working_directory_home) {
+                 if (!home)
+@@ -3526,7 +3544,7 @@ static int apply_working_directory(
+                 _cleanup_close_ int dfd = -EBADF;
+ 
+                 r = chase(wd,
+-                          (runtime ? runtime->ephemeral_copy : NULL) ?: context->root_directory,
++                          runtime->ephemeral_copy ?: context->root_directory,
+                           CHASE_PREFIX_ROOT|CHASE_AT_RESOLVE_IN_ROOT,
+                           /* ret_path= */ NULL,
+                           &dfd);
+@@ -3544,11 +3562,13 @@ static int apply_root_directory(
+                 int *exit_status) {
+ 
+         assert(context);
++        assert(params);
++        assert(runtime);
+         assert(exit_status);
+ 
+         if (params->flags & EXEC_APPLY_CHROOT)
+                 if (!needs_mount_ns && context->root_directory)
+-                        if (chroot((runtime ? runtime->ephemeral_copy : NULL) ?: context->root_directory) < 0) {
++                        if (chroot(runtime->ephemeral_copy ?: context->root_directory) < 0) {
+                                 *exit_status = EXIT_CHROOT;
+                                 return -errno;
+                         }
+@@ -3559,7 +3579,8 @@ static int apply_root_directory(
+ static int setup_keyring(
+                 const ExecContext *context,
+                 const ExecParameters *p,
+-                uid_t uid, gid_t gid) {
++                uid_t uid,
++                gid_t gid) {
+ 
+         key_serial_t keyring;
+         int r = 0;
+@@ -3716,12 +3737,14 @@ static int close_remaining_fds(
+                 const ExecParameters *params,
+                 const ExecRuntime *runtime,
+                 int socket_fd,
+-                const int *fds, size_t n_fds) {
++                const int *fds,
++                size_t n_fds) {
+ 
+         size_t n_dont_close = 0;
+         int dont_close[n_fds + 17];
+ 
+         assert(params);
++        assert(runtime);
+ 
+         if (params->stdin_fd >= 0)
+                 dont_close[n_dont_close++] = params->stdin_fd;
+@@ -3737,15 +3760,14 @@ static int close_remaining_fds(
+                 n_dont_close += n_fds;
+         }
+ 
+-        if (runtime)
+-                append_socket_pair(dont_close, &n_dont_close, runtime->ephemeral_storage_socket);
++        append_socket_pair(dont_close, &n_dont_close, runtime->ephemeral_storage_socket);
+ 
+-        if (runtime && runtime->shared) {
++        if (runtime->shared) {
+                 append_socket_pair(dont_close, &n_dont_close, runtime->shared->netns_storage_socket);
+                 append_socket_pair(dont_close, &n_dont_close, runtime->shared->ipcns_storage_socket);
+         }
+ 
+-        if (runtime && runtime->dynamic_creds) {
++        if (runtime->dynamic_creds) {
+                 if (runtime->dynamic_creds->user)
+                         append_socket_pair(dont_close, &n_dont_close, runtime->dynamic_creds->user->storage_socket);
+                 if (runtime->dynamic_creds->group)
+@@ -4163,11 +4185,12 @@ static int setup_delegated_namespaces(
+ 
+         assert(context);
+         assert(params);
++        assert(runtime);
+         assert(reterr_exit_status);
+ 
+         if (exec_needs_network_namespace(context) &&
+             exec_namespace_is_delegated(context, params, CLONE_NEWNET) == delegate &&
+-            runtime && runtime->shared && runtime->shared->netns_storage_socket[0] >= 0) {
++            runtime->shared && runtime->shared->netns_storage_socket[0] >= 0) {
+ 
+                 /* Try to enable network namespacing if network namespacing is available and we have
+                  * CAP_NET_ADMIN in the current user namespace (either the system manager one or the unit's
+@@ -4194,7 +4217,7 @@ static int setup_delegated_namespaces(
+ 
+         if (exec_needs_ipc_namespace(context) &&
+             exec_namespace_is_delegated(context, params, CLONE_NEWIPC) == delegate &&
+-            runtime && runtime->shared && runtime->shared->ipcns_storage_socket[0] >= 0) {
++            runtime->shared && runtime->shared->ipcns_storage_socket[0] >= 0) {
+ 
+                 if (ns_type_supported(NAMESPACE_IPC)) {
+                         r = setup_shareable_ns(runtime->shared->ipcns_storage_socket, CLONE_NEWIPC);
+@@ -4517,6 +4540,8 @@ int exec_invoke(
+         assert(command);
+         assert(context);
+         assert(params);
++        assert(runtime);
++        assert(cgroup_context);
+         assert(exit_status);
+ 
+         /* This should be mostly redundant, as the log level is also passed as an argument of the executor,
+@@ -4675,7 +4700,7 @@ int exec_invoke(
+                 return log_exec_error_errno(context, params, errno, "Failed to update environment: %m");
+         }
+ 
+-        if (context->dynamic_user && runtime && runtime->dynamic_creds) {
++        if (context->dynamic_user && runtime->dynamic_creds) {
+                 _cleanup_strv_free_ char **suggested_paths = NULL;
+ 
+                 /* On top of that, make sure we bypass our own NSS module nss-systemd comprehensively for any NSS
+@@ -4804,7 +4829,7 @@ int exec_invoke(
+                 }
+         }
+ 
+-        if (context->network_namespace_path && runtime && runtime->shared && runtime->shared->netns_storage_socket[0] >= 0) {
++        if (context->network_namespace_path && runtime->shared && runtime->shared->netns_storage_socket[0] >= 0) {
+                 r = open_shareable_ns_path(runtime->shared->netns_storage_socket, context->network_namespace_path, CLONE_NEWNET);
+                 if (r < 0) {
+                         *exit_status = EXIT_NETWORK;
+@@ -4812,7 +4837,7 @@ int exec_invoke(
+                 }
+         }
+ 
+-        if (context->ipc_namespace_path && runtime && runtime->shared && runtime->shared->ipcns_storage_socket[0] >= 0) {
++        if (context->ipc_namespace_path && runtime->shared && runtime->shared->ipcns_storage_socket[0] >= 0) {
+                 r = open_shareable_ns_path(runtime->shared->ipcns_storage_socket, context->ipc_namespace_path, CLONE_NEWIPC);
+                 if (r < 0) {
+                         *exit_status = EXIT_NAMESPACE;
+@@ -5033,7 +5058,7 @@ int exec_invoke(
+                         }
+                 }
+ 
+-                if (cgroup_context && cg_unified() > 0 && is_pressure_supported() > 0) {
++                if (cg_unified() > 0 && is_pressure_supported() > 0) {
+                         if (cgroup_context_want_memory_pressure(cgroup_context)) {
+                                 r = cg_get_path("memory", params->cgroup_path, "memory.pressure", &memory_pressure_path);
+                                 if (r < 0) {
+@@ -5421,7 +5446,7 @@ int exec_invoke(
+                 /* LSM Smack needs the capability CAP_MAC_ADMIN to change the current execution security context of the
+                  * process. This is the latest place before dropping capabilities. Other MAC context are set later. */
+                 if (use_smack) {
+-                        r = setup_smack(params, context, executable_fd);
++                        r = setup_smack(context, params, executable_fd);
+                         if (r < 0 && !context->smack_process_label_ignore) {
+                                 *exit_status = EXIT_SMACK_PROCESS_LABEL;
+                                 return log_exec_error_errno(context, params, r, "Failed to set SMACK process label: %m");
+
+From 7a00092b423303d5b3867305abd229cde60a1caa Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Mon, 17 Mar 2025 10:44:05 +0100
+Subject: [PATCH 12/18] exec-invoke: Rename various variables from has_ to
+ have_
+
+All of these encode information of the current process, so have_ is
+more approriate than has_, which refers to something else.
+
+(cherry picked from commit af6a8b6969d3f8b2189ea7b8a164910bcf2cc71e)
+---
+ src/core/exec-invoke.c | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/src/core/exec-invoke.c b/src/core/exec-invoke.c
+index 3007354cf82a9..7af92551e4caa 100644
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -1377,7 +1377,7 @@ static bool context_has_no_new_privileges(const ExecContext *c) {
+ 
+ static bool seccomp_allows_drop_privileges(const ExecContext *c) {
+         void *id, *val;
+-        bool has_capget = false, has_capset = false, has_prctl = false;
++        bool have_capget = false, have_capset = false, have_prctl = false;
+ 
+         assert(c);
+ 
+@@ -1391,17 +1391,17 @@ static bool seccomp_allows_drop_privileges(const ExecContext *c) {
+                 name = seccomp_syscall_resolve_num_arch(SCMP_ARCH_NATIVE, PTR_TO_INT(id) - 1);
+ 
+                 if (streq(name, "capget"))
+-                        has_capget = true;
++                        have_capget = true;
+                 else if (streq(name, "capset"))
+-                        has_capset = true;
++                        have_capset = true;
+                 else if (streq(name, "prctl"))
+-                        has_prctl = true;
++                        have_prctl = true;
+         }
+ 
+         if (c->syscall_allow_list)
+-                return has_capget && has_capset && has_prctl;
++                return have_capget && have_capset && have_prctl;
+         else
+-                return !(has_capget || has_capset || has_prctl);
++                return !(have_capget || have_capset || have_prctl);
+ }
+ 
+ static bool skip_seccomp_unavailable(const ExecContext *c, const ExecParameters *p, const char *msg) {
+@@ -4171,7 +4171,7 @@ static int setup_delegated_namespaces(
+                 uid_t gid,
+                 const ExecCommand *command,
+                 bool needs_sandboxing,
+-                bool has_cap_sys_admin,
++                bool have_cap_sys_admin,
+                 int *reterr_exit_status) {
+ 
+         int r;
+@@ -4262,7 +4262,7 @@ static int setup_delegated_namespaces(
+                  * We need to check prior to entering the user namespace because if we're running unprivileged or in a
+                  * system without CAP_SYS_ADMIN, then we can have CAP_SYS_ADMIN in the current user namespace but not
+                  * once we unshare a mount namespace. */
+-                if (!has_cap_sys_admin) {
++                if (!have_cap_sys_admin) {
+                         r = can_mount_proc(context, params);
+                         if (r < 0) {
+                                 *reterr_exit_status = EXIT_NAMESPACE;
+@@ -4510,7 +4510,7 @@ int exec_invoke(
+                 needs_mount_namespace,  /* Do we need to set up a mount namespace for this kernel? */
+                 needs_ambient_hack;     /* Do we need to apply the ambient capabilities hack? */
+         bool keep_seccomp_privileges = false;
+-        bool has_cap_sys_admin = false;
++        bool have_cap_sys_admin = false;
+ #if HAVE_SELINUX
+         _cleanup_free_ char *mac_selinux_context_net = NULL;
+         bool use_selinux = false;
+@@ -5185,7 +5185,7 @@ int exec_invoke(
+         uint64_t capability_ambient_set = context->capability_ambient_set;
+ 
+         /* Check CAP_SYS_ADMIN before we enter user namespace to see if we can mount /proc even though its masked. */
+-        has_cap_sys_admin = have_effective_cap(CAP_SYS_ADMIN) > 0;
++        have_cap_sys_admin = have_effective_cap(CAP_SYS_ADMIN) > 0;
+ 
+         if (needs_sandboxing) {
+                 /* MAC enablement checks need to be done before a new mount ns is created, as they rely on
+@@ -5282,7 +5282,7 @@ int exec_invoke(
+                         gid,
+                         command,
+                         needs_sandboxing,
+-                        has_cap_sys_admin,
++                        have_cap_sys_admin,
+                         exit_status);
+         if (r < 0)
+                 return r;
+@@ -5343,7 +5343,7 @@ int exec_invoke(
+                         gid,
+                         command,
+                         needs_sandboxing,
+-                        has_cap_sys_admin,
++                        have_cap_sys_admin,
+                         exit_status);
+         if (r < 0)
+                 return r;
+
+From 2577eb5c91bf75a5e2f5d15559e049974bf3f9ae Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Mon, 17 Mar 2025 16:17:25 +0100
+Subject: [PATCH 13/18] core: Also check if we can mount /proc if pid namespace
+ is delegated
+
+If the pid namespace is delegated, it doesn't matter if we have CAP_SYS_ADMIN,
+we'll still fail to mount /proc if part of it is masked on the host so also
+check if we can mount /proc if the pid namespace is delegated.
+
+(cherry picked from commit 918a188fdab1278fbbe2c960e1da7c655f644340)
+---
+ src/core/exec-invoke.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/core/exec-invoke.c b/src/core/exec-invoke.c
+index 7af92551e4caa..d3bdd9dc192cf 100644
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -4262,7 +4262,7 @@ static int setup_delegated_namespaces(
+                  * We need to check prior to entering the user namespace because if we're running unprivileged or in a
+                  * system without CAP_SYS_ADMIN, then we can have CAP_SYS_ADMIN in the current user namespace but not
+                  * once we unshare a mount namespace. */
+-                if (!have_cap_sys_admin) {
++                if (!have_cap_sys_admin || delegate) {
+                         r = can_mount_proc(context, params);
+                         if (r < 0) {
+                                 *reterr_exit_status = EXIT_NAMESPACE;
+
+From 809c0d6858e47c28e8efeecef58f67d73bab754d Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Mon, 17 Mar 2025 11:35:23 +0100
+Subject: [PATCH 14/18] core: Make DelegateNamespaces= work for user managers
+ with CAP_SYS_ADMIN
+
+Currently DelegateNamespaces= only works for services spawned by the
+system manager. User managers will always unshare the user namespace
+first even if they're running with CAP_SYS_ADMIN.
+
+Let's add support for DelegateNamespaces= for user managers if they're
+running with CAP_SYS_ADMIN. By default, we'll still delegate all namespaces
+for user managers, but this can now be overridden by explicitly passing
+DelegateNamespaces=.
+
+If a user manager is running without CAP_SYS_ADMIN, the user manager is
+still always unshared first just like before.
+
+(cherry picked from commit 38748596f0783f2b773bd95d4af4d83f5b5ff872)
+---
+ src/core/exec-invoke.c                        | 46 ++++++++-----------
+ .../units/TEST-07-PID1.delegate-namespaces.sh | 12 +++++
+ 2 files changed, 32 insertions(+), 26 deletions(-)
+
+diff --git a/src/core/exec-invoke.c b/src/core/exec-invoke.c
+index d3bdd9dc192cf..5cc1251c7d094 100644
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -4076,19 +4076,10 @@ static void log_command_line(
+                         LOG_EXEC_INVOCATION_ID(params));
+ }
+ 
+-static bool exec_context_need_unprivileged_private_users(
+-                const ExecContext *context,
+-                const ExecParameters *params) {
+-
++static bool exec_context_needs_cap_sys_admin(const ExecContext *context, const ExecParameters *params) {
+         assert(context);
+         assert(params);
+ 
+-        /* These options require PrivateUsers= when used in user units, as we need to be in a user namespace
+-         * to have permission to enable them when not running as root. If we have effective CAP_SYS_ADMIN
+-         * (system manager) then we have privileges and don't need this. */
+-        if (params->runtime_scope != RUNTIME_SCOPE_USER)
+-                return false;
+-
+         return context->private_users != PRIVATE_USERS_NO ||
+                context->private_tmp != PRIVATE_TMP_NO ||
+                context->private_devices ||
+@@ -4130,9 +4121,6 @@ static PrivateUsers exec_context_get_effective_private_users(
+         if (context->private_users != PRIVATE_USERS_NO)
+                 return context->private_users;
+ 
+-        if (exec_context_need_unprivileged_private_users(context, params))
+-                return PRIVATE_USERS_SELF;
+-
+         /* If any namespace is delegated with DelegateNamespaces=, always set up a user namespace. */
+         if (context->delegate_namespaces != NAMESPACE_FLAGS_INITIAL)
+                 return PRIVATE_USERS_SELF;
+@@ -4143,6 +4131,7 @@ static PrivateUsers exec_context_get_effective_private_users(
+ static bool exec_namespace_is_delegated(
+                 const ExecContext *context,
+                 const ExecParameters *params,
++                bool have_cap_sys_admin,
+                 unsigned long namespace) {
+ 
+         assert(context);
+@@ -4152,11 +4141,11 @@ static bool exec_namespace_is_delegated(
+         /* If we need unprivileged private users, we've already unshared a user namespace by the time we call
+          * setup_delegated_namespaces() for the first time so let's make sure we do all other namespace
+          * unsharing in the first call to setup_delegated_namespaces() by returning false here. */
+-        if (exec_context_need_unprivileged_private_users(context, params))
++        if (!have_cap_sys_admin && exec_context_needs_cap_sys_admin(context, params))
+                 return false;
+ 
+         if (context->delegate_namespaces == NAMESPACE_FLAGS_INITIAL)
+-                return false;
++                return params->runtime_scope == RUNTIME_SCOPE_USER;
+ 
+         return FLAGS_SET(context->delegate_namespaces, namespace);
+ }
+@@ -4189,7 +4178,7 @@ static int setup_delegated_namespaces(
+         assert(reterr_exit_status);
+ 
+         if (exec_needs_network_namespace(context) &&
+-            exec_namespace_is_delegated(context, params, CLONE_NEWNET) == delegate &&
++            exec_namespace_is_delegated(context, params, have_cap_sys_admin, CLONE_NEWNET) == delegate &&
+             runtime->shared && runtime->shared->netns_storage_socket[0] >= 0) {
+ 
+                 /* Try to enable network namespacing if network namespacing is available and we have
+@@ -4216,7 +4205,7 @@ static int setup_delegated_namespaces(
+         }
+ 
+         if (exec_needs_ipc_namespace(context) &&
+-            exec_namespace_is_delegated(context, params, CLONE_NEWIPC) == delegate &&
++            exec_namespace_is_delegated(context, params, have_cap_sys_admin, CLONE_NEWIPC) == delegate &&
+             runtime->shared && runtime->shared->ipcns_storage_socket[0] >= 0) {
+ 
+                 if (ns_type_supported(NAMESPACE_IPC)) {
+@@ -4238,7 +4227,7 @@ static int setup_delegated_namespaces(
+         }
+ 
+         if (needs_sandboxing && exec_needs_cgroup_namespace(context, params) &&
+-            exec_namespace_is_delegated(context, params, CLONE_NEWCGROUP) == delegate) {
++            exec_namespace_is_delegated(context, params, have_cap_sys_admin, CLONE_NEWCGROUP) == delegate) {
+                 if (unshare(CLONE_NEWCGROUP) < 0) {
+                         *reterr_exit_status = EXIT_NAMESPACE;
+                         return log_exec_error_errno(context, params, errno, "Failed to set up cgroup namespacing: %m");
+@@ -4250,7 +4239,7 @@ static int setup_delegated_namespaces(
+         /* Unshare a new PID namespace before setting up mounts to ensure /proc/ is mounted with only processes in PID namespace visible.
+          * Note PrivatePIDs=yes implies MountAPIVFS=yes so we'll always ensure procfs is remounted. */
+         if (needs_sandboxing && exec_needs_pid_namespace(context) &&
+-            exec_namespace_is_delegated(context, params, CLONE_NEWPID) == delegate) {
++            exec_namespace_is_delegated(context, params, have_cap_sys_admin, CLONE_NEWPID) == delegate) {
+                 if (params->pidref_transport_fd < 0) {
+                         *reterr_exit_status = EXIT_NAMESPACE;
+                         return log_exec_error_errno(context, params, SYNTHETIC_ERRNO(ENOTCONN), "PidRef socket is not set up: %m");
+@@ -4287,7 +4276,7 @@ static int setup_delegated_namespaces(
+         /* If PrivatePIDs= yes is configured, we're now running as pid 1 in a pid namespace! */
+ 
+         if (exec_needs_mount_namespace(context, params, runtime) &&
+-            exec_namespace_is_delegated(context, params, CLONE_NEWNS) == delegate) {
++            exec_namespace_is_delegated(context, params, have_cap_sys_admin, CLONE_NEWNS) == delegate) {
+                 _cleanup_free_ char *error_path = NULL;
+ 
+                 r = apply_mount_namespace(command->flags,
+@@ -4308,7 +4297,8 @@ static int setup_delegated_namespaces(
+                 log_exec_debug(context, params, "Set up %smount namespace", delegate ? "delegated " : "");
+         }
+ 
+-        if (needs_sandboxing && exec_namespace_is_delegated(context, params, CLONE_NEWUTS) == delegate) {
++        if (needs_sandboxing &&
++            exec_namespace_is_delegated(context, params, have_cap_sys_admin, CLONE_NEWUTS) == delegate) {
+                 r = apply_protect_hostname(context, params, reterr_exit_status);
+                 if (r < 0)
+                         return r;
+@@ -4508,9 +4498,10 @@ int exec_invoke(
+         bool needs_sandboxing,          /* Do we need to set up full sandboxing? (i.e. all namespacing, all MAC stuff, caps, yadda yadda */
+                 needs_setuid,           /* Do we need to do the actual setresuid()/setresgid() calls? */
+                 needs_mount_namespace,  /* Do we need to set up a mount namespace for this kernel? */
+-                needs_ambient_hack;     /* Do we need to apply the ambient capabilities hack? */
+-        bool keep_seccomp_privileges = false;
+-        bool have_cap_sys_admin = false;
++                needs_ambient_hack,     /* Do we need to apply the ambient capabilities hack? */
++                have_cap_sys_admin,
++                userns_set_up = false,
++                keep_seccomp_privileges = false;
+ #if HAVE_SELINUX
+         _cleanup_free_ char *mac_selinux_context_net = NULL;
+         bool use_selinux = false;
+@@ -5248,11 +5239,13 @@ int exec_invoke(
+                 }
+         }
+ 
+-        if (needs_sandboxing && exec_context_need_unprivileged_private_users(context, params)) {
++        if (needs_sandboxing && !have_cap_sys_admin && exec_context_needs_cap_sys_admin(context, params)) {
+                 /* If we're unprivileged, set up the user namespace first to enable use of the other namespaces.
+                  * Users with CAP_SYS_ADMIN can set up user namespaces last because they will be able to
+                  * set up all of the other namespaces (i.e. network, mount, UTS) without a user namespace. */
+                 PrivateUsers pu = exec_context_get_effective_private_users(context, params);
++                if (pu == PRIVATE_USERS_NO)
++                        pu = PRIVATE_USERS_SELF;
+ 
+                 /* The kernel requires /proc/pid/setgroups be set to "deny" prior to writing /proc/pid/gid_map in
+                  * unprivileged user namespaces. */
+@@ -5267,6 +5260,7 @@ int exec_invoke(
+                         log_exec_info_errno(context, params, r, "Failed to set up user namespacing for unprivileged user, ignoring: %m");
+                 else {
+                         assert(r > 0);
++                        userns_set_up = true;
+                         log_debug("Set up unprivileged user namespace");
+                 }
+         }
+@@ -5319,7 +5313,7 @@ int exec_invoke(
+          * case of mount namespaces being less privileged when the mount point list is copied from a
+          * different user namespace). */
+ 
+-        if (needs_sandboxing && !exec_context_need_unprivileged_private_users(context, params)) {
++        if (needs_sandboxing && !userns_set_up) {
+                 PrivateUsers pu = exec_context_get_effective_private_users(context, params);
+ 
+                 r = setup_private_users(pu, saved_uid, saved_gid, uid, gid,
+diff --git a/test/units/TEST-07-PID1.delegate-namespaces.sh b/test/units/TEST-07-PID1.delegate-namespaces.sh
+index fe0defaeb6567..c16e7e46ad607 100755
+--- a/test/units/TEST-07-PID1.delegate-namespaces.sh
++++ b/test/units/TEST-07-PID1.delegate-namespaces.sh
+@@ -42,6 +42,18 @@ testcase_implied_private_users_self() {
+     systemd-run -p PrivateUsersEx=identity -p PrivateMounts=yes -p DelegateNamespaces=mnt --wait bash -c 'test "$(cat /proc/self/uid_map)" == "         0          0      65536"'
+ }
+ 
++testcase_user_manager() {
++    systemctl start user@0
++    # DelegateNamespaces=yes is implied for user managers.
++    systemd-run --machine=testuser@.host --user -p PrivateMounts=yes -p AmbientCapabilities="~" --wait --pipe -- mount --bind /usr /home
++    # Even those with CAP_SYS_ADMIN.
++    SYSTEMD_LOG_LEVEL=debug systemd-run --machine=.host --user -p PrivateMounts=yes --wait --pipe -- mount --bind /usr /home
++    # But can be overridden for user managers that are running with CAP_SYS_ADMIN.
++    (! systemd-run --machine=.host --user -p PrivateMounts=yes -p DelegateNamespaces=no --wait --pipe -- mount --bind /usr /home)
++    # But not for those without CAP_SYS_ADMIN.
++    systemd-run --machine=testuser@.host --user -p PrivateMounts=yes -p DelegateNamespaces=no -p AmbientCapabilities="~" --wait --pipe -- mount --bind /usr /home
++}
++
+ testcase_multiple_features() {
+     unsquashfs -no-xattrs -d /tmp/TEST-07-PID1-delegate-namespaces-root /usr/share/minimal_0.raw
+ 
+
+From 01b741ba179e75a5238e91ecfa1d4d1577800129 Mon Sep 17 00:00:00 2001
+From: Ryan Wilson <ryantimwilson@meta.com>
+Date: Mon, 2 Dec 2024 07:38:06 -0800
+Subject: [PATCH 15/18] core: Migrate ProtectHostname to use enum vs boolean
+
+Migrating ProtectHostname to enum will set the stage for adding more
+properties like ProtectHostname=private in future commits.
+
+In addition, we add PrivateHostnameEx property to dbus API which uses
+string instead of boolean.
+
+(cherry picked from commit 6746f288548a240148c7c9643e14996bfe960017)
+---
+ man/org.freedesktop.systemd1.xml      | 50 +++++++++++++++--------
+ src/core/dbus-execute.c               | 59 +++++++++++++++++++++++++--
+ src/core/exec-invoke.c                |  8 ++--
+ src/core/execute-serialize.c          |  9 ++--
+ src/core/execute.c                    |  2 +-
+ src/core/execute.h                    |  2 +-
+ src/core/load-fragment-gperf.gperf.in |  2 +-
+ src/core/load-fragment.c              |  1 +
+ src/core/load-fragment.h              |  1 +
+ src/core/namespace.c                  | 13 ++++--
+ src/core/namespace.h                  | 10 +++++
+ src/shared/bus-unit-util.c            |  1 +
+ 12 files changed, 123 insertions(+), 35 deletions(-)
+
+diff --git a/man/org.freedesktop.systemd1.xml b/man/org.freedesktop.systemd1.xml
+index f4625214106be..3d204a4b69260 100644
+--- a/man/org.freedesktop.systemd1.xml
++++ b/man/org.freedesktop.systemd1.xml
+@@ -3361,6 +3361,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b ProtectHostname = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
++      readonly s ProtectHostnameEx = '...';
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b MemoryKSM = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly s NetworkNamespacePath = '...';
+@@ -3962,8 +3964,6 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+ 
+     <!--property ProcSubset is not documented!-->
+ 
+-    <!--property ProtectHostname is not documented!-->
+-
+     <!--property MemoryKSM is not documented!-->
+ 
+     <!--property NetworkNamespacePath is not documented!-->
+@@ -4688,6 +4688,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="ProtectHostname"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="ProtectHostnameEx"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryKSM"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="NetworkNamespacePath"/>
+@@ -4886,6 +4888,12 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+       unit file setting <varname>PrivatePIDs=</varname> listed in
+       <citerefentry><refentrytitle>systemd.exec</refentrytitle><manvolnum>5</manvolnum></citerefentry>.
+       Note <varname>PrivatePIDs</varname> is a string type to allow adding more values in the future.</para>
++
++      <para><varname>ProtectHostnameEx</varname> implement the destination parameter of the
++      unit file setting <varname>ProtectHostname=</varname> listed in
++      <citerefentry><refentrytitle>systemd.exec</refentrytitle><manvolnum>5</manvolnum></citerefentry>.
++      Unlike boolean <varname>ProtectHostname</varname>, <varname>ProtectHostnameEx</varname>
++      is a string type.</para>
+     </refsect2>
+   </refsect1>
+ 
+@@ -5553,6 +5561,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b ProtectHostname = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
++      readonly s ProtectHostnameEx = '...';
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b MemoryKSM = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly s NetworkNamespacePath = '...';
+@@ -6166,8 +6176,6 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
+ 
+     <!--property ProcSubset is not documented!-->
+ 
+-    <!--property ProtectHostname is not documented!-->
+-
+     <!--property MemoryKSM is not documented!-->
+ 
+     <!--property NetworkNamespacePath is not documented!-->
+@@ -6864,6 +6872,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="ProtectHostname"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="ProtectHostnameEx"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryKSM"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="NetworkNamespacePath"/>
+@@ -7566,6 +7576,8 @@ node /org/freedesktop/systemd1/unit/home_2emount {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b ProtectHostname = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
++      readonly s ProtectHostnameEx = '...';
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b MemoryKSM = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly s NetworkNamespacePath = '...';
+@@ -8105,8 +8117,6 @@ node /org/freedesktop/systemd1/unit/home_2emount {
+ 
+     <!--property ProcSubset is not documented!-->
+ 
+-    <!--property ProtectHostname is not documented!-->
+-
+     <!--property MemoryKSM is not documented!-->
+ 
+     <!--property NetworkNamespacePath is not documented!-->
+@@ -8715,6 +8725,8 @@ node /org/freedesktop/systemd1/unit/home_2emount {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="ProtectHostname"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="ProtectHostnameEx"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryKSM"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="NetworkNamespacePath"/>
+@@ -9546,6 +9558,8 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b ProtectHostname = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
++      readonly s ProtectHostnameEx = '...';
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b MemoryKSM = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly s NetworkNamespacePath = '...';
+@@ -10071,8 +10085,6 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
+ 
+     <!--property ProcSubset is not documented!-->
+ 
+-    <!--property ProtectHostname is not documented!-->
+-
+     <!--property MemoryKSM is not documented!-->
+ 
+     <!--property NetworkNamespacePath is not documented!-->
+@@ -10667,6 +10679,8 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="ProtectHostname"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="ProtectHostnameEx"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryKSM"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="NetworkNamespacePath"/>
+@@ -12329,8 +12343,9 @@ $ gdbus introspect --system --dest org.freedesktop.systemd1 \
+       <varname>BindLogSockets</varname>,
+       <varname>ProtectControlGroupsEx</varname>,
+       <varname>PrivateUsersEx</varname>,
+-      <varname>PrivatePIDs</varname> and
+-      <varname>DelegateNamespaces</varname> were added in version 257.</para>
++      <varname>PrivatePIDs</varname>,
++      <varname>DelegateNamespaces</varname>, and
++      <varname>ProtectHostnameEx</varname> were added in version 257.</para>
+     </refsect2>
+     <refsect2>
+       <title>Socket Unit Objects</title>
+@@ -12373,8 +12388,9 @@ $ gdbus introspect --system --dest org.freedesktop.systemd1 \
+       <varname>PrivateUsersEx</varname>,
+       <varname>ManagedOOMMemoryPressureDurationUSec</varname>,
+       <varname>ProtectControlGroupsEx</varname>,
+-      <varname>PrivatePIDs</varname>, and
+-      <varname>DelegateNamespaces</varname> were added in version 257.</para>
++      <varname>PrivatePIDs</varname>,
++      <varname>DelegateNamespaces</varname>, and
++      <varname>ProtectHostnameEx</varname> were added in version 257.</para>
+     </refsect2>
+     <refsect2>
+       <title>Mount Unit Objects</title>
+@@ -12414,8 +12430,9 @@ $ gdbus introspect --system --dest org.freedesktop.systemd1 \
+       <varname>PrivateUsersEx</varname>,
+       <varname>ManagedOOMMemoryPressureDurationUSec</varname>,
+       <varname>ProtectControlGroupsEx</varname>,
+-      <varname>PrivatePIDs</varname>, and
+-      <varname>DelegateNamespaces</varname> were added in version 257.</para>
++      <varname>PrivatePIDs</varname>,
++      <varname>DelegateNamespaces</varname>, and
++      <varname>ProtectHostnameEx</varname> were added in version 257.</para>
+     </refsect2>
+     <refsect2>
+       <title>Swap Unit Objects</title>
+@@ -12455,8 +12472,9 @@ $ gdbus introspect --system --dest org.freedesktop.systemd1 \
+       <varname>PrivateUsersEx</varname>,
+       <varname>ManagedOOMMemoryPressureDurationUSec</varname>,
+       <varname>ProtectControlGroupsEx</varname>,
+-      <varname>PrivatePIDs</varname>, and
+-      <varname>DelegateNamespaces</varname> were added in version 257.</para>
++      <varname>PrivatePIDs</varname>,
++      <varname>DelegateNamespaces</varname>, and
++      <varname>ProtectHostnameEx</varname> were added in version 257.</para>
+     </refsect2>
+     <refsect2>
+       <title>Slice Unit Objects</title>
+diff --git a/src/core/dbus-execute.c b/src/core/dbus-execute.c
+index a8c3755b073c4..73483e2480384 100644
+--- a/src/core/dbus-execute.c
++++ b/src/core/dbus-execute.c
+@@ -64,6 +64,7 @@ static BUS_DEFINE_PROPERTY_GET_REF(property_get_private_tmp_ex, "s", PrivateTmp,
+ static BUS_DEFINE_PROPERTY_GET_REF(property_get_private_users_ex, "s", PrivateUsers, private_users_to_string);
+ static BUS_DEFINE_PROPERTY_GET_REF(property_get_protect_control_groups_ex, "s", ProtectControlGroups, protect_control_groups_to_string);
+ static BUS_DEFINE_PROPERTY_GET_REF(property_get_private_pids, "s", PrivatePIDs, private_pids_to_string);
++static BUS_DEFINE_PROPERTY_GET_REF(property_get_protect_hostname_ex, "s", ProtectHostname, protect_hostname_to_string);
+ static BUS_DEFINE_PROPERTY_GET_REF(property_get_syslog_level, "i", int, LOG_PRI);
+ static BUS_DEFINE_PROPERTY_GET_REF(property_get_syslog_facility, "i", int, LOG_FAC);
+ static BUS_DEFINE_PROPERTY_GET(property_get_cpu_affinity_from_numa, "b", ExecContext, exec_context_get_cpu_affinity_from_numa);
+@@ -1068,6 +1069,21 @@ static int property_get_protect_control_groups(
+         return sd_bus_message_append_basic(reply, 'b', &b);
+ }
+ 
++static int property_get_protect_hostname(
++                sd_bus *bus,
++                const char *path,
++                const char *interface,
++                const char *property,
++                sd_bus_message *reply,
++                void *userdata,
++                sd_bus_error *error) {
++
++        ProtectHostname *p = ASSERT_PTR(userdata);
++        int b = *p != PROTECT_HOSTNAME_NO;
++
++        return sd_bus_message_append_basic(reply, 'b', &b);
++}
++
+ static int property_get_unsigned_as_uint16(
+                 sd_bus *bus,
+                 const char *path,
+@@ -1260,7 +1276,8 @@ const sd_bus_vtable bus_exec_vtable[] = {
+         SD_BUS_PROPERTY("KeyringMode", "s", property_get_exec_keyring_mode, offsetof(ExecContext, keyring_mode), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("ProtectProc", "s", property_get_protect_proc, offsetof(ExecContext, protect_proc), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("ProcSubset", "s", property_get_proc_subset, offsetof(ExecContext, proc_subset), SD_BUS_VTABLE_PROPERTY_CONST),
+-        SD_BUS_PROPERTY("ProtectHostname", "b", bus_property_get_bool, offsetof(ExecContext, protect_hostname), SD_BUS_VTABLE_PROPERTY_CONST),
++        SD_BUS_PROPERTY("ProtectHostname", "b", property_get_protect_hostname, offsetof(ExecContext, protect_hostname), SD_BUS_VTABLE_PROPERTY_CONST),
++        SD_BUS_PROPERTY("ProtectHostnameEx", "s", property_get_protect_hostname_ex, offsetof(ExecContext, protect_hostname), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("MemoryKSM", "b", bus_property_get_tristate, offsetof(ExecContext, memory_ksm), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("NetworkNamespacePath", "s", NULL, offsetof(ExecContext, network_namespace_path), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("IPCNamespacePath", "s", NULL, offsetof(ExecContext, ipc_namespace_path), SD_BUS_VTABLE_PROPERTY_CONST),
+@@ -2011,6 +2028,43 @@ int bus_exec_context_set_transient_property(
+                 return 1;
+         }
+ 
++        if (streq(name, "ProtectHostname")) {
++                int v;
++
++                r = sd_bus_message_read(message, "b", &v);
++                if (r < 0)
++                        return r;
++
++                if (!UNIT_WRITE_FLAGS_NOOP(flags)) {
++                        c->protect_hostname = v ? PROTECT_HOSTNAME_YES : PROTECT_HOSTNAME_NO;
++                        (void) unit_write_settingf(u, flags, name, "%s=%s", name, yes_no(v));
++                }
++
++                return 1;
++
++        }
++
++        if (streq(name, "ProtectHostnameEx")) {
++                const char *s;
++                ProtectHostname t;
++
++                r = sd_bus_message_read(message, "s", &s);
++                if (r < 0)
++                        return r;
++
++                t = protect_hostname_from_string(s);
++                if (t < 0)
++                        return sd_bus_error_setf(error, SD_BUS_ERROR_INVALID_ARGS, "Invalid %s setting: %s", name, s);
++
++                if (!UNIT_WRITE_FLAGS_NOOP(flags)) {
++                        c->protect_hostname = t;
++                        (void) unit_write_settingf(u, flags, name, "ProtectHostname=%s",
++                                                   protect_hostname_to_string(c->protect_hostname));
++                }
++
++                return 1;
++        }
++
+         if (streq(name, "PrivateDevices"))
+                 return bus_set_transient_bool(u, name, &c->private_devices, message, flags, error);
+ 
+@@ -2071,9 +2125,6 @@ int bus_exec_context_set_transient_property(
+         if (streq(name, "LockPersonality"))
+                 return bus_set_transient_bool(u, name, &c->lock_personality, message, flags, error);
+ 
+-        if (streq(name, "ProtectHostname"))
+-                return bus_set_transient_bool(u, name, &c->protect_hostname, message, flags, error);
+-
+         if (streq(name, "MemoryKSM"))
+                 return bus_set_transient_tristate(u, name, &c->memory_ksm, message, flags, error);
+ 
+diff --git a/src/core/exec-invoke.c b/src/core/exec-invoke.c
+index 5cc1251c7d094..cef230815814c 100644
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -1348,7 +1348,7 @@ static bool context_has_seccomp(const ExecContext *c) {
+                 c->memory_deny_write_execute ||
+                 c->private_devices ||
+                 c->protect_clock ||
+-                c->protect_hostname ||
++                c->protect_hostname == PROTECT_HOSTNAME_YES ||
+                 c->protect_kernel_tunables ||
+                 c->protect_kernel_modules ||
+                 c->protect_kernel_logs ||
+@@ -1712,7 +1712,7 @@ static int apply_protect_hostname(const ExecContext *c, const ExecParameters *p,
+         assert(p);
+         assert(ret_exit_status);
+ 
+-        if (!c->protect_hostname)
++        if (c->protect_hostname == PROTECT_HOSTNAME_NO)
+                 return 0;
+ 
+         if (ns_type_supported(NAMESPACE_UTS)) {
+@@ -3467,7 +3467,7 @@ static int apply_mount_namespace(
+                 .protect_kernel_tunables = needs_sandboxing && context->protect_kernel_tunables,
+                 .protect_kernel_modules = needs_sandboxing && context->protect_kernel_modules,
+                 .protect_kernel_logs = needs_sandboxing && context->protect_kernel_logs,
+-                .protect_hostname = needs_sandboxing && context->protect_hostname,
++                .protect_hostname = needs_sandboxing && context->protect_hostname == PROTECT_HOSTNAME_YES,
+ 
+                 .private_dev = needs_sandboxing && context->private_devices,
+                 .private_network = needs_sandboxing && exec_needs_network_namespace(context),
+@@ -4102,7 +4102,7 @@ static bool exec_context_needs_cap_sys_admin(const ExecContext *context, const E
+                context->protect_kernel_logs ||
+                exec_needs_cgroup_mount(context, params) ||
+                context->protect_clock ||
+-               context->protect_hostname ||
++               context->protect_hostname != PROTECT_HOSTNAME_NO ||
+                !strv_isempty(context->read_write_paths) ||
+                !strv_isempty(context->read_only_paths) ||
+                !strv_isempty(context->inaccessible_paths) ||
+diff --git a/src/core/execute-serialize.c b/src/core/execute-serialize.c
+index 01c974623c815..0765d4c142733 100644
+--- a/src/core/execute-serialize.c
++++ b/src/core/execute-serialize.c
+@@ -1978,7 +1978,7 @@ static int exec_context_serialize(const ExecContext *c, FILE *f) {
+         if (r < 0)
+                 return r;
+ 
+-        r = serialize_bool_elide(f, "exec-context-protect-hostname", c->protect_hostname);
++        r = serialize_item(f, "exec-context-protect-hostname", protect_hostname_to_string(c->protect_hostname));
+         if (r < 0)
+                 return r;
+ 
+@@ -2887,10 +2887,9 @@ static int exec_context_deserialize(ExecContext *c, FILE *f) {
+                         if (c->keyring_mode < 0)
+                                 return -EINVAL;
+                 } else if ((val = startswith(l, "exec-context-protect-hostname="))) {
+-                        r = parse_boolean(val);
+-                        if (r < 0)
+-                                return r;
+-                        c->protect_hostname = r;
++                        c->protect_hostname = protect_hostname_from_string(val);
++                        if (c->protect_hostname < 0)
++                                return -EINVAL;
+                 } else if ((val = startswith(l, "exec-context-protect-proc="))) {
+                         c->protect_proc = protect_proc_from_string(val);
+                         if (c->protect_proc < 0)
+diff --git a/src/core/execute.c b/src/core/execute.c
+index 6b7fc32aca0cc..848aa646b161b 100644
+--- a/src/core/execute.c
++++ b/src/core/execute.c
+@@ -1072,7 +1072,7 @@ void exec_context_dump(const ExecContext *c, FILE* f, const char *prefix) {
+                 prefix, yes_no(c->restrict_realtime),
+                 prefix, yes_no(c->restrict_suid_sgid),
+                 prefix, exec_keyring_mode_to_string(c->keyring_mode),
+-                prefix, yes_no(c->protect_hostname),
++                prefix, protect_hostname_to_string(c->protect_hostname),
+                 prefix, protect_proc_to_string(c->protect_proc),
+                 prefix, proc_subset_to_string(c->proc_subset));
+ 
+diff --git a/src/core/execute.h b/src/core/execute.h
+index 00b8c74ccc005..7630b4ed1bf40 100644
+--- a/src/core/execute.h
++++ b/src/core/execute.h
+@@ -336,7 +336,7 @@ struct ExecContext {
+         ProtectSystem protect_system;
+         ProtectHome protect_home;
+         PrivatePIDs private_pids;
+-        bool protect_hostname;
++        ProtectHostname protect_hostname;
+ 
+         bool dynamic_user;
+         bool remove_ipc;
+diff --git a/src/core/load-fragment-gperf.gperf.in b/src/core/load-fragment-gperf.gperf.in
+index 211e5c543972c..b807af59c8ec4 100644
+--- a/src/core/load-fragment-gperf.gperf.in
++++ b/src/core/load-fragment-gperf.gperf.in
+@@ -181,7 +181,7 @@
+ {% else %}
+ {{type}}.SmackProcessLabel,                   config_parse_warn_compat,                           DISABLED_CONFIGURATION,             0
+ {% endif %}
+-{{type}}.ProtectHostname,                     config_parse_bool,                                  0,                                  offsetof({{type}}, exec_context.protect_hostname)
++{{type}}.ProtectHostname,                     config_parse_protect_hostname,                      0,                                  offsetof({{type}}, exec_context.protect_hostname)
+ {{type}}.MemoryKSM,                           config_parse_tristate,                              0,                                  offsetof({{type}}, exec_context.memory_ksm)
+ {%- endmacro -%}
+ 
+diff --git a/src/core/load-fragment.c b/src/core/load-fragment.c
+index d992622562a60..b0ddd67dc9940 100644
+--- a/src/core/load-fragment.c
++++ b/src/core/load-fragment.c
+@@ -141,6 +141,7 @@ DEFINE_CONFIG_PARSE_ENUM(config_parse_exec_utmp_mode, exec_utmp_mode, ExecUtmpMo
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_job_mode, job_mode, JobMode);
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_notify_access, notify_access, NotifyAccess);
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_protect_home, protect_home, ProtectHome);
++DEFINE_CONFIG_PARSE_ENUM(config_parse_protect_hostname, protect_hostname, ProtectHostname);
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_protect_system, protect_system, ProtectSystem);
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_exec_preserve_mode, exec_preserve_mode, ExecPreserveMode);
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_service_type, service_type, ServiceType);
+diff --git a/src/core/load-fragment.h b/src/core/load-fragment.h
+index 4637dda10ea4f..7b758df2e68f0 100644
+--- a/src/core/load-fragment.h
++++ b/src/core/load-fragment.h
+@@ -119,6 +119,7 @@ CONFIG_PARSER_PROTOTYPE(config_parse_protect_control_groups);
+ CONFIG_PARSER_PROTOTYPE(config_parse_cpu_quota);
+ CONFIG_PARSER_PROTOTYPE(config_parse_allowed_cpuset);
+ CONFIG_PARSER_PROTOTYPE(config_parse_protect_home);
++CONFIG_PARSER_PROTOTYPE(config_parse_protect_hostname);
+ CONFIG_PARSER_PROTOTYPE(config_parse_protect_system);
+ CONFIG_PARSER_PROTOTYPE(config_parse_bus_name);
+ CONFIG_PARSER_PROTOTYPE(config_parse_exec_utmp_mode);
+diff --git a/src/core/namespace.c b/src/core/namespace.c
+index 2dcc365932e88..0f1b4d62bd6fc 100644
+--- a/src/core/namespace.c
++++ b/src/core/namespace.c
+@@ -250,7 +250,7 @@ static const MountEntry protect_system_strict_table[] = {
+ };
+ 
+ /* ProtectHostname=yes able */
+-static const MountEntry protect_hostname_table[] = {
++static const MountEntry protect_hostname_yes_table[] = {
+         { "/proc/sys/kernel/hostname",   MOUNT_READ_ONLY, false },
+         { "/proc/sys/kernel/domainname", MOUNT_READ_ONLY, false },
+ };
+@@ -2654,8 +2654,8 @@ int setup_namespace(const NamespaceParameters *p, char **reterr_path) {
+         if (p->protect_hostname) {
+                 r = append_static_mounts(
+                                 &ml,
+-                                protect_hostname_table,
+-                                ELEMENTSOF(protect_hostname_table),
++                                protect_hostname_yes_table,
++                                ELEMENTSOF(protect_hostname_yes_table),
+                                 ignore_protect_proc);
+                 if (r < 0)
+                         return r;
+@@ -3317,6 +3317,13 @@ static const char *const protect_home_table[_PROTECT_HOME_MAX] = {
+ 
+ DEFINE_STRING_TABLE_LOOKUP_WITH_BOOLEAN(protect_home, ProtectHome, PROTECT_HOME_YES);
+ 
++static const char *const protect_hostname_table[_PROTECT_HOSTNAME_MAX] = {
++        [PROTECT_HOSTNAME_NO]      = "no",
++        [PROTECT_HOSTNAME_YES]     = "yes",
++};
++
++DEFINE_STRING_TABLE_LOOKUP_WITH_BOOLEAN(protect_hostname, ProtectHostname, PROTECT_HOSTNAME_YES);
++
+ static const char *const protect_system_table[_PROTECT_SYSTEM_MAX] = {
+         [PROTECT_SYSTEM_NO]     = "no",
+         [PROTECT_SYSTEM_YES]    = "yes",
+diff --git a/src/core/namespace.h b/src/core/namespace.h
+index 5d466a8c1c724..d33913749e8d4 100644
+--- a/src/core/namespace.h
++++ b/src/core/namespace.h
+@@ -28,6 +28,13 @@ typedef enum ProtectHome {
+         _PROTECT_HOME_INVALID = -EINVAL,
+ } ProtectHome;
+ 
++typedef enum ProtectHostname {
++        PROTECT_HOSTNAME_NO,
++        PROTECT_HOSTNAME_YES,
++        _PROTECT_HOSTNAME_MAX,
++        _PROTECT_HOSTNAME_INVALID = -EINVAL,
++} ProtectHostname;
++
+ typedef enum ProtectSystem {
+         PROTECT_SYSTEM_NO,
+         PROTECT_SYSTEM_YES,
+@@ -216,6 +223,9 @@ int open_shareable_ns_path(int netns_storage_socket[static 2], const char *path,
+ const char* protect_home_to_string(ProtectHome p) _const_;
+ ProtectHome protect_home_from_string(const char *s) _pure_;
+ 
++const char* protect_hostname_to_string(ProtectHostname p) _const_;
++ProtectHostname protect_hostname_from_string(const char *s) _pure_;
++
+ const char* protect_system_to_string(ProtectSystem p) _const_;
+ ProtectSystem protect_system_from_string(const char *s) _pure_;
+ 
+diff --git a/src/shared/bus-unit-util.c b/src/shared/bus-unit-util.c
+index c42f70b88e4a8..c11010935711b 100644
+--- a/src/shared/bus-unit-util.c
++++ b/src/shared/bus-unit-util.c
+@@ -1045,6 +1045,7 @@ static int bus_append_execute_property(sd_bus_message *m, const char *field, con
+                               "SyslogIdentifier",
+                               "ProtectSystem",
+                               "ProtectHome",
++                              "ProtectHostnameEx",
+                               "PrivateTmpEx",
+                               "PrivateUsersEx",
+                               "ProtectControlGroupsEx",
+
+From 74817571816bf3135ac3938bdf74f6f6ecc2f241 Mon Sep 17 00:00:00 2001
+From: Ryan Wilson <ryantimwilson@meta.com>
+Date: Mon, 2 Dec 2024 08:10:05 -0800
+Subject: [PATCH 16/18] core: Add ProtectHostname=private
+
+This allows an option for systemd exec units to enable UTS namespaces
+but not restrict changing hostname via seccomp. Thus, units can change
+hostname without affecting the host.
+
+Fixes: #30348
+(cherry picked from commit cf48bde7aea52b18ac3fa218d3f60fd3d533ef66)
+---
+ man/systemd.exec.xml                        | 13 +++++-
+ mkosi/mkosi.conf                            |  1 +
+ src/core/exec-invoke.c                      | 19 +++++----
+ src/core/namespace.c                        |  1 +
+ src/core/namespace.h                        |  1 +
+ test/units/TEST-07-PID1.protect-hostname.sh | 44 +++++++++++++++++++++
+ 6 files changed, 70 insertions(+), 9 deletions(-)
+ create mode 100755 test/units/TEST-07-PID1.protect-hostname.sh
+
+diff --git a/man/systemd.exec.xml b/man/systemd.exec.xml
+index 495f17d395310..9fa90a1196361 100644
+--- a/man/systemd.exec.xml
++++ b/man/systemd.exec.xml
+@@ -2062,8 +2062,11 @@ BindReadOnlyPaths=/var/lib/systemd</programlisting>
+       <varlistentry>
+         <term><varname>ProtectHostname=</varname></term>
+ 
+-        <listitem><para>Takes a boolean argument. When set, sets up a new UTS namespace for the executed
+-        processes. In addition, changing hostname or domainname is prevented. Defaults to off.</para>
++        <listitem><para>Takes a boolean argument or <literal>private</literal>. If enabled, sets up a new UTS namespace
++        for the executed processes. If set to a true value, changing hostname or domainname via
++        <function>sethostname()</function> and <function>setdomainname()</function> system calls is prevented. If set to
++        <literal>private</literal>, changing hostname or domainname is allowed but only affects the unit's UTS namespace.
++        Defaults to off.</para>
+ 
+         <para>Note that the implementation of this setting might be impossible (for example if UTS namespaces
+         are not available), and the unit should be written in a way that does not solely rely on this setting
+@@ -2073,6 +2076,12 @@ BindReadOnlyPaths=/var/lib/systemd</programlisting>
+         the system into the service, it is hence not suitable for services that need to take notice of system
+         hostname changes dynamically.</para>
+ 
++        <para>Note that this option does not prevent changing system hostname via <command>hostnamectl</command>.
++        However, <varname>User=</varname> and <varname>Group=</varname> may be used to run as an unprivileged user
++        to disallow changing system hostname. See <function>SetHostname()</function> in
++        <citerefentry project="man-pages"><refentrytitle>org.freedesktop.hostname1</refentrytitle><manvolnum>5</manvolnum></citerefentry>
++        for more details.</para>
++
+         <xi:include href="system-or-user-ns.xml" xpointer="singular"/>
+ 
+         <xi:include href="version-info.xml" xpointer="v242"/></listitem>
+diff --git a/mkosi/mkosi.conf b/mkosi/mkosi.conf
+index ff211f88df907..7f2dc7a3ad5c1 100644
+--- a/mkosi/mkosi.conf
++++ b/mkosi/mkosi.conf
+@@ -96,6 +96,7 @@ Packages=
+         gdb
+         grep
+         gzip
++        hostname
+         jq
+         kbd
+         kexec-tools
+diff --git a/src/core/exec-invoke.c b/src/core/exec-invoke.c
+index cef230815814c..fd5ea67363347 100644
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -1737,15 +1737,17 @@ static int apply_protect_hostname(const ExecContext *c, const ExecParameters *p,
+                                  "support UTS namespaces, ignoring namespace setup.");
+ 
+ #if HAVE_SECCOMP
+-        int r;
++        if (c->protect_hostname == PROTECT_HOSTNAME_YES) {
++                int r;
+ 
+-        if (skip_seccomp_unavailable(c, p, "ProtectHostname="))
+-                return 0;
++                if (skip_seccomp_unavailable(c, p, "ProtectHostname="))
++                        return 0;
+ 
+-        r = seccomp_protect_hostname();
+-        if (r < 0) {
+-                *ret_exit_status = EXIT_SECCOMP;
+-                return log_exec_error_errno(c, p, r, "Failed to apply hostname restrictions: %m");
++                r = seccomp_protect_hostname();
++                if (r < 0) {
++                        *ret_exit_status = EXIT_SECCOMP;
++                        return log_exec_error_errno(c, p, r, "Failed to apply hostname restrictions: %m");
++                }
+         }
+ #endif
+ 
+@@ -3467,6 +3469,9 @@ static int apply_mount_namespace(
+                 .protect_kernel_tunables = needs_sandboxing && context->protect_kernel_tunables,
+                 .protect_kernel_modules = needs_sandboxing && context->protect_kernel_modules,
+                 .protect_kernel_logs = needs_sandboxing && context->protect_kernel_logs,
++                /* Only mount /proc/sys/kernel/hostname and domainname read-only if ProtectHostname=yes. Otherwise, ProtectHostname=no
++                 * allows changing hostname for the host and ProtectHostname=private allows changing the hostname in the unit's UTS
++                 * namespace. */
+                 .protect_hostname = needs_sandboxing && context->protect_hostname == PROTECT_HOSTNAME_YES,
+ 
+                 .private_dev = needs_sandboxing && context->private_devices,
+diff --git a/src/core/namespace.c b/src/core/namespace.c
+index 0f1b4d62bd6fc..ced1021e466b9 100644
+--- a/src/core/namespace.c
++++ b/src/core/namespace.c
+@@ -3320,6 +3320,7 @@ DEFINE_STRING_TABLE_LOOKUP_WITH_BOOLEAN(protect_home, ProtectHome, PROTECT_HOME_
+ static const char *const protect_hostname_table[_PROTECT_HOSTNAME_MAX] = {
+         [PROTECT_HOSTNAME_NO]      = "no",
+         [PROTECT_HOSTNAME_YES]     = "yes",
++        [PROTECT_HOSTNAME_PRIVATE] = "private",
+ };
+ 
+ DEFINE_STRING_TABLE_LOOKUP_WITH_BOOLEAN(protect_hostname, ProtectHostname, PROTECT_HOSTNAME_YES);
+diff --git a/src/core/namespace.h b/src/core/namespace.h
+index d33913749e8d4..7ad4ef002ddb3 100644
+--- a/src/core/namespace.h
++++ b/src/core/namespace.h
+@@ -31,6 +31,7 @@ typedef enum ProtectHome {
+ typedef enum ProtectHostname {
+         PROTECT_HOSTNAME_NO,
+         PROTECT_HOSTNAME_YES,
++        PROTECT_HOSTNAME_PRIVATE,
+         _PROTECT_HOSTNAME_MAX,
+         _PROTECT_HOSTNAME_INVALID = -EINVAL,
+ } ProtectHostname;
+diff --git a/test/units/TEST-07-PID1.protect-hostname.sh b/test/units/TEST-07-PID1.protect-hostname.sh
+new file mode 100755
+index 0000000000000..c2ede395535f5
+--- /dev/null
++++ b/test/units/TEST-07-PID1.protect-hostname.sh
+@@ -0,0 +1,44 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: LGPL-2.1-or-later
++# shellcheck disable=SC2016
++set -eux
++set -o pipefail
++
++# shellcheck source=test/units/test-control.sh
++. "$(dirname "$0")"/test-control.sh
++# shellcheck source=test/units/util.sh
++. "$(dirname "$0")"/util.sh
++
++LEGACY_HOSTNAME="$(hostname)"
++HOSTNAME_FROM_SYSTEMD="$(hostnamectl hostname)"
++
++testcase_yes() {
++    # hostnamectl calls SetHostname method via dbus socket which executes in homenamed
++    # in the init namespace. So hostnamectl is not affected by ProtectHostname=yes or
++    # private since sethostname() system call is executed in the init namespace.
++    #
++    # hostnamed does authentication based on UID via polkit so this guarantees admins
++    # can only set hostname.
++    (! systemd-run --wait -p ProtectHostname=yes hostname foo)
++
++    systemd-run --wait -p ProtectHostname=yes -p PrivateMounts=yes \
++        findmnt --mountpoint /proc/sys/kernel/hostname
++}
++
++testcase_private() {
++    systemd-run --wait -p ProtectHostnameEx=private \
++        -P bash -xec '
++            hostname foo
++            test "$(hostname)" = "foo"
++        '
++
++    # Verify host hostname is unchanged.
++    test "$(hostname)" = "$LEGACY_HOSTNAME"
++    test "$(hostnamectl hostname)" = "$HOSTNAME_FROM_SYSTEMD"
++
++    # Verify /proc/sys/kernel/hostname is not bind mounted from host read-only.
++    (! systemd-run --wait -p ProtectHostnameEx=private -p PrivateMounts=yes \
++        findmnt --mountpoint /proc/sys/kernel/hostname)
++}
++
++run_testcases
+
+From 9f8f91613338458a7fbcf89e321c291f9a691d6c Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Sun, 15 Dec 2024 10:00:06 +0900
+Subject: [PATCH 17/18] core/exec-invoke: fix ProtectHostname= value in log
+ message
+
+Follow-up for cf48bde7aea52b18ac3fa218d3f60fd3d533ef66.
+
+(cherry picked from commit 0d298a771a628e110a8ae9c8ad265b5d3cb28cd2)
+---
+ src/core/exec-invoke.c | 19 +++++++------------
+ 1 file changed, 7 insertions(+), 12 deletions(-)
+
+diff --git a/src/core/exec-invoke.c b/src/core/exec-invoke.c
+index fd5ea67363347..b79ddd2dcaeb9 100644
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -1719,22 +1719,17 @@ static int apply_protect_hostname(const ExecContext *c, const ExecParameters *p,
+                 if (unshare(CLONE_NEWUTS) < 0) {
+                         if (!ERRNO_IS_NOT_SUPPORTED(errno) && !ERRNO_IS_PRIVILEGE(errno)) {
+                                 *ret_exit_status = EXIT_NAMESPACE;
+-                                return log_exec_error_errno(c,
+-                                                            p,
+-                                                            errno,
+-                                                            "Failed to set up UTS namespacing: %m");
++                                return log_exec_error_errno(c, p, errno, "Failed to set up UTS namespacing: %m");
+                         }
+ 
+-                        log_exec_warning(c,
+-                                         p,
+-                                         "ProtectHostname=yes is configured, but UTS namespace setup is "
+-                                         "prohibited (container manager?), ignoring namespace setup.");
++                        log_exec_warning(c, p,
++                                         "ProtectHostname=%s is configured, but UTS namespace setup is prohibited (container manager?), ignoring namespace setup.",
++                                         protect_hostname_to_string(c->protect_hostname));
+                 }
+         } else
+-                log_exec_warning(c,
+-                                 p,
+-                                 "ProtectHostname=yes is configured, but the kernel does not "
+-                                 "support UTS namespaces, ignoring namespace setup.");
++                log_exec_warning(c, p,
++                                 "ProtectHostname=%s is configured, but the kernel does not support UTS namespaces, ignoring namespace setup.",
++                                 protect_hostname_to_string(c->protect_hostname));
+ 
+ #if HAVE_SECCOMP
+         if (c->protect_hostname == PROTECT_HOSTNAME_YES) {
+
+From 8ab76f0095592a6ab345dc58be88b44d3ce560fa Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Sun, 15 Dec 2024 10:36:42 +0900
+Subject: [PATCH 18/18] core: make ProtectHostname= optionally take a hostname
+
+Closes #35623.
+
+(cherry picked from commit e76fcd0e40a6910f4818a374c6a8d854d644ff93)
+---
+ man/org.freedesktop.systemd1.xml            | 13 ++--
+ man/systemd.exec.xml                        | 12 ++--
+ src/core/dbus-execute.c                     | 41 +++++++++---
+ src/core/exec-invoke.c                      | 12 +++-
+ src/core/execute-serialize.c                |  8 +++
+ src/core/execute.c                          |  6 +-
+ src/core/execute.h                          |  1 +
+ src/core/load-fragment-gperf.gperf.in       |  2 +-
+ src/core/load-fragment.c                    | 52 +++++++++++++++-
+ src/shared/bus-unit-util.c                  | 19 +++++-
+ test/units/TEST-07-PID1.protect-hostname.sh | 69 +++++++++++++++++++++
+ 11 files changed, 208 insertions(+), 27 deletions(-)
+
+diff --git a/man/org.freedesktop.systemd1.xml b/man/org.freedesktop.systemd1.xml
+index 3d204a4b69260..f27fafbea0504 100644
+--- a/man/org.freedesktop.systemd1.xml
++++ b/man/org.freedesktop.systemd1.xml
+@@ -3361,7 +3361,7 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b ProtectHostname = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+-      readonly s ProtectHostnameEx = '...';
++      readonly (ss) ProtectHostnameEx = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b MemoryKSM = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+@@ -4892,8 +4892,9 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+       <para><varname>ProtectHostnameEx</varname> implement the destination parameter of the
+       unit file setting <varname>ProtectHostname=</varname> listed in
+       <citerefentry><refentrytitle>systemd.exec</refentrytitle><manvolnum>5</manvolnum></citerefentry>.
+-      Unlike boolean <varname>ProtectHostname</varname>, <varname>ProtectHostnameEx</varname>
+-      is a string type.</para>
++      Unlike boolean <varname>ProtectHostname</varname>, <varname>ProtectHostnameEx</varname> is a pair of
++      strings, the first one is a boolean string or special value <literal>private</literal>, and the second
++      one is an optional private hostname that will be set in a new UTS namespace for the unit.</para>
+     </refsect2>
+   </refsect1>
+ 
+@@ -5561,7 +5562,7 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b ProtectHostname = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+-      readonly s ProtectHostnameEx = '...';
++      readonly (ss) ProtectHostnameEx = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b MemoryKSM = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+@@ -7576,7 +7577,7 @@ node /org/freedesktop/systemd1/unit/home_2emount {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b ProtectHostname = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+-      readonly s ProtectHostnameEx = '...';
++      readonly (ss) ProtectHostnameEx = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b MemoryKSM = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+@@ -9558,7 +9559,7 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b ProtectHostname = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+-      readonly s ProtectHostnameEx = '...';
++      readonly (ss) ProtectHostnameEx = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+       readonly b MemoryKSM = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
+diff --git a/man/systemd.exec.xml b/man/systemd.exec.xml
+index 9fa90a1196361..22ce7d7b369c1 100644
+--- a/man/systemd.exec.xml
++++ b/man/systemd.exec.xml
+@@ -2062,11 +2062,13 @@ BindReadOnlyPaths=/var/lib/systemd</programlisting>
+       <varlistentry>
+         <term><varname>ProtectHostname=</varname></term>
+ 
+-        <listitem><para>Takes a boolean argument or <literal>private</literal>. If enabled, sets up a new UTS namespace
+-        for the executed processes. If set to a true value, changing hostname or domainname via
+-        <function>sethostname()</function> and <function>setdomainname()</function> system calls is prevented. If set to
+-        <literal>private</literal>, changing hostname or domainname is allowed but only affects the unit's UTS namespace.
+-        Defaults to off.</para>
++        <listitem><para>Takes a boolean argument or <literal>private</literal>. If enabled, sets up a new UTS
++        namespace for the executed processes. If enabled, a hostname can be optionally specified following a
++        colon (e.g. <literal>yes:foo</literal> or <literal>private:host.example.com</literal>), and the
++        hostname is set in the new UTS namespace for the unit. If set to a true value, changing hostname or
++        domainname via <function>sethostname()</function> and <function>setdomainname()</function> system
++        calls is prevented. If set to <literal>private</literal>, changing hostname or domainname is allowed
++        but only affects the unit's UTS namespace. Defaults to off.</para>
+ 
+         <para>Note that the implementation of this setting might be impossible (for example if UTS namespaces
+         are not available), and the unit should be written in a way that does not solely rely on this setting
+diff --git a/src/core/dbus-execute.c b/src/core/dbus-execute.c
+index 73483e2480384..61f85aa1569d3 100644
+--- a/src/core/dbus-execute.c
++++ b/src/core/dbus-execute.c
+@@ -13,6 +13,7 @@
+ #include "creds-util.h"
+ #include "dbus-execute.h"
+ #include "dbus-util.h"
++#include "dns-domain.h"
+ #include "env-util.h"
+ #include "errno-list.h"
+ #include "escape.h"
+@@ -21,6 +22,7 @@
+ #include "fd-util.h"
+ #include "fileio.h"
+ #include "hexdecoct.h"
++#include "hostname-util.h"
+ #include "iovec-util.h"
+ #include "ioprio-util.h"
+ #include "journal-file.h"
+@@ -64,7 +66,6 @@ static BUS_DEFINE_PROPERTY_GET_REF(property_get_private_tmp_ex, "s", PrivateTmp,
+ static BUS_DEFINE_PROPERTY_GET_REF(property_get_private_users_ex, "s", PrivateUsers, private_users_to_string);
+ static BUS_DEFINE_PROPERTY_GET_REF(property_get_protect_control_groups_ex, "s", ProtectControlGroups, protect_control_groups_to_string);
+ static BUS_DEFINE_PROPERTY_GET_REF(property_get_private_pids, "s", PrivatePIDs, private_pids_to_string);
+-static BUS_DEFINE_PROPERTY_GET_REF(property_get_protect_hostname_ex, "s", ProtectHostname, protect_hostname_to_string);
+ static BUS_DEFINE_PROPERTY_GET_REF(property_get_syslog_level, "i", int, LOG_PRI);
+ static BUS_DEFINE_PROPERTY_GET_REF(property_get_syslog_facility, "i", int, LOG_FAC);
+ static BUS_DEFINE_PROPERTY_GET(property_get_cpu_affinity_from_numa, "b", ExecContext, exec_context_get_cpu_affinity_from_numa);
+@@ -1084,6 +1085,20 @@ static int property_get_protect_hostname(
+         return sd_bus_message_append_basic(reply, 'b', &b);
+ }
+ 
++static int property_get_protect_hostname_ex(
++                sd_bus *bus,
++                const char *path,
++                const char *interface,
++                const char *property,
++                sd_bus_message *reply,
++                void *userdata,
++                sd_bus_error *error) {
++
++        ExecContext *c = ASSERT_PTR(userdata);
++
++        return sd_bus_message_append(reply, "(ss)", protect_hostname_to_string(c->protect_hostname), c->private_hostname);
++}
++
+ static int property_get_unsigned_as_uint16(
+                 sd_bus *bus,
+                 const char *path,
+@@ -1277,7 +1292,7 @@ const sd_bus_vtable bus_exec_vtable[] = {
+         SD_BUS_PROPERTY("ProtectProc", "s", property_get_protect_proc, offsetof(ExecContext, protect_proc), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("ProcSubset", "s", property_get_proc_subset, offsetof(ExecContext, proc_subset), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("ProtectHostname", "b", property_get_protect_hostname, offsetof(ExecContext, protect_hostname), SD_BUS_VTABLE_PROPERTY_CONST),
+-        SD_BUS_PROPERTY("ProtectHostnameEx", "s", property_get_protect_hostname_ex, offsetof(ExecContext, protect_hostname), SD_BUS_VTABLE_PROPERTY_CONST),
++        SD_BUS_PROPERTY("ProtectHostnameEx", "(ss)", property_get_protect_hostname_ex, 0, SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("MemoryKSM", "b", bus_property_get_tristate, offsetof(ExecContext, memory_ksm), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("NetworkNamespacePath", "s", NULL, offsetof(ExecContext, network_namespace_path), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("IPCNamespacePath", "s", NULL, offsetof(ExecContext, ipc_namespace_path), SD_BUS_VTABLE_PROPERTY_CONST),
+@@ -2045,21 +2060,29 @@ int bus_exec_context_set_transient_property(
+         }
+ 
+         if (streq(name, "ProtectHostnameEx")) {
+-                const char *s;
+-                ProtectHostname t;
++                const char *s, *h = NULL;
+ 
+-                r = sd_bus_message_read(message, "s", &s);
++                r = sd_bus_message_read(message, "(ss)", &s, &h);
+                 if (r < 0)
+                         return r;
+ 
+-                t = protect_hostname_from_string(s);
+-                if (t < 0)
++                if (!isempty(h) && !hostname_is_valid(h, /* flags = */ 0))
++                        return sd_bus_error_setf(error, SD_BUS_ERROR_INVALID_ARGS, "Invalid hostname in %s setting: %s", name, h);
++
++                ProtectHostname t = protect_hostname_from_string(s);
++                if (t < 0 || (t == PROTECT_HOSTNAME_NO && !isempty(h)))
+                         return sd_bus_error_setf(error, SD_BUS_ERROR_INVALID_ARGS, "Invalid %s setting: %s", name, s);
+ 
+                 if (!UNIT_WRITE_FLAGS_NOOP(flags)) {
+                         c->protect_hostname = t;
+-                        (void) unit_write_settingf(u, flags, name, "ProtectHostname=%s",
+-                                                   protect_hostname_to_string(c->protect_hostname));
++                        r = free_and_strdup(&c->private_hostname, empty_to_null(h));
++                        if (r < 0)
++                                return r;
++
++                        (void) unit_write_settingf(u, flags, name, "ProtectHostname=%s%s%s",
++                                                   protect_hostname_to_string(c->protect_hostname),
++                                                   c->private_hostname ? ":" : "",
++                                                   strempty(c->private_hostname));
+                 }
+ 
+                 return 1;
+diff --git a/src/core/exec-invoke.c b/src/core/exec-invoke.c
+index b79ddd2dcaeb9..ae270c125f28d 100644
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -40,6 +40,7 @@
+ #include "exit-status.h"
+ #include "fd-util.h"
+ #include "hexdecoct.h"
++#include "hostname-setup.h"
+ #include "io-util.h"
+ #include "iovec-util.h"
+ #include "journal-send.h"
+@@ -1708,6 +1709,8 @@ static int apply_restrict_filesystems(const ExecContext *c, const ExecParameters
+ #endif
+ 
+ static int apply_protect_hostname(const ExecContext *c, const ExecParameters *p, int *ret_exit_status) {
++        int r;
++
+         assert(c);
+         assert(p);
+         assert(ret_exit_status);
+@@ -1725,6 +1728,13 @@ static int apply_protect_hostname(const ExecContext *c, const ExecParameters *p,
+                         log_exec_warning(c, p,
+                                          "ProtectHostname=%s is configured, but UTS namespace setup is prohibited (container manager?), ignoring namespace setup.",
+                                          protect_hostname_to_string(c->protect_hostname));
++
++                } else if (c->private_hostname) {
++                        r = sethostname_idempotent(c->private_hostname);
++                        if (r < 0) {
++                                *ret_exit_status = EXIT_NAMESPACE;
++                                return log_exec_error_errno(c, p, r, "Failed to set private hostname '%s': %m", c->private_hostname);
++                        }
+                 }
+         } else
+                 log_exec_warning(c, p,
+@@ -1733,8 +1743,6 @@ static int apply_protect_hostname(const ExecContext *c, const ExecParameters *p,
+ 
+ #if HAVE_SECCOMP
+         if (c->protect_hostname == PROTECT_HOSTNAME_YES) {
+-                int r;
+-
+                 if (skip_seccomp_unavailable(c, p, "ProtectHostname="))
+                         return 0;
+ 
+diff --git a/src/core/execute-serialize.c b/src/core/execute-serialize.c
+index 0765d4c142733..0eec9cdf8fdc2 100644
+--- a/src/core/execute-serialize.c
++++ b/src/core/execute-serialize.c
+@@ -1982,6 +1982,10 @@ static int exec_context_serialize(const ExecContext *c, FILE *f) {
+         if (r < 0)
+                 return r;
+ 
++        r = serialize_item(f, "exec-context-private-hostname", c->private_hostname);
++        if (r < 0)
++                return r;
++
+         r = serialize_item(f, "exec-context-protect-proc", protect_proc_to_string(c->protect_proc));
+         if (r < 0)
+                 return r;
+@@ -2890,6 +2894,10 @@ static int exec_context_deserialize(ExecContext *c, FILE *f) {
+                         c->protect_hostname = protect_hostname_from_string(val);
+                         if (c->protect_hostname < 0)
+                                 return -EINVAL;
++                } else if ((val = startswith(l, "exec-context-private-hostname="))) {
++                        r = free_and_strdup(&c->private_hostname, val);
++                        if (r < 0)
++                                return r;
+                 } else if ((val = startswith(l, "exec-context-protect-proc="))) {
+                         c->protect_proc = protect_proc_from_string(val);
+                         if (c->protect_proc < 0)
+diff --git a/src/core/execute.c b/src/core/execute.c
+index 848aa646b161b..33fa206b0e74c 100644
+--- a/src/core/execute.c
++++ b/src/core/execute.c
+@@ -702,6 +702,8 @@ void exec_context_done(ExecContext *c) {
+         c->root_image_policy = image_policy_free(c->root_image_policy);
+         c->mount_image_policy = image_policy_free(c->mount_image_policy);
+         c->extension_image_policy = image_policy_free(c->extension_image_policy);
++
++        c->private_hostname = mfree(c->private_hostname);
+ }
+ 
+ int exec_context_destroy_runtime_directory(const ExecContext *c, const char *runtime_prefix) {
+@@ -1045,7 +1047,7 @@ void exec_context_dump(const ExecContext *c, FILE* f, const char *prefix) {
+                 "%sRestrictRealtime: %s\n"
+                 "%sRestrictSUIDSGID: %s\n"
+                 "%sKeyringMode: %s\n"
+-                "%sProtectHostname: %s\n"
++                "%sProtectHostname: %s%s%s\n"
+                 "%sProtectProc: %s\n"
+                 "%sProcSubset: %s\n",
+                 prefix, c->umask,
+@@ -1072,7 +1074,7 @@ void exec_context_dump(const ExecContext *c, FILE* f, const char *prefix) {
+                 prefix, yes_no(c->restrict_realtime),
+                 prefix, yes_no(c->restrict_suid_sgid),
+                 prefix, exec_keyring_mode_to_string(c->keyring_mode),
+-                prefix, protect_hostname_to_string(c->protect_hostname),
++                prefix, protect_hostname_to_string(c->protect_hostname), c->private_hostname ? ":" : "", strempty(c->private_hostname),
+                 prefix, protect_proc_to_string(c->protect_proc),
+                 prefix, proc_subset_to_string(c->proc_subset));
+ 
+diff --git a/src/core/execute.h b/src/core/execute.h
+index 7630b4ed1bf40..09f30f128f23f 100644
+--- a/src/core/execute.h
++++ b/src/core/execute.h
+@@ -337,6 +337,7 @@ struct ExecContext {
+         ProtectHome protect_home;
+         PrivatePIDs private_pids;
+         ProtectHostname protect_hostname;
++        char *private_hostname;
+ 
+         bool dynamic_user;
+         bool remove_ipc;
+diff --git a/src/core/load-fragment-gperf.gperf.in b/src/core/load-fragment-gperf.gperf.in
+index b807af59c8ec4..099b08f66eba7 100644
+--- a/src/core/load-fragment-gperf.gperf.in
++++ b/src/core/load-fragment-gperf.gperf.in
+@@ -181,7 +181,7 @@
+ {% else %}
+ {{type}}.SmackProcessLabel,                   config_parse_warn_compat,                           DISABLED_CONFIGURATION,             0
+ {% endif %}
+-{{type}}.ProtectHostname,                     config_parse_protect_hostname,                      0,                                  offsetof({{type}}, exec_context.protect_hostname)
++{{type}}.ProtectHostname,                     config_parse_protect_hostname,                      0,                                  offsetof({{type}}, exec_context)
+ {{type}}.MemoryKSM,                           config_parse_tristate,                              0,                                  offsetof({{type}}, exec_context.memory_ksm)
+ {%- endmacro -%}
+ 
+diff --git a/src/core/load-fragment.c b/src/core/load-fragment.c
+index b0ddd67dc9940..bba289d8aff78 100644
+--- a/src/core/load-fragment.c
++++ b/src/core/load-fragment.c
+@@ -40,6 +40,7 @@
+ #include "fs-util.h"
+ #include "fstab-util.h"
+ #include "hexdecoct.h"
++#include "hostname-util.h"
+ #include "iovec-util.h"
+ #include "ioprio-util.h"
+ #include "ip-protocol-list.h"
+@@ -141,7 +142,6 @@ DEFINE_CONFIG_PARSE_ENUM(config_parse_exec_utmp_mode, exec_utmp_mode, ExecUtmpMo
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_job_mode, job_mode, JobMode);
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_notify_access, notify_access, NotifyAccess);
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_protect_home, protect_home, ProtectHome);
+-DEFINE_CONFIG_PARSE_ENUM(config_parse_protect_hostname, protect_hostname, ProtectHostname);
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_protect_system, protect_system, ProtectSystem);
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_exec_preserve_mode, exec_preserve_mode, ExecPreserveMode);
+ DEFINE_CONFIG_PARSE_ENUM(config_parse_service_type, service_type, ServiceType);
+@@ -6754,3 +6754,53 @@ int config_parse_cgroup_nft_set(
+ 
+         return config_parse_nft_set(unit, filename, line, section, section_line, lvalue, ltype, rvalue, &c->nft_set_context, u);
+ }
++
++int config_parse_protect_hostname(
++                const char *unit,
++                const char *filename,
++                unsigned line,
++                const char *section,
++                unsigned section_line,
++                const char *lvalue,
++                int ltype,
++                const char *rvalue,
++                void *data,
++                void *userdata) {
++
++        ExecContext *c = ASSERT_PTR(data);
++        Unit *u = ASSERT_PTR(userdata);
++        _cleanup_free_ char *h = NULL, *p = NULL;
++        int r;
++
++        if (isempty(rvalue)) {
++                c->protect_hostname = PROTECT_HOSTNAME_NO;
++                c->private_hostname = mfree(c->private_hostname);
++                return 1;
++        }
++
++        const char *colon = strchr(rvalue, ':');
++        if (colon) {
++                r = unit_full_printf_full(u, colon + 1, HOST_NAME_MAX, &h);
++                if (r < 0) {
++                        log_syntax(unit, LOG_WARNING, filename, line, r,
++                                   "Failed to resolve unit specifiers in '%s', ignoring: %m", colon + 1);
++                        return 0;
++                }
++
++                if (!hostname_is_valid(h, /* flags = */ 0))
++                        return log_syntax(unit, LOG_WARNING, filename, line, 0,
++                                          "Invalid hostname is specified to %s=, ignoring: %s", lvalue, h);
++
++                p = strndup(rvalue, colon - rvalue);
++                if (!p)
++                        return log_oom();
++        }
++
++        ProtectHostname t = protect_hostname_from_string(p ?: rvalue);
++        if (t < 0 || (t == PROTECT_HOSTNAME_NO && h))
++                return log_syntax_parse_error(unit, filename, line, 0, lvalue, rvalue);
++
++        c->protect_hostname = t;
++        free_and_replace(c->private_hostname, h);
++        return 1;
++}
+diff --git a/src/shared/bus-unit-util.c b/src/shared/bus-unit-util.c
+index c11010935711b..7120417228050 100644
+--- a/src/shared/bus-unit-util.c
++++ b/src/shared/bus-unit-util.c
+@@ -1045,7 +1045,6 @@ static int bus_append_execute_property(sd_bus_message *m, const char *field, con
+                               "SyslogIdentifier",
+                               "ProtectSystem",
+                               "ProtectHome",
+-                              "ProtectHostnameEx",
+                               "PrivateTmpEx",
+                               "PrivateUsersEx",
+                               "ProtectControlGroupsEx",
+@@ -2274,6 +2273,24 @@ static int bus_append_execute_property(sd_bus_message *m, const char *field, con
+                 return 1;
+         }
+ 
++        if (streq(field, "ProtectHostnameEx")) {
++                const char *colon = strchr(eq, ':');
++                if (colon) {
++                        if (isempty(colon + 1))
++                                return log_error_errno(SYNTHETIC_ERRNO(EINVAL), "Failed to parse argument: %s=%s", field, eq);
++
++                        _cleanup_free_ char *p = strndup(eq, colon - eq);
++                        if (!p)
++                                return -ENOMEM;
++
++                        r = sd_bus_message_append(m, "(sv)", field, "(ss)", p, colon + 1);
++                } else
++                        r = sd_bus_message_append(m, "(sv)", field, "(ss)", eq, NULL);
++                if (r < 0)
++                        return bus_log_create_error(r);
++
++                return 1;
++        }
+         return 0;
+ }
+ 
+diff --git a/test/units/TEST-07-PID1.protect-hostname.sh b/test/units/TEST-07-PID1.protect-hostname.sh
+index c2ede395535f5..10d448b80debf 100755
+--- a/test/units/TEST-07-PID1.protect-hostname.sh
++++ b/test/units/TEST-07-PID1.protect-hostname.sh
+@@ -21,6 +21,33 @@ testcase_yes() {
+     # can only set hostname.
+     (! systemd-run --wait -p ProtectHostname=yes hostname foo)
+ 
++    # ProtectHostname=yes can optionally take a hostname.
++    systemd-run --wait -p ProtectHostnameEx=yes:hoge \
++        -P bash -xec '
++            test "$(hostname)" = "hoge"
++            (! hostname foo)
++            test "$(hostname)" = "hoge"
++        '
++
++    # Verify host hostname is unchanged.
++    test "$(hostname)" = "$LEGACY_HOSTNAME"
++    test "$(hostnamectl hostname)" = "$HOSTNAME_FROM_SYSTEMD"
++
++    # ProtectHostname= supportes specifiers.
++    mkdir -p /run/systemd/system/
++    cat >/run/systemd/system/test-protect-hostname-yes@.service <<EOF
++[Service]
++Type=oneshot
++ExecStart=bash -xec 'test "\$\$(hostname)" = "%i"; (! hostname foo); test "\$\$(hostname)" = "%i"'
++ProtectHostname=yes:%i
++EOF
++    systemctl daemon-reload
++    systemctl start --wait test-protect-hostname-yes@hoge.example.com.service
++
++    # Verify host hostname is unchanged.
++    test "$(hostname)" = "$LEGACY_HOSTNAME"
++    test "$(hostnamectl hostname)" = "$HOSTNAME_FROM_SYSTEMD"
++
+     systemd-run --wait -p ProtectHostname=yes -p PrivateMounts=yes \
+         findmnt --mountpoint /proc/sys/kernel/hostname
+ }
+@@ -36,9 +63,51 @@ testcase_private() {
+     test "$(hostname)" = "$LEGACY_HOSTNAME"
+     test "$(hostnamectl hostname)" = "$HOSTNAME_FROM_SYSTEMD"
+ 
++    # ProtectHostname=private can optionally take a hostname.
++    systemd-run --wait -p ProtectHostnameEx=private:hoge \
++        -P bash -xec '
++            test "$(hostname)" = "hoge"
++            hostname foo
++            test "$(hostname)" = "foo"
++        '
++
++    # Verify host hostname is unchanged.
++    test "$(hostname)" = "$LEGACY_HOSTNAME"
++    test "$(hostnamectl hostname)" = "$HOSTNAME_FROM_SYSTEMD"
++
++    # ProtectHostname= supportes specifiers.
++    mkdir -p /run/systemd/system/
++    cat >/run/systemd/system/test-protect-hostname-private@.service <<EOF
++[Service]
++Type=oneshot
++ExecStart=bash -xec 'test "\$\$(hostname)" = "%i"; hostname foo; test "\$\$(hostname)" = "foo"'
++ProtectHostname=private:%i
++EOF
++    systemctl daemon-reload
++    systemctl start --wait test-protect-hostname-private@hoge.example.com.service
++
++    # Verify host hostname is unchanged.
++    test "$(hostname)" = "$LEGACY_HOSTNAME"
++    test "$(hostnamectl hostname)" = "$HOSTNAME_FROM_SYSTEMD"
++
+     # Verify /proc/sys/kernel/hostname is not bind mounted from host read-only.
+     (! systemd-run --wait -p ProtectHostnameEx=private -p PrivateMounts=yes \
+         findmnt --mountpoint /proc/sys/kernel/hostname)
+ }
+ 
++testcase_invalid() {
++    # ProtectHostname=no cannot take hostname.
++    (! systemd-run --wait -p ProtectHostnameEx=no:hoge true)
++
++    # Invalid hostname.
++    (! systemd-run --wait -p ProtectHostnameEx=yes: true)
++    (! systemd-run --wait -p ProtectHostnameEx=yes:.foo true)
++    (! systemd-run --wait -p ProtectHostnameEx=yes:foo.-example.com true)
++    (! systemd-run --wait -p ProtectHostnameEx=yes:foo..example.com true)
++    (! systemd-run --wait -p ProtectHostnameEx=private: true)
++    (! systemd-run --wait -p ProtectHostnameEx=private:.foo true)
++    (! systemd-run --wait -p ProtectHostnameEx=private:foo.-example.com true)
++    (! systemd-run --wait -p ProtectHostnameEx=private:foo..example.com true)
++}
++
+ run_testcases
