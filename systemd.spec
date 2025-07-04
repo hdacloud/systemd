@@ -136,6 +136,9 @@ Patch:          https://github.com/systemd/systemd/pull/30846.patch
 # https://github.com/systemd/systemd/pull/37040/commits/6d47c16ce0b82996b575327ca9c1e361bcd251b0
 Patch:          https://github.com/systemd/systemd/pull/37859.patch
 
+# Backport systemd-networkd-varlink.socket to avoid dropping the socket when networkd restarts
+Patch:          https://github.com/systemd/systemd/pull/38067.patch
+
 %endif
 
 # Meta specific backports
