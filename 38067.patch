@@ -1,0 +1,240 @@
+From dd10e404c9130102fba596eba2237c4e2b464e10 Mon Sep 17 00:00:00 2001
+From: Ivan Kruglov <mail@ikruglov.com>
+Date: Fri, 4 Jul 2025 06:45:54 -0700
+Subject: [PATCH] network: Add varlink socket unit
+
+backport of https://github.com/systemd/systemd/pull/37991
+---
+ src/network/networkd-manager-varlink.c     | 12 ++++++++---
+ src/network/networkd-manager-varlink.h     |  2 +-
+ src/network/networkd-manager.c             | 20 +++++++++++------
+ test/units/TEST-74-AUX-UTILS.varlinkctl.sh |  5 +++++
+ units/meson.build                          |  4 ++++
+ units/systemd-networkd-varlink.socket      | 25 ++++++++++++++++++++++
+ units/systemd-networkd.service.in          |  7 +++---
+ 7 files changed, 62 insertions(+), 13 deletions(-)
+ create mode 100644 units/systemd-networkd-varlink.socket
+
+diff --git a/src/network/networkd-manager-varlink.c b/src/network/networkd-manager-varlink.c
+index 546dae0739ed3..18d3e4449e34f 100644
+--- a/src/network/networkd-manager-varlink.c
++++ b/src/network/networkd-manager-varlink.c
+@@ -262,8 +262,9 @@ static int on_connect(sd_varlink_server *s, sd_varlink *vlink, void *userdata) {
+         return 0;
+ }
+ 
+-int manager_connect_varlink(Manager *m) {
++int manager_connect_varlink(Manager *m, int fd) {
+         _cleanup_(sd_varlink_server_unrefp) sd_varlink_server *s = NULL;
++        _unused_ _cleanup_close_ int fd_close = fd;
+         int r;
+ 
+         assert(m);
+@@ -290,10 +291,16 @@ int manager_connect_varlink(Manager *m) {
+         if (r < 0)
+                 return log_error_errno(r, "Failed to register varlink methods: %m");
+ 
+-        r = sd_varlink_server_listen_address(s, "/run/systemd/netif/io.systemd.Network", 0666);
++        if (fd < 0)
++                r = sd_varlink_server_listen_address(s, "/run/systemd/netif/io.systemd.Network", /* mode= */ 0666);
++        else
++                r = sd_varlink_server_listen_fd(s, fd);
++
+         if (r < 0)
+                 return log_error_errno(r, "Failed to bind to varlink socket: %m");
+ 
++        TAKE_FD(fd_close);
++
+         r = sd_varlink_server_attach_event(s, m->event, SD_EVENT_PRIORITY_NORMAL);
+         if (r < 0)
+                 return log_error_errno(r, "Failed to attach varlink connection to event loop: %m");
+@@ -310,5 +317,4 @@ void manager_varlink_done(Manager *m) {
+         assert(m);
+ 
+         m->varlink_server = sd_varlink_server_unref(m->varlink_server);
+-        (void) unlink("/run/systemd/netif/io.systemd.Network");
+ }
+diff --git a/src/network/networkd-manager-varlink.h b/src/network/networkd-manager-varlink.h
+index 46078a81d9bab..0f11da9b22c19 100644
+--- a/src/network/networkd-manager-varlink.h
++++ b/src/network/networkd-manager-varlink.h
+@@ -3,5 +3,5 @@
+ 
+ #include "networkd-manager.h"
+ 
+-int manager_connect_varlink(Manager *m);
++int manager_connect_varlink(Manager *m, int fd);
+ void manager_varlink_done(Manager *m);
+diff --git a/src/network/networkd-manager.c b/src/network/networkd-manager.c
+index 9290255ad06af..5c397f34312f7 100644
+--- a/src/network/networkd-manager.c
++++ b/src/network/networkd-manager.c
+@@ -219,12 +219,13 @@ static int manager_connect_udev(Manager *m) {
+         return 0;
+ }
+ 
+-static int manager_listen_fds(Manager *m, int *ret_rtnl_fd) {
++static int manager_listen_fds(Manager *m, int *ret_rtnl_fd, int *ret_varlink_fd) {
+         _cleanup_strv_free_ char **names = NULL;
+-        int n, rtnl_fd = -EBADF;
++        int n, rtnl_fd = -EBADF, varlink_fd = -EBADF;
+ 
+         assert(m);
+         assert(ret_rtnl_fd);
++        assert(ret_varlink_fd);
+ 
+         n = sd_listen_fds_with_names(/* unset_environment = */ true, &names);
+         if (n < 0)
+@@ -238,7 +239,7 @@ static int manager_listen_fds(Manager *m, int *ret_rtnl_fd) {
+ 
+                 if (sd_is_socket(fd, AF_NETLINK, SOCK_RAW, -1) > 0) {
+                         if (rtnl_fd >= 0) {
+-                                log_debug("Received multiple netlink socket, ignoring.");
++                                log_debug("Received multiple netlink sockets, ignoring.");
+                                 goto unused;
+                         }
+ 
+@@ -246,6 +247,11 @@ static int manager_listen_fds(Manager *m, int *ret_rtnl_fd) {
+                         continue;
+                 }
+ 
++                if (streq(names[i], "varlink")) {
++                        varlink_fd = fd;
++                        continue;
++                }
++
+                 if (manager_set_serialization_fd(m, fd, names[i]) >= 0)
+                         continue;
+ 
+@@ -260,6 +266,8 @@ static int manager_listen_fds(Manager *m, int *ret_rtnl_fd) {
+         }
+ 
+         *ret_rtnl_fd = rtnl_fd;
++        *ret_varlink_fd = varlink_fd;
++
+         return 0;
+ }
+ 
+@@ -529,7 +537,7 @@ static int manager_set_keep_configuration(Manager *m) {
+ }
+ 
+ int manager_setup(Manager *m) {
+-        _cleanup_close_ int rtnl_fd = -EBADF;
++        _cleanup_close_ int rtnl_fd = -EBADF, varlink_fd = -EBADF;
+         int r;
+ 
+         assert(m);
+@@ -553,7 +561,7 @@ int manager_setup(Manager *m) {
+         if (r < 0)
+                 return r;
+ 
+-        r = manager_listen_fds(m, &rtnl_fd);
++        r = manager_listen_fds(m, &rtnl_fd, &varlink_fd);
+         if (r < 0)
+                 return r;
+ 
+@@ -568,7 +576,7 @@ int manager_setup(Manager *m) {
+         if (m->test_mode)
+                 return 0;
+ 
+-        r = manager_connect_varlink(m);
++        r = manager_connect_varlink(m, TAKE_FD(varlink_fd));
+         if (r < 0)
+                 return r;
+ 
+diff --git a/test/units/TEST-74-AUX-UTILS.varlinkctl.sh b/test/units/TEST-74-AUX-UTILS.varlinkctl.sh
+index a0797469a46cb..2cca31336b634 100755
+--- a/test/units/TEST-74-AUX-UTILS.varlinkctl.sh
++++ b/test/units/TEST-74-AUX-UTILS.varlinkctl.sh
+@@ -66,6 +66,11 @@ if [[ -x /usr/lib/systemd/systemd-pcrextend ]]; then
+     varlinkctl introspect /usr/lib/systemd/systemd-pcrextend
+ fi
+ 
++# Test various varlink socket units to make sure that we can still connect to the varlink sockets even if the
++# services are currently stopped (or restarting).
++systemctl stop systemd-networkd.service
++varlinkctl introspect /run/systemd/netif/io.systemd.Network
++
+ # SSH transport
+ SSHBINDIR="$(mktemp -d)"
+ 
+diff --git a/units/meson.build b/units/meson.build
+index 96f48527419e2..c1c76ce9b80cd 100644
+--- a/units/meson.build
++++ b/units/meson.build
+@@ -450,6 +450,10 @@ units = [
+           'file' : 'systemd-networkd-persistent-storage.service',
+           'conditions' : ['ENABLE_NETWORKD'],
+         },
++        {
++          'file' : 'systemd-networkd-varlink.socket',
++          'conditions' : ['ENABLE_NETWORKD'],
++        },
+         {
+           'file' : 'systemd-networkd-wait-online.service.in',
+           'conditions' : ['ENABLE_NETWORKD'],
+diff --git a/units/systemd-networkd-varlink.socket b/units/systemd-networkd-varlink.socket
+new file mode 100644
+index 0000000000000..0f2304ff4904e
+--- /dev/null
++++ b/units/systemd-networkd-varlink.socket
+@@ -0,0 +1,25 @@
++#  SPDX-License-Identifier: LGPL-2.1-or-later
++#
++#  This file is part of systemd.
++#
++#  systemd is free software; you can redistribute it and/or modify it
++#  under the terms of the GNU Lesser General Public License as published by
++#  the Free Software Foundation; either version 2.1 of the License, or
++#  (at your option) any later version.
++
++[Unit]
++Description=Network Service Varlink Socket
++Documentation=man:systemd-networkd.service(8)
++ConditionCapability=CAP_NET_ADMIN
++DefaultDependencies=no
++Before=sockets.target shutdown.target
++Conflicts=shutdown.target
++
++[Socket]
++ListenStream=/run/systemd/netif/io.systemd.Network
++FileDescriptorName=varlink
++SocketMode=0666
++Service=systemd-networkd.service
++
++[Install]
++WantedBy=sockets.target
+diff --git a/units/systemd-networkd.service.in b/units/systemd-networkd.service.in
+index cf81c7d841b15..b8451a5ad822b 100644
+--- a/units/systemd-networkd.service.in
++++ b/units/systemd-networkd.service.in
+@@ -14,10 +14,10 @@ Documentation=man:org.freedesktop.network1(5)
+ ConditionCapability=CAP_NET_ADMIN
+ DefaultDependencies=no
+ # systemd-udevd.service can be dropped once tuntap is moved to netlink
+-After=systemd-networkd.socket systemd-udevd.service network-pre.target systemd-sysusers.service systemd-sysctl.service
++After=systemd-udevd.service network-pre.target systemd-sysusers.service systemd-sysctl.service
+ Before=network.target multi-user.target shutdown.target initrd-switch-root.target
+ Conflicts=shutdown.target initrd-switch-root.target
+-Wants=systemd-networkd.socket network.target systemd-networkd-persistent-storage.service
++Wants=network.target systemd-networkd-persistent-storage.service
+ 
+ [Service]
+ AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_BROADCAST CAP_NET_RAW CAP_BPF CAP_SYS_ADMIN
+@@ -46,6 +46,7 @@ RestrictRealtime=yes
+ RestrictSUIDSGID=yes
+ RuntimeDirectory=systemd/netif
+ RuntimeDirectoryPreserve=yes
++Sockets=systemd-networkd.socket systemd-networkd-varlink.socket
+ SystemCallArchitectures=native
+ SystemCallErrorNumber=EPERM
+ SystemCallFilter=@system-service bpf
+@@ -55,7 +56,7 @@ User=systemd-network
+ 
+ [Install]
+ WantedBy=multi-user.target
+-Also=systemd-networkd.socket
++Also=systemd-networkd.socket systemd-networkd-varlink.socket
+ Alias=dbus-org.freedesktop.network1.service
+ 
+ # The output from this generator is used by udevd and networkd. Enable it by

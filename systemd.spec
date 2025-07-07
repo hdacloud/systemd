@@ -46,11 +46,11 @@ Url:            https://systemd.io
 # But don't do that on OBS, otherwise the version subst fails, and will be
 # like 257-123-gabcd257.1 instead of 257-123-gabcd
 %if %{without obs}
-Version:        %{?version_override}%{!?version_override:257.6}
+Version:        %{?version_override}%{!?version_override:257.7}
 %else
 Version:        %{?version_override}%{!?version_override:%(cat meson.version)}
 %endif
-Release:        %{?release_override}%{!?release_override:1.2}%{?dist}
+Release:        %{?release_override}%{!?release_override:1.1}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -136,6 +136,16 @@ Patch:          https://github.com/systemd/systemd/pull/30846.patch
 # https://github.com/systemd/systemd/pull/37040/commits/6d47c16ce0b82996b575327ca9c1e361bcd251b0
 Patch:          https://github.com/systemd/systemd/pull/37859.patch
 
+# Avoid blocking on writting to memory.max or memory.high
+# https://github.com/systemd/systemd/pull/37211
+Patch: https://github.com/systemd/systemd/pull/37868.patch
+
+# Backport systemd-networkd-varlink.socket to avoid dropping the socket when networkd restarts
+Patch:          https://github.com/systemd/systemd/pull/38067.patch
+
+# Backport DelegateNamespaces= and other relevant features
+Patch:          https://github.com/systemd/systemd/pull/38073.patch
+
 %endif
 
 # Meta specific backports
@@ -146,10 +156,6 @@ Patch:          https://github.com/systemd/systemd/pull/37859.patch
 
 # pam_systemd: Make pam_systemd 256 backwards compatible to logind 255
 Patch: 0001-pam_systemd-Make-pam_systemd-256-backwards-compatibl.patch
-
-# Avoid blocking on writting to memory.max or memory.high
-# https://github.com/systemd/systemd/pull/37211
-Patch: https://github.com/systemd/systemd/pull/37868.patch
 
 %endif
 
