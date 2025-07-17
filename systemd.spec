@@ -150,18 +150,15 @@ Patch:          https://github.com/systemd/systemd/pull/38073.patch
 
 # Meta specific backports
 
-%if 0%{?facebook}
-
-%if %{without upstream}
+# without upstream: 1000-1499
 
 # pam_systemd: Make pam_systemd 256 backwards compatible to logind 255
-Patch: 0001-pam_systemd-Make-pam_systemd-256-backwards-compatibl.patch
+Patch1000: 0001-pam_systemd-Make-pam_systemd-256-backwards-compatibl.patch
 
-%endif
+# with upstream: 1500-1999
 
 # bump networkd netlink timeout to infinity
-Patch: FB_only_bump_netlink_timeout_to_infinity.patch
-%endif
+Patch1500: FB_only_bump_netlink_timeout_to_infinity.patch
 
 %ifarch %{ix86} x86_64 aarch64 riscv64
 %global want_bootloader 1
@@ -757,12 +754,26 @@ main systemd package and is meant for use in exitrds.
 
 %prep
 %if %{defined branch}
-%autosetup -n %{name}-%{branch} -p1
+%autosetup -n %{name}-%{branch} -N
 %elif %{defined commit}
-%autosetup -n %{name}-%{commit} -p1
+%autosetup -n %{name}-%{commit} -N
 %else
-%autosetup -n %{name}-%{version} -p1
+%autosetup -n %{name}-%{version} -N
 %endif
+
+# Apply common patches
+%autopatch -p1 -M 999
+
+%if 0%{?facebook}
+
+%if %{without upstream}
+%autopatch -p1 -m 1000 -M 1499
+%endif
+
+%autopatch -p1 -m 1500 -M 1999
+%endif
+
+
 
 # Disable user lockdown until rpm implements it natively.
 # https://github.com/rpm-software-management/rpm/issues/3450
