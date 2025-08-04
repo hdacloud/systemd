@@ -125,6 +125,10 @@ def get_task_id(output: str) -> str:
     return ""
 
 
+def cleanup_git_tag_or_commit(val: str) -> str:
+    return val.replace("~", "-")
+
+
 def update_spec_for_head_build(args: argparse.Namespace, original_systemd_spec: Path, latest_sha: str) -> Path:
     # we're building upstream HEAD.
     # Hence going to ignore all version/release/etc in the spec file.
@@ -548,7 +552,7 @@ def do_publish(args: argparse.Namespace) -> None:
         artifacts_dir = args.git_dir / "artifacts"
         artifacts_dir.mkdir(exist_ok=True)
 
-        git_tag = package.replace("~", "-")  # TODO need comes up with a standard
+        git_tag = cleanup_git_tag_or_commit(package)
         tag_file = artifacts_dir / f"{git_tag}-tag.txt"
         logging.info("")
         logging.info(f"Dumping git_tag {git_tag} to {tag_file}")
@@ -633,6 +637,7 @@ def do_unpack(args: argparse.Namespace) -> None:
     else:
         git_source_tag_or_commit = "v" + output
 
+    git_source_tag_or_commit = cleanup_git_tag_or_commit(git_source_tag_or_commit)
     logging.info(f"systemd source tag/commit to apply patches on top: {git_source_tag_or_commit}")
 
     git_unpacked_tag = rpm_query(srcrpm, "%{name}-%{version}-%{release}")
