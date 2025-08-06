@@ -66,19 +66,32 @@ systemd:test:
       allow_failure: false
   interruptible: true
 
-systemd:publish:
+.publish:
   stage: publish
   extends: .fedora
   dependencies:
     - systemd:build
   script:
     - export TASK_ID=$(find . -name "*-task-id.txt" -exec cat {} \; -quit); echo "$TASK_ID"; test -n "$TASK_ID"
-    - ./releng.py $DRY_RUN --cert "$CENTOS_CERT" publish --repo "$REPO" --release "$RELEASE" --task-id "$TASK_ID" --publish-repo "$DO_PUBLISH"
+    - export PUBLISH_REPO=$(test "$DO_PUBLISH" == "release" && echo "release" || echo "testing"); echo "$PUBLISH_REPO"; test -n "$PUBLISH_REPO"
+    - ./releng.py $DRY_RUN --cert "$CENTOS_CERT" publish --repo "$REPO" --release "$RELEASE" --task-id "$TASK_ID" --publish-repo "$PUBLISH_REPO"
+  interruptible: true
+
+systemd:publish:
+  extends: .publish
   rules:
     - if: $DO_PUBLISH != 'false'
-  interruptible: true
   artifacts:
     paths: [ 'artifacts/*-tag.txt' ]
+
+systemd:publish:dry-run:
+  extends: .publish
+  variables:
+    DO_DRY_RUN: 'true'
+  rules:
+    - if: $DO_PUBLISH_DRY_RUN == 'true'
+    - if: $DO_PUBLISH_DRY_RUN == 'no-wait'
+      needs: [ 'systemd:build' ] # allows proceeding without waiting previous steps
 
 systemd:tag:
   stage: tag

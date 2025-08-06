@@ -43,6 +43,7 @@ mr:
     DO_UNPACK: "manual"
     DO_PUBLISH: "false"
     DO_RPM_EXTRA_INFO: "true"
+    DO_PUBLISH_DRY_RUN: "no-wait"
   trigger:
     include: .gitlab-child-ci.yml
     strategy: depend
