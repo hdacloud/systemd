@@ -475,6 +475,7 @@ def do_build(args: argparse.Namespace) -> None:
     )
 
     if args.dry_run:
+        logging.info("Exiting early due to --dry-run")
         return
 
     # explicetly not using logging.*
