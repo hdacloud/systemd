@@ -23,6 +23,7 @@ workflow:
     - test -n "$DO_PUBLISH"; echo "$DO_PUBLISH"
     - test -n "$DO_TEST"; echo "$DO_TEST"
     - test -n "$DO_UNPACK"; echo "$DO_UNPACK"
+    - export DRY_RUN=$(test "$DO_DRY_RUN" == "true" && echo "--dry-run" || echo "--no-dry-run"); echo "$DRY_RUN"; test -n "$DRY_RUN"
     - env
 
     # install necessary packages
@@ -34,7 +35,7 @@ systemd:build:
   script:
     - export SCRATCH=$(test "$DO_PUBLISH" == "false" && echo "--scratch" || echo "--no-scratch"); echo "$SCRATCH"; test -n "$SCRATCH"
     - export RPM_EXTRA_INFO=$(test "$DO_RPM_EXTRA_INFO" == "true" && echo "--rpm-extra-info=mr${CI_MERGE_REQUEST_IID}"); echo "$RPM_EXTRA_INFO"
-    - ./releng.py --cert "$CENTOS_CERT" build --repo "$REPO" --release "$RELEASE" --source "$SOURCE" $SCRATCH $RPM_EXTRA_INFO
+    - ./releng.py $DRY_RUN --cert "$CENTOS_CERT" build --repo "$REPO" --release "$RELEASE" --source "$SOURCE" $SCRATCH $RPM_EXTRA_INFO
   rules:
     - when: always
   interruptible: true
@@ -72,7 +73,7 @@ systemd:publish:
     - systemd:build
   script:
     - export TASK_ID=$(find . -name "*-task-id.txt" -exec cat {} \; -quit); echo "$TASK_ID"; test -n "$TASK_ID"
-    - ./releng.py --cert "$CENTOS_CERT" publish --repo "$REPO" --release "$RELEASE" --task-id "$TASK_ID" --publish-repo "$DO_PUBLISH"
+    - ./releng.py $DRY_RUN --cert "$CENTOS_CERT" publish --repo "$REPO" --release "$RELEASE" --task-id "$TASK_ID" --publish-repo "$DO_PUBLISH"
   rules:
     - if: $DO_PUBLISH != 'false'
   interruptible: true
@@ -103,7 +104,7 @@ systemd:unpack:
     - systemd:build
   script:
     - export TASK_ID=$(find . -name "*-task-id.txt" -exec cat {} \; -quit); echo "$TASK_ID"; test -n "$TASK_ID"
-    - ./releng.py unpack --repo "$REPO" --release "$RELEASE" --task-id "$TASK_ID"
+    - ./releng.py $DRY_RUN unpack --repo "$REPO" --release "$RELEASE" --task-id "$TASK_ID"
   rules:
     - if: $DO_UNPACK == 'true'
       allow_failure: false
