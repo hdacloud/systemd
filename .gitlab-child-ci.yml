@@ -110,7 +110,7 @@ systemd:tag:
     - if: $DO_PUBLISH == 'release'
   interruptible: false # tagging should complete if results are published
 
-systemd:unpack:
+.unpack:
   stage: unpack
   extends: .fedora
   dependencies:
@@ -118,10 +118,22 @@ systemd:unpack:
   script:
     - export TASK_ID=$(find . -name "*-task-id.txt" -exec cat {} \; -quit); echo "$TASK_ID"; test -n "$TASK_ID"
     - ./releng.py $DRY_RUN unpack --repo "$REPO" --release "$RELEASE" --task-id "$TASK_ID"
+  interruptible: true
+
+systemd:unpack:
+  extends: .unpack
   rules:
     - if: $DO_UNPACK == 'true'
       allow_failure: false
     - if: $DO_UNPACK == 'manual'
       when: manual
       allow_failure: true # this is necessary to let pipeline completing without waiting for this job
-  interruptible: true
+
+systemd:unpack:dry-run:
+  extends: .unpack
+  variables:
+    DO_DRY_RUN: "true"
+  rules:
+    - if: $DO_UNPACK_DRY_RUN == 'true'
+    - if: $DO_UNPACK_DRY_RUN == 'no-wait'
+      needs: [ 'systemd:build' ] # allows proceeding without waiting previous steps
