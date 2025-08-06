@@ -801,6 +801,9 @@ def main() -> None:
         die("The verb must be run from the rpm git repository")
 
     try:
+        if not args.verb:
+            die("Need verb")
+
         func = {
             "build": do_build,
             "publish": do_publish,
