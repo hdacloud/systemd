@@ -763,6 +763,12 @@ main systemd package and is meant for use in exitrds.
 
 %if 0%{?facebook}
 
+###
+### ATTENTION!
+### IF changing conditions below you need to also update
+### do_unpack() function in releng.py
+###
+
 %if %{without upstream}
 %autopatch -p1 -m 1000 -M 1499
 %endif
