@@ -160,6 +160,12 @@ def update_spec_for_head_build(args: argparse.Namespace, original_systemd_spec: 
     release_extra = f".{args.rpm_extra_info}" if args.scratch and args.rpm_extra_info else ""
     release = f"{release_date}{release_extra}"
 
+    #####################################################################################
+    # !!!IMPORTANT!!!                                                                   #
+    # do_unpack (and maybe later others) searches for '%bcond upstream 1' in spec file  #
+    # to distinguish head from spec builds.                                             #
+    # Look for is_specfile_head_build()                                                 #
+    #####################################################################################
     logging.info(f"Modifing {systemd_spec} with version={version} release={release} commit={latest_sha}")
     systemd_spec.write_text(
         textwrap.dedent(
@@ -580,6 +586,16 @@ def download_and_validate_src_rpm(args: argparse.Namespace) -> Path:
     return srcrpms[0]
 
 
+def unpack_src_rpm(srcrpm: Path) -> Path:
+    logging.info(f"Unpacking {srcrpm}")
+    with open(f"{srcrpm}.tar", "w") as rpmtar:
+        # rpm2cpio rejects to create tar file itself when runs in a gitlab runner
+        run(["rpm2cpio", f"{srcrpm}"], stdout=rpmtar)
+
+    run(["cpio", "--extract", "--make-directories", "--file", f"{srcrpm}.tar", *(["--verbose"] if need_verbose() else [])])
+    return Path.cwd()
+
+
 def rpm_query(rpm: Path, query: str) -> str:
     return run(
         [
@@ -593,6 +609,80 @@ def rpm_query(rpm: Path, query: str) -> str:
     ).stdout.strip()
 
 
+def is_specfile_head_build(systemd_spec: Path) -> bool:
+    lines = systemd_spec.read_text().splitlines()
+    for line in lines:
+        if line.strip() == '%bcond upstream 1':
+            return True
+
+    return False
+
+
+def should_apply_patch(args: argparse.Namespace, systemd_spec: Path, patch: Path) -> bool:
+    # The function duplicates conditional patching in systemd.spec
+    #
+    # %autopatch -p1 -M 999
+    #
+    # %if 0%{?facebook}
+    #
+    # %if %{without upstream}
+    # %autopatch -p1 -m 1000 -M 1499
+    # %endif
+    #
+    # %autopatch -p1 -m 1500 -M 1999
+    # %endif
+    #
+    # In other words:
+    # 1. apply patches <= 999 for all builds
+    # 2. apply patches [1000..1499] (inclusive) for facebook spec builds
+    #    as in: a patches is already in HEAD but we want to backport it.
+    # 3. apply 1000+ patches for all facebook builds
+
+    systemd_spec_lines = systemd_spec.read_text().splitlines()
+    lines = [line for line in systemd_spec_lines if patch.name in line]
+
+    patch_number = 0  # if no matches found, apply patch
+    for line in lines:
+        match = re.match(r'^Patch([0-9]+)?:\s+', line)
+        if match and match.group(1):
+            patch_number = int(match.group(1))
+            break
+
+    logging.debug(f"Patch{patch_number}: {patch}")
+    if patch_number < 1000:
+        return True
+
+    # I intentiaonally make this if conditions to be 1:1
+    # maping to systemd.spec rules.
+    if args.repo == "facebook":
+        if not is_specfile_head_build(systemd_spec):  # without upstream
+            if patch_number >= 1000 and patch_number <= 1499:
+                return True
+
+        if patch_number >= 1500 and patch_number <= 1999:
+            return True
+
+    return False
+
+
+def filter_and_validate_patches(args: argparse.Namespace, systemd_spec: Path, patches: list[Path]) -> list[Path]:
+        logging.info(f"Found {len(patches)} patches")
+        result: list[Path] = []
+
+        for patch in patches:
+            if not should_apply_patch(args, systemd_spec, patch):
+                logging.info(f"  - [SKIP] {patch.name}")
+                continue
+
+            logging.info(f"  - [OK] {patch.name}")
+            if not patch.exists():
+                die(f"Patch {patch} does not exist")
+
+            result.append(patch)
+
+        return result
+
+
 def do_unpack(args: argparse.Namespace) -> None:
     if not args.task_id:
         die("Can't publish rpms without CBS build id")
@@ -600,35 +690,25 @@ def do_unpack(args: argparse.Namespace) -> None:
     logging.info(f"UNPACK: repo={args.repo} release={args.release} task_id={args.task_id}")
 
     srcrpm = download_and_validate_src_rpm(args)
+    srcdir = unpack_src_rpm(srcrpm)
+    systemd_spec = srcdir / "systemd.spec"
+    if not systemd_spec.exists():
+        die("Expected to see systemd.spec after unpacking .src.rpm, but for nothing")
 
     logging.info("Searching for patches")
     # here we query patches. They are ordered! Should be applied in reverse order though!
     patches = rpm_query(srcrpm, "[%{patch}\n]").splitlines()
-    patches = list(reversed(patches))
-    if len(patches) > 0:
-        logging.info(f"Found {len(patches)} patches")
-
-        logging.info(f"Unpacking {srcrpm}")
-        with open(f"{srcrpm}.tar", "w") as rpmtar:
-            # rpm2cpio rejects to create tar file itself when runs in a gitlab runner
-            run(["rpm2cpio", f"{srcrpm}"], stdout=rpmtar)
-
-        run(["cpio", "--extract", "--make-directories", "--file", f"{srcrpm}.tar", *(["--verbose"] if need_verbose() else [])])
-
-        for i, patch in enumerate(patches):
-            patch = patches[i] = Path.cwd() / patch
-            logging.info(f"  - {patch.name}")
-            if not patch.exists():
-                die(f"Patch {patch} does not exist")
-    else:
+    patches = list(reversed([srcdir / patch for patch in patches]))
+    patches = filter_and_validate_patches(args, systemd_spec, patches)
+    if len(patches) == 0:
         logging.info("Found no patches. Still going to push to have clean tag in the unpacked repo")
 
-    logging.info("Searching for source code version")
+    logging.info("Quering source code version")
     output = rpm_query(srcrpm, "%{version}")
     if not output:
         die(f"Failed to query version from source RPM: {srcrpm}")
 
-    if "~devel" in output:
+    if is_specfile_head_build(systemd_spec):
         systemd_source_pattern = r"^systemd-[0-9a-f]+\.tar\.gz$"
         sources = rpm_query(srcrpm, "[%{source}\n]").splitlines()
         source = next((s for s in sources if re.match(systemd_source_pattern, s)), None)
