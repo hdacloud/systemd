@@ -128,6 +128,7 @@ systemd:unpack:
     - if: $DO_UNPACK == 'manual'
       when: manual
       allow_failure: true # this is necessary to let pipeline completing without waiting for this job
+      needs: [ 'systemd:build' ] # allows proceeding without waiting previous steps
 
 systemd:unpack:dry-run:
   extends: .unpack
