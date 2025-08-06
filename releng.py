@@ -647,8 +647,9 @@ def do_unpack(args: argparse.Namespace) -> None:
 
     with tempfile.TemporaryDirectory(dir='.', prefix='systemd-source-', delete=args.cleanup) as repodir:
         run(["git", "clone", "https://github.com/systemd/systemd.git", str(repodir)])
-        run(["git", "config", "--global", "user.email", "hyperscalebot@example.com"])
-        run(["git", "config", "--global", "user.name", "hyperscalebot"])
+        if os.environ.get("GITLAB_CI"):
+            run(["git", "config", "--global", "user.email", "hyperscalebot@example.com"])
+            run(["git", "config", "--global", "user.name", "hyperscalebot"])
 
         with chdir(Path(repodir)):
             run(["git", "checkout", git_source_tag_or_commit, *([] if need_verbose() else ["--quiet"])])
