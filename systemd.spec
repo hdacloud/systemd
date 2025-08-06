@@ -151,11 +151,8 @@ Patch:          https://github.com/systemd/systemd/pull/38073.patch
 # Meta specific backports
 
 # without upstream: 1000-1499
-
 # pam_systemd: Make pam_systemd 256 backwards compatible to logind 255
 Patch1000: 0001-pam_systemd-Make-pam_systemd-256-backwards-compatibl.patch
-
-# with upstream: 1500-1999
 
 # bump networkd netlink timeout to infinity
 Patch1500: FB_only_bump_netlink_timeout_to_infinity.patch
