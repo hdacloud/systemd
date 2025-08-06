@@ -717,7 +717,8 @@ def main() -> None:
     parser.add_argument(
         "--dry-run",
         help="Activate dry run",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=False,
     )
     parser.add_argument(
         "--log-level",
