@@ -652,8 +652,8 @@ def should_apply_patch(args: argparse.Namespace, systemd_spec: Path, patch: Path
     if patch_number < 1000:
         return True
 
-    # I intentiaonally make this if conditions to be 1:1
-    # maping to systemd.spec rules.
+    # I intentionally make this if conditions to be 1:1
+    # mapping to systemd.spec rules.
     if args.repo == "facebook":
         if not is_specfile_head_build(systemd_spec):  # without upstream
             if patch_number >= 1000 and patch_number <= 1499:
