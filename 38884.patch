@@ -1,0 +1,87 @@
+From ae73aecc1c4bcb73263e3ec7d8304655e778196d Mon Sep 17 00:00:00 2001
+From: Ivan Kruglov <mail@ikruglov.com>
+Date: Wed, 10 Sep 2025 05:10:39 -0700
+Subject: [PATCH 1/2] core: ensure stable order of units in systemd-state
+
+This patch make behaivour of
+https://github.com/systemd/systemd/issues/38817 more predictable
+---
+ src/core/manager-serialize.c | 22 +++++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/src/core/manager-serialize.c b/src/core/manager-serialize.c
+index 3f624619dfd19..7e618ad2e21ef 100644
+--- a/src/core/manager-serialize.c
++++ b/src/core/manager-serialize.c
+@@ -14,6 +14,7 @@
+ #include "manager.h"
+ #include "parse-util.h"
+ #include "serialize.h"
++#include "sort-util.h"
+ #include "syslog-util.h"
+ #include "unit-serialize.h"
+ #include "user-util.h"
+@@ -73,6 +74,13 @@ static void manager_serialize_gid_refs(Manager *m, FILE *f) {
+         manager_serialize_uid_refs_internal(f, m->gid_refs, "destroy-ipc-gid");
+ }
+ 
++static int unit_compare_id(Unit * const *a, Unit * const *b) {
++        assert(a);
++        assert(b);
++
++        return strcmp((*a)->id, (*b)->id);
++}
++
+ int manager_serialize(
+                 Manager *m,
+                 FILE *f,
+@@ -177,11 +185,23 @@ int manager_serialize(
+ 
+         (void) fputc('\n', f);
+ 
++        _cleanup_free_ Unit **units = NULL;
++        size_t n_units = 0;
++
+         HASHMAP_FOREACH_KEY(u, t, m->units) {
+                 if (u->id != t)
+                         continue;
+ 
+-                r = unit_serialize_state(u, f, fds, switching_root);
++                if (!GREEDY_REALLOC(units, n_units + 1))
++                        return -ENOMEM;
++
++                units[n_units++] = u;
++        }
++
++        typesafe_qsort(units, n_units, unit_compare_id);
++
++        FOREACH_ARRAY(unit, units, n_units) {
++                r = unit_serialize_state(*unit, f, fds, switching_root);
+                 if (r < 0)
+                         return r;
+         }
+
+From 7c5a7c7c80ccaaede93d01b684ea16c63744a6db Mon Sep 17 00:00:00 2001
+From: Ivan Kruglov <mail@ikruglov.com>
+Date: Wed, 10 Sep 2025 08:12:23 -0700
+Subject: [PATCH 2/2] core: warning if lookup deserialized unit via alias
+
+This is potentially dangerous and can cause https://github.com/systemd/systemd/issues/38817
+---
+ src/core/manager-serialize.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/core/manager-serialize.c b/src/core/manager-serialize.c
+index 7e618ad2e21ef..2d5587a32f62b 100644
+--- a/src/core/manager-serialize.c
++++ b/src/core/manager-serialize.c
+@@ -228,6 +228,9 @@ static int manager_deserialize_one_unit(Manager *m, const char *name, FILE *f, F
+                 return log_notice_errno(r, "Failed to load unit \"%s\", skipping deserialization: %m", name);
+         }
+ 
++        if (!streq(u->id, name))
++                log_warning("Loaded unit '%s' via alias '%s'! This is a dangerous behaivour potentially leading to https://github.com/systemd/systemd/issues/38817", u->id, name);
++
+         r = unit_deserialize_state(u, f, fds);
+         if (r < 0) {
+                 if (r == -ENOMEM)
