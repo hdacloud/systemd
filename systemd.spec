@@ -149,6 +149,9 @@ Patch:          https://github.com/systemd/systemd/pull/38073.patch
 # A patch to make https://github.com/systemd/systemd/issues/38817 more easy to reproduce and visible
 Patch:          https://github.com/systemd/systemd/pull/38884.patch
 
+# Backport OOMKills & ManagedOOMKills dbus/varlink fields
+Patch:          https://github.com/systemd/systemd/pull/38910.patch
+
 %endif
 
 # Meta specific backports
