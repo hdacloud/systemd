@@ -125,6 +125,10 @@ def get_task_id(output: str) -> str:
     return ""
 
 
+def get_build_time() -> str:
+    return datetime.now().strftime("%Y%m%d%H%M%S")
+
+
 def cleanup_git_tag_or_commit(val: str) -> str:
     return val.replace("~", "-")
 
@@ -156,7 +160,7 @@ def update_spec_for_head_build(args: argparse.Namespace, original_systemd_spec: 
     ).stdout.strip()
 
     # The timestamp is to ensure the release is always monotonically increasing
-    release_date = datetime.now().strftime(r"%Y%m%d%H%M%S")
+    release_date = get_build_time()
     release_extra = f".{args.rpm_extra_info}" if args.scratch and args.rpm_extra_info else ""
     release = f"{release_date}{release_extra}"
 
@@ -194,7 +198,7 @@ def update_spec_for_spec_scratch_build(args: argparse.Namespace, original_system
     if not release_spec:
         die("Failed to get systemd release from systemd.spec")
 
-    release_date = datetime.now().strftime(r"%Y%m%d%H%M%S")
+    release_date = get_build_time()
     release_extra = f".{args.rpm_extra_info}" if args.rpm_extra_info else ""
     release = f"{release_spec}~{release_date}{release_extra}"
 
