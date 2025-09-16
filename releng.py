@@ -570,6 +570,76 @@ def do_publish(args: argparse.Namespace) -> None:
         tag_file.write_text(git_tag)
 
 
+def do_unpublish(args: argparse.Namespace) -> None:
+    logging.info(f"UNPUBLISH: repo={args.repo} release={args.release} publish_repo={args.publish_repo} latest_n={args.latest_n} max={args.max}")
+    build_tag = get_build_tag(args)
+
+    output = run(
+        [
+            "cbs",
+            *(["--cert", args.cert] if args.cert else []),
+            "list-tagged",
+            "--quiet",
+            f"--latest-n={args.latest_n}",
+            build_tag,
+            "systemd",
+        ],
+        stdout=subprocess.PIPE,
+    ).stdout
+
+    latest_builds = set()
+
+    # $ cbs list-tagged --quiet --latest-n=1 hyperscale9s-packages-main-testing systemd
+    # systemd-258~rc4-20250911010943.hs.el9     hyperscale9s-packages-main-testing  hyperscalebot
+    for line in output.splitlines():
+        if not line.startswith("systemd-"):
+            continue
+
+        build = line.split()[0]
+        latest_builds.add(build)
+
+    logging.info(f"Found {len(latest_builds)} build(s)")
+    logging.info(f"{latest_builds}")
+
+    output = run(
+        [
+            "cbs",
+            *(["--cert", args.cert] if args.cert else []),
+            "list-tagged",
+            "--quiet",
+            build_tag,
+            "systemd",
+        ],
+        stdout=subprocess.PIPE,
+    ).stdout
+
+    max_untagging = args.max + 1
+    for line in output.splitlines():
+        if not line.startswith("systemd-"):
+            continue
+
+        build = line.split()[0]
+        if build not in latest_builds:
+            max_untagging -= 1
+            if max_untagging <= 0:
+                logging.info("Maximal untagging amount reached. Giving up!")
+                return
+
+            logging.info(f"Build {build} it not among latest builds. Untagging it!")
+            run(
+                [
+                    "cbs",
+                    *(["--cert", args.cert] if args.cert else []),
+                    "untag-build",
+                    *(["--test"] if args.dry_run else []),
+                    *(["--verbose"] if need_verbose() else []),
+                    build_tag,
+                    build,
+                ],
+                check=False,
+            )
+
+
 def download_rpms(task_id: str, arch: str) -> None:
     run(["cbs", "download-task", "--noprogress", "--arch", arch, str(task_id)])
 
@@ -867,6 +937,26 @@ def main() -> None:
         default='testing',
     )
 
+    unpublish_parser = subparsers.add_parser('unpublish', help='Remove published builds in CBS', parents=[repo_release_parser])
+    unpublish_parser.add_argument(
+        "--publish-repo",
+        help="Remove packages from 'release' or 'testing' repo",
+        choices=['release', 'testing'],
+        default='testing',
+    )
+    unpublish_parser.add_argument(
+        "--latest-n",
+        help="Keep given amount of latest builds (default: 7)",
+        type=int,
+        default=7,
+    )
+    unpublish_parser.add_argument(
+        "--max",
+        help="Remove up to this amount of builds (default: 10)",
+        type=int,
+        default=10,
+    )
+
     unpack_parser = subparsers.add_parser('unpack',
                                           help='Unpack systemd RPMs content and, optionally, push it to https://gitlab.com/CentOS/Hyperscale/rpms-unpacked/systemd',
                                           parents=[repo_release_parser])
@@ -894,6 +984,7 @@ def main() -> None:
         func = {
             "build": do_build,
             "publish": do_publish,
+            "unpublish": do_unpublish,
             "unpack": do_unpack,
             "autorelease": do_autorelease,
         }[args.verb]
