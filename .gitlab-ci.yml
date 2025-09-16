@@ -42,8 +42,10 @@ mr:
     DO_TEST: "true"
     DO_UNPACK: "manual"
     DO_PUBLISH: "false"
+    DO_UNPUBLISH: "false"
     DO_RPM_EXTRA_INFO: "true"
     DO_PUBLISH_DRY_RUN: "no-wait"
+    DO_UNPUBLISH_DRY_RUN: "no-wait"
     DO_UNPACK_DRY_RUN: "no-wait"
   trigger:
     include: .gitlab-child-ci.yml
@@ -65,6 +67,7 @@ ni:
     DO_TEST: "allow_failure"
     DO_UNPACK: "true"
     DO_PUBLISH: "testing"
+    DO_UNPUBLISH: "true"
   trigger:
     include: .gitlab-child-ci.yml
     strategy: depend

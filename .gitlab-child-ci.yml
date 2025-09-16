@@ -2,6 +2,7 @@ stages:
   - build
   - test
   - publish
+  - unpublish
   - tag
   - unpack
 
@@ -91,6 +92,29 @@ systemd:publish:dry-run:
   rules:
     - if: $DO_PUBLISH_DRY_RUN == 'true'
     - if: $DO_PUBLISH_DRY_RUN == 'no-wait'
+      needs: [ 'systemd:build' ] # allows proceeding without waiting previous steps
+
+.unpublish:
+  stage: unpublish
+  extends: .fedora
+  script:
+    - export PUBLISH_REPO=$(test "$DO_PUBLISH" == "release" && echo "release" || echo "testing"); echo "$PUBLISH_REPO"; test -n "$PUBLISH_REPO"
+    - export LATEST_N=$(test "$DO_PUBLISH" == "release" && echo "30" || echo "7"); echo "$LATEST_N"; test -n "$LATEST_N"
+    - ./releng.py $DRY_RUN --cert "$CENTOS_CERT" unpublish --repo "$REPO" --release "$RELEASE" --publish-repo "$PUBLISH_REPO" --latest-n "$LATEST_N"
+  interruptible: true
+
+systemd:unpublish:
+  extends: .publish
+  rules:
+    - if: $DO_UNPUBLISH == 'true'
+
+systemd:unpublish:dry-run:
+  extends: .unpublish
+  variables:
+    DO_DRY_RUN: 'true'
+  rules:
+    - if: $DO_UNPUBLISH_DRY_RUN == 'true'
+    - if: $DO_UNPUBLISH_DRY_RUN == 'no-wait'
       needs: [ 'systemd:build' ] # allows proceeding without waiting previous steps
 
 systemd:tag:
