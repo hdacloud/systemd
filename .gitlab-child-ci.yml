@@ -30,6 +30,9 @@ workflow:
     # install necessary packages
     - dnf --quiet install -y tar git-core python3 centos-packager mock mock-centos-sig-configs
 
+###################################################
+# BUILD
+###################################################
 systemd:build:
   stage: build
   extends: .fedora
@@ -43,6 +46,9 @@ systemd:build:
   artifacts:
     paths: [ 'artifacts/*-task-id.txt' ]
 
+###################################################
+# TEST
+###################################################
 systemd:test:
   stage: test
   image: quay.io/testing-farm/cli:latest
@@ -67,6 +73,9 @@ systemd:test:
       allow_failure: false
   interruptible: true
 
+###################################################
+# PUBLISH
+###################################################
 .publish:
   stage: publish
   extends: .fedora
@@ -94,6 +103,9 @@ systemd:publish:dry-run:
     - if: $DO_PUBLISH_DRY_RUN == 'no-wait'
       needs: [ 'systemd:build' ] # allows proceeding without waiting previous steps
 
+###################################################
+# UNPUBLISH
+###################################################
 .unpublish:
   stage: unpublish
   extends: .fedora
@@ -117,6 +129,9 @@ systemd:unpublish:dry-run:
     - if: $DO_UNPUBLISH_DRY_RUN == 'no-wait'
       needs: [ 'systemd:build' ] # allows proceeding without waiting previous steps
 
+###################################################
+# TAG
+###################################################
 systemd:tag:
   stage: tag
   dependencies:
@@ -134,6 +149,9 @@ systemd:tag:
     - if: $DO_PUBLISH == 'release'
   interruptible: false # tagging should complete if results are published
 
+###################################################
+# UNPACK
+###################################################
 .unpack:
   stage: unpack
   extends: .fedora
