@@ -119,6 +119,7 @@ systemd:unpublish:
   extends: .unpublish
   rules:
     - if: $DO_UNPUBLISH == 'true'
+      allow_failure: true
 
 systemd:unpublish:dry-run:
   extends: .unpublish
