@@ -116,7 +116,7 @@ systemd:publish:dry-run:
   interruptible: true
 
 systemd:unpublish:
-  extends: .publish
+  extends: .unpublish
   rules:
     - if: $DO_UNPUBLISH == 'true'
 
