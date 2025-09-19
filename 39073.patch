@@ -1,0 +1,269 @@
+From 468c84d1ce17f6c21b4f62a35998f2db7095f9ed Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Fri, 19 Sep 2025 13:54:37 +0200
+Subject: [PATCH 1/4] mkosi: Add stress-ng to sanitizer wrapper programs
+
+---
+ mkosi/mkosi.sanitizers/mkosi.postinst | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/mkosi/mkosi.sanitizers/mkosi.postinst b/mkosi/mkosi.sanitizers/mkosi.postinst
+index bcf7afaff34b7..4f946a8e9b7d1 100755
+--- a/mkosi/mkosi.sanitizers/mkosi.postinst
++++ b/mkosi/mkosi.sanitizers/mkosi.postinst
+@@ -75,6 +75,7 @@ wrap=(
+     setpriv
+     sshd
+     stat
++    stress-ng
+     su
+     tar
+     tgtd
+
+From ff90367f2a6d8528beaa92a5b0b74720dea5b34e Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Thu, 18 Sep 2025 09:59:10 +0200
+Subject: [PATCH 2/4] core: Use oom_group_kill attribute if OOMPolicy=kill
+
+For managed oom kills, we check the user.oomd_ooms property which
+reports how many times systemd-oomd recursively killed the entire
+cgroup. For kernel OOM kills, we check the oom_kill property from
+memory.events which reports how many processes were killed by the
+kernel OOM killer in the corresponding cgroup and its child cgroups.
+For units with Delegate=yes, this is problematic, becase OOM kills
+in child cgroups that were handled by the delegated unit will still
+be treated as unit OOM kills by systemd.
+
+Specifically, if systemd is managing the delegated cgroup and
+memory.oom.group=1 is set on both the service cgroup and the child
+cgroup, if the child cgroup is OOM killed and this is handled by systemd
+running inside the delegated units, when the unit exits later, it will
+still be treated as oom-killed because oom_kill in memory.events will
+contain the OOM kills that happened in the child cgroup.
+
+To allow addressing this, the oom_group_kill property was added to the
+memory.events and memory.events.local files which allows reading how many
+times the entire cgroup was oom killed by the kernel if memory.oom.group=1.
+If we read this from memory.events.local, we know how many times the unit's
+entire cgroup (plus child cgroups) got oom killed by the kernel. This matches
+what we report for systemd-oomd managed oom kills and avoids reporting the
+unit as oom-killed if a child cgroup was oom killed by the kernel due to
+having memory.oom.group=1 set on it.
+
+Since this is only available from kernel 5.12 onwards, we fall back to
+reading the oom_kill field from memory.events if the oom_group_kill property
+is not available.
+---
+ src/core/cgroup.c | 35 +++++++++++++++++++++++++++++------
+ 1 file changed, 29 insertions(+), 6 deletions(-)
+
+diff --git a/src/core/cgroup.c b/src/core/cgroup.c
+index 7b7cc5c14c798..74c0481dd5d8b 100644
+--- a/src/core/cgroup.c
++++ b/src/core/cgroup.c
+@@ -3932,20 +3932,43 @@ int unit_check_oom(Unit *u) {
+         if (!crt || !crt->cgroup_path)
+                 return 0;
+ 
+-        r = cg_get_keyed_attribute(
++        CGroupContext *ctx = unit_get_cgroup_context(u);
++        if (!ctx)
++                return 0;
++
++        /* If memory.oom.group=1, then look up the oom_group_kill field, which reports how many times the
++         * kernel killed every process recursively in this cgroup and its descendants, similar to
++         * systemd-oomd. Because the memory.events.local file was only introduced in kernel 5.12, we fall
++         * back to reading oom_kill if we can't find the file or field. */
++
++        if (ctx->memory_oom_group) {
++                r = cg_get_keyed_attribute(
++                        "memory",
++                        crt->cgroup_path,
++                        "memory.events.local",
++                        STRV_MAKE("oom_group_kill"),
++                        &oom_kill);
++                if (r < 0 && !IN_SET(r, -ENOENT, -ENXIO))
++                        return log_unit_debug_errno(u, r, "Failed to read oom_group_kill field of memory.events.local cgroup attribute, ignoring: %m");
++        }
++
++        if (isempty(oom_kill)) {
++                r = cg_get_keyed_attribute(
+                         "memory",
+                         crt->cgroup_path,
+                         "memory.events",
+                         STRV_MAKE("oom_kill"),
+                         &oom_kill);
+-        if (IN_SET(r, -ENOENT, -ENXIO)) /* Handle gracefully if cgroup or oom_kill attribute don't exist */
++                if (r < 0 && !IN_SET(r, -ENOENT, -ENXIO))
++                        return log_unit_debug_errno(u, r, "Failed to read oom_kill field of memory.events cgroup attribute: %m");
++        }
++
++        if (!oom_kill)
+                 c = 0;
+-        else if (r < 0)
+-                return log_unit_debug_errno(u, r, "Failed to read oom_kill field of memory.events cgroup attribute: %m");
+         else {
+                 r = safe_atou64(oom_kill, &c);
+                 if (r < 0)
+-                        return log_unit_debug_errno(u, r, "Failed to parse oom_kill field: %m");
++                        return log_unit_debug_errno(u, r, "Failed to parse memory.events cgroup oom field: %m");
+         }
+ 
+         increased = c > crt->oom_kill_last;
+@@ -3957,7 +3980,7 @@ int unit_check_oom(Unit *u) {
+         log_unit_struct(u, LOG_NOTICE,
+                         "MESSAGE_ID=" SD_MESSAGE_UNIT_OUT_OF_MEMORY_STR,
+                         LOG_UNIT_INVOCATION_ID(u),
+-                        LOG_UNIT_MESSAGE(u, "A process of this unit has been killed by the OOM killer."));
++                        LOG_UNIT_MESSAGE(u, "The kernel OOM killer killed some processes in this unit."));
+ 
+         unit_notify_cgroup_oom(u, /* ManagedOOM= */ false);
+ 
+
+From 77a86338b6d40ebf65ac74e9312fa7fa3213b12c Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Fri, 12 Sep 2025 14:14:26 +0200
+Subject: [PATCH 3/4] core: Expose oom kills and managed oom kills as
+ properties
+
+It can be useful for users to know this information so let's expose
+it as properties so it can be queried.
+---
+ src/core/dbus-unit.c       | 38 ++++++++++++++++++++++++++++++++++++++
+ test/units/TEST-55-OOMD.sh |  2 ++
+ 2 files changed, 40 insertions(+)
+
+diff --git a/src/core/dbus-unit.c b/src/core/dbus-unit.c
+index f84192205ef94..4d9271a12dfa1 100644
+--- a/src/core/dbus-unit.c
++++ b/src/core/dbus-unit.c
+@@ -1259,6 +1259,42 @@ static int property_get_cgroup_id(
+         return sd_bus_message_append(reply, "t", crt ? crt->cgroup_id : UINT64_C(0));
+ }
+ 
++static int property_get_oom_kills(
++                sd_bus *bus,
++                const char *path,
++                const char *interface,
++                const char *property,
++                sd_bus_message *reply,
++                void *userdata,
++                sd_bus_error *error) {
++
++        Unit *u = ASSERT_PTR(userdata);
++
++        assert(bus);
++        assert(reply);
++
++        CGroupRuntime *crt = unit_get_cgroup_runtime(u);
++        return sd_bus_message_append(reply, "t", crt ? crt->oom_kill_last : UINT64_MAX);
++}
++
++static int property_get_managed_oom_kills(
++                sd_bus *bus,
++                const char *path,
++                const char *interface,
++                const char *property,
++                sd_bus_message *reply,
++                void *userdata,
++                sd_bus_error *error) {
++
++        Unit *u = ASSERT_PTR(userdata);
++
++        assert(bus);
++        assert(reply);
++
++        CGroupRuntime *crt = unit_get_cgroup_runtime(u);
++        return sd_bus_message_append(reply, "t", crt ? crt->managed_oom_kill_last : UINT64_MAX);
++}
++
+ static int append_process(sd_bus_message *reply, const char *p, PidRef *pid, Set *pids) {
+         _cleanup_free_ char *buf = NULL, *cmdline = NULL;
+         int r;
+@@ -1621,6 +1657,8 @@ const sd_bus_vtable bus_unit_cgroup_vtable[] = {
+         SD_BUS_PROPERTY("IOReadOperations", "t", property_get_io_counter, 0, 0),
+         SD_BUS_PROPERTY("IOWriteBytes", "t", property_get_io_counter, 0, 0),
+         SD_BUS_PROPERTY("IOWriteOperations", "t", property_get_io_counter, 0, 0),
++        SD_BUS_PROPERTY("OOMKills", "t", property_get_oom_kills, 0, 0),
++        SD_BUS_PROPERTY("ManagedOOMKills", "t", property_get_managed_oom_kills, 0, 0),
+ 
+         SD_BUS_METHOD_WITH_ARGS("GetProcesses",
+                                 SD_BUS_NO_ARGS,
+diff --git a/test/units/TEST-55-OOMD.sh b/test/units/TEST-55-OOMD.sh
+index 3c9b4391a963e..638ae849e9f9e 100755
+--- a/test/units/TEST-55-OOMD.sh
++++ b/test/units/TEST-55-OOMD.sh
+@@ -125,6 +125,8 @@ test_basic() {
+     if systemctl "$@" status TEST-55-OOMD-testbloat.service; then exit 42; fi
+     if ! systemctl "$@" status TEST-55-OOMD-testchill.service; then exit 24; fi
+ 
++    assert_eq "$(systemctl "$@" show TEST-55-OOMD-testbloat.service -P ManagedOOMKills)" "1"
++
+     systemctl "$@" kill --signal=KILL TEST-55-OOMD-testbloat.service || :
+     systemctl "$@" stop TEST-55-OOMD-testbloat.service
+     systemctl "$@" stop TEST-55-OOMD-testchill.service
+
+From 0a653812a0ddd8894d503a5d35b2d2cbfaab2cb0 Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Thu, 18 Sep 2025 10:18:17 +0200
+Subject: [PATCH 4/4] test: Add tests for systemd's kernel oom kill handling
+
+---
+ test/units/TEST-55-OOMD.sh | 44 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+
+diff --git a/test/units/TEST-55-OOMD.sh b/test/units/TEST-55-OOMD.sh
+index 638ae849e9f9e..4cb925b4d148c 100755
+--- a/test/units/TEST-55-OOMD.sh
++++ b/test/units/TEST-55-OOMD.sh
+@@ -266,6 +266,50 @@ EOF
+     systemctl daemon-reload
+ }
+ 
++testcase_kernel_oom() {
++    cat >/tmp/script.sh <<"EOF"
++#!/bin/bash
++choom --adjust '+1000' -- bash -c 'echo f >/proc/sysrq-trigger && exec sleep infinity'
++choom --adjust '+1000' -p $$
++echo f >/proc/sysrq-trigger
++exec sleep infinity
++EOF
++    chmod +x /tmp/script.sh
++
++    (! systemd-run --wait --unit oom-kill -p OOMPolicy=continue /tmp/script.sh)
++    # With OOMPolicy=continue, we shouldn't get the oom-kill result.
++    assert_eq "$(systemctl show oom-kill -P Result)" "signal"
++    # Check that OOMKills reports 2 individual processes killed.
++    assert_eq "$(systemctl show oom-kill -P OOMKills)" "2"
++    systemctl reset-failed
++
++    (! systemd-run --wait --unit oom-kill -p OOMPolicy=kill /tmp/script.sh)
++    # Check that a regular kernel oom kill with OOMPolicy=kill results in the oom-kill result.
++    assert_eq "$(systemctl show oom-kill -P Result)" "oom-kill"
++    # Check that OOMKills reports 1 oom group kill instead of the number of processes that were killed.
++    assert_eq "$(systemctl show oom-kill -P OOMKills)" "1"
++    systemctl reset-failed
++
++    cat >/tmp/script.sh <<"EOF"
++#!/bin/bash
++echo '+memory' >/sys/fs/cgroup/system.slice/oom-kill.service/cgroup.subtree_control
++mkdir /sys/fs/cgroup/system.slice/oom-kill.service/sub
++echo 1 >/sys/fs/cgroup/system.slice/oom-kill.service/sub/memory.oom.group
++echo $$ >/sys/fs/cgroup/system.slice/oom-kill.service/sub/cgroup.procs
++choom --adjust '+1000' -p $$
++echo f >/proc/sysrq-trigger
++exec sleep infinity
++EOF
++    chmod +x /tmp/script.sh
++
++    (! systemd-run --wait --unit oom-kill -p OOMPolicy=kill -p Delegate=yes -p DelegateSubgroup=init.scope /tmp/script.sh)
++    # Test that an oom-kill in a delegated unit in a subcgroup with memory.oom.group=1 also results in the
++    # oom-kill exit status.
++    assert_eq "$(systemctl show oom-kill -P Result)" "oom-kill"
++    assert_eq "$(systemctl show oom-kill -P OOMKills)" "1"
++    systemctl reset-failed
++}
++
+ run_testcases
+ 
+ systemd-analyze log-level info
