@@ -90,17 +90,29 @@ def chdir(directory: Path) -> Iterator[None]:
 
 
 def get_build_root(args: argparse.Namespace) -> str:
+    # @michel said it should be fine to keep build-root for building src.rpm untouched.
     if args.repo == "main":
         return f"centos-stream-hyperscale-{args.release}-{os.uname().machine}"
     else:
         return f"centos-stream-hyperscale-{args.repo}-{args.release}-{os.uname().machine}"
 
+# --repo=facebook packages build against RHEL
+# --repo=main packages build agains CentOS stream
+
+# hyperscale9s-... vs hyperscale9-...
+# 9s means centos 9 stream, 9 means rhel 9
 
 def get_build_target(args: argparse.Namespace) -> str:
+    if args.repo == "facebook":
+        return f"hyperscale{args.release}-packages-{args.repo}-el{args.release}"
+
     return f"hyperscale{args.release}s-packages-{args.repo}-el{args.release}s"
 
 
 def get_build_tag_for(release: str, repo: str, publish_repo: str) -> str:
+    if repo == "facebook":
+        return f"hyperscale{release}-packages-{repo}-{publish_repo}"
+
     return f"hyperscale{release}s-packages-{repo}-{publish_repo}"
 
 
@@ -109,8 +121,10 @@ def get_build_tag(args: argparse.Namespace) -> str:
 
 
 def get_rpm_suffix_for(release: str, repo: str) -> str:
-    prefix = "hs+fb" if repo == "facebook" else "hs"
-    return f"{prefix}.el{release}"
+    if repo == "facebook":
+        return f"hs+fb.el{release}_z"
+
+    return f"hs.el{release}"
 
 
 def get_rpm_suffix(args: argparse.Namespace) -> str:
