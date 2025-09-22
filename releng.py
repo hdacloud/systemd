@@ -287,7 +287,7 @@ def get_latest_cbs_systemd_version_for(args: argparse.Namespace, release: str, r
     build_tag = get_build_tag_for(release, repo, "release")
 
     logging.info(f"Quering CBS for latest-build of {build_tag}")
-    output = run(
+    line = run(
         [
             "cbs",
             *(["--cert", args.cert] if args.cert else []),
@@ -297,10 +297,15 @@ def get_latest_cbs_systemd_version_for(args: argparse.Namespace, release: str, r
             "systemd",
         ],
         stdout=subprocess.PIPE,
-    ).stdout.strip().split()[0].strip()
+    ).stdout.strip()
 
+    if not line.startswith("systemd-"):
+        logging.info("No latest-build in {build_tag}")
+        return None
+
+    latest_build_version = line.split()[0].strip()
     rpm_suffix = get_rpm_suffix_for(release, repo)
-    cbs_systemd_version = output.removesuffix("." + rpm_suffix)  # remove .hs+fb.el10 from 257.3-1.5.hs+fb.el10
+    cbs_systemd_version = latest_build_version.removesuffix("." + rpm_suffix)  # remove .hs+fb.el10 from 257.3-1.5.hs+fb.el10
     if not cbs_systemd_version:
         die("Failed to get latest systemd build from CBS")
 
@@ -322,12 +327,13 @@ def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spe
         for repo in REPOS:
             logging.info("")
             cbs_systemd_version = get_latest_cbs_systemd_version_for(args, release, repo)
+            if not cbs_systemd_version:
+                continue
+
             vercmp_result = run(["systemd-analyze", "compare-versions", systemd_version, cbs_systemd_version], check=False)
             cbs_systemd_vercmp_results[cbs_systemd_version] = vercmp_result.returncode
 
-    if len(cbs_systemd_vercmp_results) == 0:
-        die("No cbs_systemd_version_results")
-    if len(cbs_systemd_vercmp_results) > 1:
+    if len(cbs_systemd_vercmp_results) != 1:
         # Some CBS build tags have different systemd version.
         # There is not much what we can do. Let's just do sanity checks
         # that we're not building something which is smaller than already built.
