@@ -18,9 +18,9 @@ import urllib.request
 import time
 import re
 
-REPOS = ["main", "facebook"]
+REPOS = ["facebook", "main"]
 RELEASES = [9, 10]
-SOURCES = ["head", "spec"]
+SOURCES = ["spec", "head"]
 INTERRUPTED = False
 
 
