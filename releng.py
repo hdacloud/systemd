@@ -19,7 +19,7 @@ import time
 import re
 
 REPOS = ["facebook", "main"]
-RELEASES = [9, 10]
+RELEASES = ["9_z", "10_z"]
 SOURCES = ["spec", "head"]
 INTERRUPTED = False
 
@@ -88,32 +88,47 @@ def chdir(directory: Path) -> Iterator[None]:
     finally:
         os.chdir(old)
 
+def is_rhel_based_release(release: str) -> bool:
+    return release.endswith("_z")
+
+
+def remove_rhel_release_suffix(release: str) -> str:
+    return release.removesuffix("_z")
+
+
+def get_release_without_suffix(release: str) -> str:
+    if is_rhel_based_release(release):
+        return remove_rhel_release_suffix(release)
+
+    return release
+
 
 def get_build_root(args: argparse.Namespace) -> str:
     # @michel said it should be fine to keep build-root for building src.rpm untouched.
+    release = get_release_without_suffix(args.release)
     if args.repo == "main":
-        return f"centos-stream-hyperscale-{args.release}-{os.uname().machine}"
+        return f"centos-stream-hyperscale-{release}-{os.uname().machine}"
     else:
-        return f"centos-stream-hyperscale-{args.repo}-{args.release}-{os.uname().machine}"
+        return f"centos-stream-hyperscale-{args.repo}-{release}-{os.uname().machine}"
 
-# --repo=facebook packages build against RHEL
-# --repo=main packages build agains CentOS stream
 
-# hyperscale9s-... vs hyperscale9-...
-# 9s means centos 9 stream, 9 means rhel 9
+def get_release_for_build_target_or_tag(release: str) -> str:
+    # hyperscale9 is rhel based
+    # hyperscale9s is centos-stream based
+    if is_rhel_based_release(release):
+        return get_release_without_suffix(release)
+
+    return f"{release}s"
+
 
 def get_build_target(args: argparse.Namespace) -> str:
-    if args.repo == "facebook":
-        return f"hyperscale{args.release}-packages-{args.repo}-el{args.release}"
-
-    return f"hyperscale{args.release}s-packages-{args.repo}-el{args.release}s"
+    release = get_release_for_build_target_or_tag(args.release)
+    return f"hyperscale{release}-packages-{args.repo}-el{release}"
 
 
 def get_build_tag_for(release: str, repo: str, publish_repo: str) -> str:
-    if repo == "facebook":
-        return f"hyperscale{release}-packages-{repo}-{publish_repo}"
-
-    return f"hyperscale{release}s-packages-{repo}-{publish_repo}"
+    release = get_release_for_build_target_or_tag(release)
+    return f"hyperscale{release}-packages-{repo}-{publish_repo}"
 
 
 def get_build_tag(args: argparse.Namespace) -> str:
@@ -122,7 +137,7 @@ def get_build_tag(args: argparse.Namespace) -> str:
 
 def get_rpm_suffix_for(release: str, repo: str) -> str:
     if repo == "facebook":
-        return f"hs+fb.el{release}_z"
+        return f"hs+fb.el{release}"
 
     return f"hs.el{release}"
 
@@ -911,11 +926,10 @@ def main() -> None:
     )
     repo_release_parser.add_argument(
         "--release",
-        help="CentOS Stream release to use (e.g 9)",
+        help="Release to use: 9/10 - CentOS-based builds; 9_z/10_z - RHEL-based builds",
         metavar="RELEASE",
         choices=RELEASES,
-        default=9,
-        type=int,
+        default="9_z",
     )
 
     subparsers = parser.add_subparsers(dest='verb')
