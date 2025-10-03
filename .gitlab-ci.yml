@@ -24,14 +24,19 @@ stages:
 .matrix2:
   parallel:
     matrix:
-      - REPO: [facebook, main]
-        RELEASE: [9, 10]
+      - REPO: facebook
+        RELEASE: ["9_z", "10_z"]
+      - REPO: main
+        RELEASE: ["9", "10"]
 
 .matrix3:
   parallel:
     matrix:
-      - REPO: [facebook, main]
-        RELEASE: [9, 10]
+      - REPO: facebook
+        RELEASE: ["9_z", "10_z"]
+        SOURCE: [head, spec]
+      - REPO: main
+        RELEASE: ["9", "10"]
         SOURCE: [head, spec]
 
 # setup for merge request
