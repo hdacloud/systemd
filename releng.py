@@ -337,44 +337,42 @@ def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spe
 
     logging.info(f"systemd version: {systemd_version}")
 
-    cbs_systemd_vercmp_results = {}
-    for release in RELEASES:
-        for repo in REPOS:
+    max_cbs_systemd_version = None
+    for repo, releases in RELEASE_REPO_VALID_MAP.items():
+        for release in releases:
+            # We do not publish RPMs to all REPO/RELEASE combinations.
+            # Some of them can have none, or very old versions.
+
             logging.info("")
             cbs_systemd_version = get_latest_cbs_systemd_version_for(args, release, repo)
             if not cbs_systemd_version:
                 continue
 
-            vercmp_result = run(["systemd-analyze", "compare-versions", systemd_version, cbs_systemd_version], check=False)
-            cbs_systemd_vercmp_results[cbs_systemd_version] = vercmp_result.returncode
+            if not max_cbs_systemd_version:
+                max_cbs_systemd_version = cbs_systemd_version
+            else:
+                vercmp_result = run(["systemd-analyze", "compare-versions", cbs_systemd_version, max_cbs_systemd_version], check=False)
+                if vercmp_result.returncode == 11:  # the version of the right is smaller
+                    max_cbs_systemd_version = cbs_systemd_version
 
-    if len(cbs_systemd_vercmp_results) != 1:
-        # Some CBS build tags have different systemd version.
-        # There is not much what we can do. Let's just do sanity checks
-        # that we're not building something which is smaller than already built.
-        logging.info("Different CBS build tags have different latest systemd builds.")
+    logging.info("")
+    logging.info(f"Maximal systemd version across CBS tags is {max_cbs_systemd_version}")
+    logging.info("")
 
-        for sv, vercmp in cbs_systemd_vercmp_results.items():
-            if vercmp == 12:  # the version of the left is smaller
-                die(f"systemd version in the spec ({systemd_version}) is smaller than one in CBS ({sv}). See logs above.")
-
-        logging.info("Cannot do autoincrement of release_override! Continue as usual!")
-        return
-
-    # All CBS build tags have the same latest systemd version.
-    # If vercmp == 0, it means that the CBS version matches one in spec file.
-    # As result, we can go ahead and bump up 'release_override'.
-    # Otherwise, there is not much to do. We just let system to proceed without any changes.
-    cbs_systemd_version = next(iter(cbs_systemd_vercmp_results.keys()))
-    vercmp = next(iter(cbs_systemd_vercmp_results.values()))
-    if vercmp == 12:  # the version of the left is smaller
-        die(f"systemd version in the spec ({systemd_version}) is smaller than one in CBS ({cbs_systemd_version})")
-    if vercmp == 11:  # the version of the right is smaller
+    # Now, let's compare systemd_version in spec with maximal version from CBS.
+    # We can bump the version if systemd_version in spec is matching max one from CBS.
+    # We cannot bump version is CBS is ahead of systemd_version in spec. This may lead to conflicts.
+    # If systemd_version in spec is instead ahead of maximal CBS version, there is no need to bump the version.
+    vercmp_result = run(["systemd-analyze", "compare-versions", systemd_version, max_cbs_systemd_version], check=False)
+    if vercmp_result.returncode == 12:  # the version of the left is smaller
+        die(f"version is not bumped: systemd version in the spec ({systemd_version}) is smaller than max one in CBS ({max_cbs_systemd_version})")
+    if vercmp_result.returncode == 11:  # the version of the right is smaller
         logging.info(f"systemd version in systemd.spec '{systemd_version}' is higher than one in CBS '{cbs_systemd_version}'")
-        logging.info("Cannot do autoincrement of release_override! Continue as usual!")
+        logging.info("No need for autoincrement of release_override! Continue as usual!")
         return
 
-    logging.info("systemd version in systemd.spec matches latest-builds for all build-tags in CBS")
+    logging.info("systemd version in systemd.spec matches maximal latest-builds for build-tags in CBS")
+    logging.info("bumping release_override")
 
     systemd_release = rpmspec_query(args, systemd_spec, "%{release}")
     if not systemd_release:
