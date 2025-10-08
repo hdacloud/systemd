@@ -18,8 +18,10 @@ import urllib.request
 import time
 import re
 
-REPOS = ["facebook", "main"]
-RELEASES = ["9_z", "10_z"]
+REPO_RELEASE_VALID_MAP = {
+    "facebook": ["9", "10", "9_z", "10_z"],
+    "main": ["9", "10"],
+}
 SOURCES = ["spec", "head"]
 INTERRUPTED = False
 
@@ -87,6 +89,16 @@ def chdir(directory: Path) -> Iterator[None]:
         yield
     finally:
         os.chdir(old)
+
+
+def validate_release_repo(release: str, repo: str):
+    valid_releases = REPO_RELEASE_VALID_MAP.get(repo, None)
+    if not valid_releases:
+        die(f"repo {repo} is invalid")
+
+    if release not in valid_releases:
+        die(f"release {release} is not valid for repo {repo}")
+
 
 def is_rhel_based_release(release: str) -> bool:
     return release.endswith("_z")
@@ -338,7 +350,7 @@ def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spe
     logging.info(f"systemd version: {systemd_version}")
 
     max_cbs_systemd_version = None
-    for repo, releases in RELEASE_REPO_VALID_MAP.items():
+    for repo, releases in REPO_RELEASE_VALID_MAP.items():
         for release in releases:
             # We do not publish RPMs to all REPO/RELEASE combinations.
             # Some of them can have none, or very old versions.
@@ -453,6 +465,8 @@ def get_latest_systemd_sha(branch):
 
 def do_build(args: argparse.Namespace) -> None:
     logging.info(f"BUILD: repo={args.repo} release={args.release} source={args.source} scratch={args.scratch}")
+    validate_release_repo(args.release, args.repo)
+
     systemd_spec = args.git_dir / "systemd.spec"
 
     # Fetching of sha happens per child-pipeline which will likely cause inconsistency.
@@ -574,6 +588,7 @@ def do_publish(args: argparse.Namespace) -> None:
         die("Can't publish rpms without CBS build id")
 
     logging.info(f"PUBLISH: repo={args.repo} release={args.release} task_id={args.task_id} publish_repo={args.publish_repo}")
+    validate_release_repo(args.release, args.repo)
 
     srcrpm = download_and_validate_src_rpm(args)
     tag = get_build_tag(args)
@@ -605,6 +620,7 @@ def do_publish(args: argparse.Namespace) -> None:
 
 def do_unpublish(args: argparse.Namespace) -> None:
     logging.info(f"UNPUBLISH: repo={args.repo} release={args.release} publish_repo={args.publish_repo} latest_n={args.latest_n} max={args.max}")
+    validate_release_repo(args.release, args.repo)
     build_tag = get_build_tag(args)
 
     output = run(
@@ -795,6 +811,7 @@ def do_unpack(args: argparse.Namespace) -> None:
         die("Can't publish rpms without CBS build id")
 
     logging.info(f"UNPACK: repo={args.repo} release={args.release} task_id={args.task_id}")
+    validate_release_repo(args.release, args.repo)
 
     srcrpm = download_and_validate_src_rpm(args)
     srcdir = unpack_src_rpm(srcrpm)
@@ -919,14 +936,15 @@ def main() -> None:
     repo_release_parser.add_argument(
         "--repo",
         help="Hyperscale repository to build against",
-        choices=REPOS,
+        choices=REPO_RELEASE_VALID_MAP.keys(),
         default="main",
     )
+    all_releases = sorted(set().union(*REPO_RELEASE_VALID_MAP.values()))
     repo_release_parser.add_argument(
         "--release",
         help="Release to use: 9/10 - CentOS-based builds; 9_z/10_z - RHEL-based builds",
         metavar="RELEASE",
-        choices=RELEASES,
+        choices=all_releases,
         default="9_z",
     )
 
