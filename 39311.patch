@@ -1,64 +1,18 @@
-From 468c84d1ce17f6c21b4f62a35998f2db7095f9ed Mon Sep 17 00:00:00 2001
-From: Daan De Meyer <daan.j.demeyer@gmail.com>
-Date: Fri, 19 Sep 2025 13:54:37 +0200
-Subject: [PATCH 1/4] mkosi: Add stress-ng to sanitizer wrapper programs
+From c76c431e7939a8dd603a08ed3cd332502a26f6ee Mon Sep 17 00:00:00 2001
+From: Ivan Kruglov <mail@ikruglov.com>
+Date: Tue, 14 Oct 2025 09:40:11 -0700
+Subject: [PATCH] spec: backport 'Expose oom kills and managed oom kills as
+ properties'
 
+Original PR: https://github.com/systemd/systemd/pull/38906
 ---
- mkosi/mkosi.sanitizers/mkosi.postinst | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/mkosi/mkosi.sanitizers/mkosi.postinst b/mkosi/mkosi.sanitizers/mkosi.postinst
-index bcf7afaff34b7..4f946a8e9b7d1 100755
---- a/mkosi/mkosi.sanitizers/mkosi.postinst
-+++ b/mkosi/mkosi.sanitizers/mkosi.postinst
-@@ -75,6 +75,7 @@ wrap=(
-     setpriv
-     sshd
-     stat
-+    stress-ng
-     su
-     tar
-     tgtd
-
-From ff90367f2a6d8528beaa92a5b0b74720dea5b34e Mon Sep 17 00:00:00 2001
-From: Daan De Meyer <daan.j.demeyer@gmail.com>
-Date: Thu, 18 Sep 2025 09:59:10 +0200
-Subject: [PATCH 2/4] core: Use oom_group_kill attribute if OOMPolicy=kill
-
-For managed oom kills, we check the user.oomd_ooms property which
-reports how many times systemd-oomd recursively killed the entire
-cgroup. For kernel OOM kills, we check the oom_kill property from
-memory.events which reports how many processes were killed by the
-kernel OOM killer in the corresponding cgroup and its child cgroups.
-For units with Delegate=yes, this is problematic, becase OOM kills
-in child cgroups that were handled by the delegated unit will still
-be treated as unit OOM kills by systemd.
-
-Specifically, if systemd is managing the delegated cgroup and
-memory.oom.group=1 is set on both the service cgroup and the child
-cgroup, if the child cgroup is OOM killed and this is handled by systemd
-running inside the delegated units, when the unit exits later, it will
-still be treated as oom-killed because oom_kill in memory.events will
-contain the OOM kills that happened in the child cgroup.
-
-To allow addressing this, the oom_group_kill property was added to the
-memory.events and memory.events.local files which allows reading how many
-times the entire cgroup was oom killed by the kernel if memory.oom.group=1.
-If we read this from memory.events.local, we know how many times the unit's
-entire cgroup (plus child cgroups) got oom killed by the kernel. This matches
-what we report for systemd-oomd managed oom kills and avoids reporting the
-unit as oom-killed if a child cgroup was oom killed by the kernel due to
-having memory.oom.group=1 set on it.
-
-Since this is only available from kernel 5.12 onwards, we fall back to
-reading the oom_kill field from memory.events if the oom_group_kill property
-is not available.
----
- src/core/cgroup.c | 35 +++++++++++++++++++++++++++++------
- 1 file changed, 29 insertions(+), 6 deletions(-)
+ src/core/cgroup.c          | 35 ++++++++++++++++++++++++-----
+ src/core/dbus-unit.c       | 38 +++++++++++++++++++++++++++++++
+ test/units/TEST-55-OOMD.sh | 46 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 113 insertions(+), 6 deletions(-)
 
 diff --git a/src/core/cgroup.c b/src/core/cgroup.c
-index 7b7cc5c14c798..74c0481dd5d8b 100644
+index f3d4659b044df..054816c1ea978 100644
 --- a/src/core/cgroup.c
 +++ b/src/core/cgroup.c
 @@ -3932,20 +3932,43 @@ int unit_check_oom(Unit *u) {
@@ -119,20 +73,6 @@ index 7b7cc5c14c798..74c0481dd5d8b 100644
  
          unit_notify_cgroup_oom(u, /* ManagedOOM= */ false);
  
-
-From 77a86338b6d40ebf65ac74e9312fa7fa3213b12c Mon Sep 17 00:00:00 2001
-From: Daan De Meyer <daan.j.demeyer@gmail.com>
-Date: Fri, 12 Sep 2025 14:14:26 +0200
-Subject: [PATCH 3/4] core: Expose oom kills and managed oom kills as
- properties
-
-It can be useful for users to know this information so let's expose
-it as properties so it can be queried.
----
- src/core/dbus-unit.c       | 38 ++++++++++++++++++++++++++++++++++++++
- test/units/TEST-55-OOMD.sh |  2 ++
- 2 files changed, 40 insertions(+)
-
 diff --git a/src/core/dbus-unit.c b/src/core/dbus-unit.c
 index f84192205ef94..4d9271a12dfa1 100644
 --- a/src/core/dbus-unit.c
@@ -190,7 +130,7 @@ index f84192205ef94..4d9271a12dfa1 100644
          SD_BUS_METHOD_WITH_ARGS("GetProcesses",
                                  SD_BUS_NO_ARGS,
 diff --git a/test/units/TEST-55-OOMD.sh b/test/units/TEST-55-OOMD.sh
-index 3c9b4391a963e..638ae849e9f9e 100755
+index 3c9b4391a963e..4cb925b4d148c 100755
 --- a/test/units/TEST-55-OOMD.sh
 +++ b/test/units/TEST-55-OOMD.sh
 @@ -125,6 +125,8 @@ test_basic() {
@@ -202,21 +142,7 @@ index 3c9b4391a963e..638ae849e9f9e 100755
      systemctl "$@" kill --signal=KILL TEST-55-OOMD-testbloat.service || :
      systemctl "$@" stop TEST-55-OOMD-testbloat.service
      systemctl "$@" stop TEST-55-OOMD-testchill.service
-
-From 0a653812a0ddd8894d503a5d35b2d2cbfaab2cb0 Mon Sep 17 00:00:00 2001
-From: Daan De Meyer <daan.j.demeyer@gmail.com>
-Date: Thu, 18 Sep 2025 10:18:17 +0200
-Subject: [PATCH 4/4] test: Add tests for systemd's kernel oom kill handling
-
----
- test/units/TEST-55-OOMD.sh | 44 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
-
-diff --git a/test/units/TEST-55-OOMD.sh b/test/units/TEST-55-OOMD.sh
-index 638ae849e9f9e..4cb925b4d148c 100755
---- a/test/units/TEST-55-OOMD.sh
-+++ b/test/units/TEST-55-OOMD.sh
-@@ -266,6 +266,50 @@ EOF
+@@ -264,6 +266,50 @@ EOF
      systemctl daemon-reload
  }
  
