@@ -937,7 +937,7 @@ def main() -> None:
         "--repo",
         help="Hyperscale repository to build against",
         choices=REPO_RELEASE_VALID_MAP.keys(),
-        default="main",
+        default="facebook",
     )
     all_releases = sorted(set().union(*REPO_RELEASE_VALID_MAP.values()))
     repo_release_parser.add_argument(
