@@ -779,7 +779,7 @@ mv %{_sourcedir}/%{name}.fedora/* %{_sourcedir}
 # Automatically figure out the name of the top-level directory.
 # TODO: Use %%autosetup -C once we can depend on rpm >= 4.20.
 %if %{undefined _build_in_place}
-%autosetup -n %(tar -tf %{SOURCE0} | head -n1) -p1
+%autosetup -n %(tar -tf %{SOURCE0} 2>/dev/null | head -n1) -p1
 %endif
 
 # Apply common patches
