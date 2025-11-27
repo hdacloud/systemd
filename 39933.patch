@@ -1,0 +1,490 @@
+From 051b46c97b9abef6e5289c14786f49c16ad53c64 Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Thu, 18 Sep 2025 09:59:10 +0200
+Subject: [PATCH 1/3] core: Use oom_group_kill attribute if OOMPolicy=kill
+
+For managed oom kills, we check the user.oomd_ooms property which
+reports how many times systemd-oomd recursively killed the entire
+cgroup. For kernel OOM kills, we check the oom_kill property from
+memory.events which reports how many processes were killed by the
+kernel OOM killer in the corresponding cgroup and its child cgroups.
+For units with Delegate=yes, this is problematic, becase OOM kills
+in child cgroups that were handled by the delegated unit will still
+be treated as unit OOM kills by systemd.
+
+Specifically, if systemd is managing the delegated cgroup and
+memory.oom.group=1 is set on both the service cgroup and the child
+cgroup, if the child cgroup is OOM killed and this is handled by systemd
+running inside the delegated units, when the unit exits later, it will
+still be treated as oom-killed because oom_kill in memory.events will
+contain the OOM kills that happened in the child cgroup.
+
+To allow addressing this, the oom_group_kill property was added to the
+memory.events and memory.events.local files which allows reading how many
+times the entire cgroup was oom killed by the kernel if memory.oom.group=1.
+If we read this from memory.events.local, we know how many times the unit's
+entire cgroup (plus child cgroups) got oom killed by the kernel. This matches
+what we report for systemd-oomd managed oom kills and avoids reporting the
+unit as oom-killed if a child cgroup was oom killed by the kernel due to
+having memory.oom.group=1 set on it.
+
+Since this is only available from kernel 5.12 onwards, we fall back to
+reading the oom_kill field from memory.events if the oom_group_kill property
+is not available.
+---
+ src/core/cgroup.c | 35 +++++++++++++++++++++++++++++------
+ 1 file changed, 29 insertions(+), 6 deletions(-)
+
+diff --git a/src/core/cgroup.c b/src/core/cgroup.c
+index 6c3ef00a4f63e..ecbfe4653d533 100644
+--- a/src/core/cgroup.c
++++ b/src/core/cgroup.c
+@@ -3036,20 +3036,43 @@ int unit_check_oom(Unit *u) {
+         if (!crt || !crt->cgroup_path)
+                 return 0;
+ 
+-        r = cg_get_keyed_attribute(
++        CGroupContext *ctx = unit_get_cgroup_context(u);
++        if (!ctx)
++                return 0;
++
++        /* If memory.oom.group=1, then look up the oom_group_kill field, which reports how many times the
++         * kernel killed every process recursively in this cgroup and its descendants, similar to
++         * systemd-oomd. Because the memory.events.local file was only introduced in kernel 5.12, we fall
++         * back to reading oom_kill if we can't find the file or field. */
++
++        if (ctx->memory_oom_group) {
++                r = cg_get_keyed_attribute(
++                        "memory",
++                        crt->cgroup_path,
++                        "memory.events.local",
++                        STRV_MAKE("oom_group_kill"),
++                        &oom_kill);
++                if (r < 0 && !IN_SET(r, -ENOENT, -ENXIO))
++                        return log_unit_debug_errno(u, r, "Failed to read oom_group_kill field of memory.events.local cgroup attribute, ignoring: %m");
++        }
++
++        if (isempty(oom_kill)) {
++                r = cg_get_keyed_attribute(
+                         "memory",
+                         crt->cgroup_path,
+                         "memory.events",
+                         STRV_MAKE("oom_kill"),
+                         &oom_kill);
+-        if (IN_SET(r, -ENOENT, -ENXIO)) /* Handle gracefully if cgroup or oom_kill attribute don't exist */
++                if (r < 0 && !IN_SET(r, -ENOENT, -ENXIO))
++                        return log_unit_debug_errno(u, r, "Failed to read oom_kill field of memory.events cgroup attribute: %m");
++        }
++
++        if (!oom_kill)
+                 c = 0;
+-        else if (r < 0)
+-                return log_unit_debug_errno(u, r, "Failed to read oom_kill field of memory.events cgroup attribute: %m");
+         else {
+                 r = safe_atou64(oom_kill, &c);
+                 if (r < 0)
+-                        return log_unit_debug_errno(u, r, "Failed to parse oom_kill field: %m");
++                        return log_unit_debug_errno(u, r, "Failed to parse memory.events cgroup oom field: %m");
+         }
+ 
+         increased = c > crt->oom_kill_last;
+@@ -3061,7 +3084,7 @@ int unit_check_oom(Unit *u) {
+         log_unit_struct(u, LOG_NOTICE,
+                         LOG_MESSAGE_ID(SD_MESSAGE_UNIT_OUT_OF_MEMORY_STR),
+                         LOG_UNIT_INVOCATION_ID(u),
+-                        LOG_UNIT_MESSAGE(u, "A process of this unit has been killed by the OOM killer."));
++                        LOG_UNIT_MESSAGE(u, "The kernel OOM killer killed some processes in this unit."));
+ 
+         unit_notify_cgroup_oom(u, /* managed_oom= */ false);
+ 
+
+From a1c88fc7290b9db199ef11df42aee55d213249d5 Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Fri, 12 Sep 2025 14:14:26 +0200
+Subject: [PATCH 2/3] core: Expose oom kills and managed oom kills as
+ properties
+
+It can be useful for users to know this information so let's expose
+it as properties so it can be queried.
+---
+ man/org.freedesktop.systemd1.xml     | 69 ++++++++++++++++++++++++++++
+ src/core/dbus-unit.c                 | 38 +++++++++++++++
+ src/core/varlink-cgroup.c            |  6 ++-
+ src/shared/varlink-io.systemd.Unit.c |  8 +++-
+ test/units/TEST-55-OOMD.sh           |  2 +
+ 5 files changed, 121 insertions(+), 2 deletions(-)
+
+diff --git a/man/org.freedesktop.systemd1.xml b/man/org.freedesktop.systemd1.xml
+index ed227127489be..2b30adab9b456 100644
+--- a/man/org.freedesktop.systemd1.xml
++++ b/man/org.freedesktop.systemd1.xml
+@@ -2691,6 +2691,15 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+       or the restart rate limit is reached. See the <literal>RestartMode=</literal> section in
+       <citerefentry><refentrytitle>systemd.service</refentrytitle><manvolnum>5</manvolnum></citerefentry>
+       for more details.</para>
++
++      <para><varname>OOMKills</varname> contains a different value depending on whether
++      <varname>OOMPolicy=kill</varname> is enabled for the unit or not. If enabled, the property contains the
++      number of times the kernel OOM killer killed all the processes in the unit's cgroup and its
++      descendant cgroups. If disabled, the property contains the number of processes the kernel OOM killer
++      has killed in the unit's cgroup and its descendant cgroups.</para>
++
++      <para><varname>ManagedOOMKills</varname> contains the number of times <command>systemd-oomd</command>
++      killed all the processes in the unit's cgroup and its descendant cgroups.</para>
+     </refsect2>
+ 
+     <refsect2>
+@@ -2900,6 +2909,10 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t IOWriteOperations = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly t OOMKills = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly t ManagedOOMKills = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly b Delegate = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly as DelegateControllers = ['...', ...];
+@@ -4247,6 +4260,10 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="IOWriteOperations"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="OOMKills"/>
++
++    <variablelist class="dbus-property" generated="True" extra-ref="ManagedOOMKills"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="Delegate"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="DelegateControllers"/>
+@@ -5139,6 +5156,10 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t IOWriteOperations = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly t OOMKills = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly t ManagedOOMKills = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly b Delegate = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly as DelegateControllers = ['...', ...];
+@@ -6486,6 +6507,10 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="IOWriteOperations"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="OOMKills"/>
++
++    <variablelist class="dbus-property" generated="True" extra-ref="ManagedOOMKills"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="Delegate"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="DelegateControllers"/>
+@@ -7202,6 +7227,10 @@ node /org/freedesktop/systemd1/unit/home_2emount {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t IOWriteOperations = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly t OOMKills = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly t ManagedOOMKills = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly b Delegate = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly as DelegateControllers = ['...', ...];
+@@ -8379,6 +8408,10 @@ node /org/freedesktop/systemd1/unit/home_2emount {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="IOWriteOperations"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="OOMKills"/>
++
++    <variablelist class="dbus-property" generated="True" extra-ref="ManagedOOMKills"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="Delegate"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="DelegateControllers"/>
+@@ -9228,6 +9261,10 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t IOWriteOperations = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly t OOMKills = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly t ManagedOOMKills = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly b Delegate = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly as DelegateControllers = ['...', ...];
+@@ -10369,6 +10406,10 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="IOWriteOperations"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="OOMKills"/>
++
++    <variablelist class="dbus-property" generated="True" extra-ref="ManagedOOMKills"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="Delegate"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="DelegateControllers"/>
+@@ -11071,6 +11112,10 @@ node /org/freedesktop/systemd1/unit/system_2eslice {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t IOWriteOperations = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly t OOMKills = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly t ManagedOOMKills = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly b Delegate = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly as DelegateControllers = ['...', ...];
+@@ -11436,6 +11481,10 @@ node /org/freedesktop/systemd1/unit/system_2eslice {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="IOWriteOperations"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="OOMKills"/>
++
++    <variablelist class="dbus-property" generated="True" extra-ref="ManagedOOMKills"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="Delegate"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="DelegateControllers"/>
+@@ -11647,6 +11696,10 @@ node /org/freedesktop/systemd1/unit/session_2d1_2escope {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t IOWriteOperations = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly t OOMKills = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly t ManagedOOMKills = ...;
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly b Delegate = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly as DelegateControllers = ['...', ...];
+@@ -12050,6 +12103,10 @@ node /org/freedesktop/systemd1/unit/session_2d1_2escope {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="IOWriteOperations"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="OOMKills"/>
++
++    <variablelist class="dbus-property" generated="True" extra-ref="ManagedOOMKills"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="Delegate"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="DelegateControllers"/>
+@@ -12459,6 +12516,8 @@ $ gdbus introspect --system --dest org.freedesktop.systemd1 \
+       <varname>LogsDirectoryQuotaUsage</varname>,
+       <varname>LogsDirectoryAccounting</varname>, and
+       <function>KillSubgroup()</function> were added in version 258.</para>
++      <para><varname>OOMKills</varname>, and
++      <varname>ManagedOOMKills</varname> were added in 259.</para>
+     </refsect2>
+     <refsect2>
+       <title>Socket Unit Objects</title>
+@@ -12524,6 +12583,8 @@ $ gdbus introspect --system --dest org.freedesktop.systemd1 \
+       <varname>LogsDirectoryQuotaUsage</varname>,
+       <varname>LogsDirectoryAccounting</varname>, and
+       <function>KillSubgroup()</function> were added in version 258.</para>
++      <para><varname>OOMKills</varname>, and
++      <varname>ManagedOOMKills</varname> were added in 259.</para>
+     </refsect2>
+     <refsect2>
+       <title>Mount Unit Objects</title>
+@@ -12584,6 +12645,8 @@ $ gdbus introspect --system --dest org.freedesktop.systemd1 \
+       <varname>LogsDirectoryQuotaUsage</varname>,
+       <varname>LogsDirectoryAccounting</varname>, and
+       <function>KillSubgroup()</function> were added in version 258.</para>
++      <para><varname>OOMKills</varname>, and
++      <varname>ManagedOOMKills</varname> were added in 259.</para>
+     </refsect2>
+     <refsect2>
+       <title>Swap Unit Objects</title>
+@@ -12642,6 +12705,8 @@ $ gdbus introspect --system --dest org.freedesktop.systemd1 \
+       <varname>LogsDirectoryQuotaUsage</varname>,
+       <varname>LogsDirectoryAccounting</varname>, and
+       <function>KillSubgroup()</function> were added in version 258.</para>
++      <para><varname>OOMKills</varname>, and
++      <varname>ManagedOOMKills</varname> were added in 259.</para>
+     </refsect2>
+     <refsect2>
+       <title>Slice Unit Objects</title>
+@@ -12672,6 +12737,8 @@ $ gdbus introspect --system --dest org.freedesktop.systemd1 \
+       <varname>NCurrentlyActive</varname>,
+       <function>RemoveSubgroup()</function>, and
+       <function>KillSubgroup()</function> were added in version 258.</para>
++      <para><varname>OOMKills</varname>, and
++      <varname>ManagedOOMKills</varname> were added in 259.</para>
+     </refsect2>
+     <refsect2>
+       <title>Scope Unit Objects</title>
+@@ -12700,6 +12767,8 @@ $ gdbus introspect --system --dest org.freedesktop.systemd1 \
+       <para><varname>ManagedOOMMemoryPressureDurationUSec</varname> was added in version 257.</para>
+       <para><function>RemoveSubgroup()</function> and
+       <function>KillSubgroup()</function> were added in version 258.</para>
++      <para><varname>OOMKills</varname>, and
++      <varname>ManagedOOMKills</varname> were added in 259.</para>
+     </refsect2>
+     <refsect2>
+       <title>Job Objects</title>
+diff --git a/src/core/dbus-unit.c b/src/core/dbus-unit.c
+index cf015b5a7bcc5..a524cfad22c94 100644
+--- a/src/core/dbus-unit.c
++++ b/src/core/dbus-unit.c
+@@ -1295,6 +1295,42 @@ static int property_get_cgroup_id(
+         return sd_bus_message_append(reply, "t", crt ? crt->cgroup_id : UINT64_C(0));
+ }
+ 
++static int property_get_oom_kills(
++                sd_bus *bus,
++                const char *path,
++                const char *interface,
++                const char *property,
++                sd_bus_message *reply,
++                void *userdata,
++                sd_bus_error *error) {
++
++        Unit *u = ASSERT_PTR(userdata);
++
++        assert(bus);
++        assert(reply);
++
++        CGroupRuntime *crt = unit_get_cgroup_runtime(u);
++        return sd_bus_message_append(reply, "t", crt ? crt->oom_kill_last : UINT64_MAX);
++}
++
++static int property_get_managed_oom_kills(
++                sd_bus *bus,
++                const char *path,
++                const char *interface,
++                const char *property,
++                sd_bus_message *reply,
++                void *userdata,
++                sd_bus_error *error) {
++
++        Unit *u = ASSERT_PTR(userdata);
++
++        assert(bus);
++        assert(reply);
++
++        CGroupRuntime *crt = unit_get_cgroup_runtime(u);
++        return sd_bus_message_append(reply, "t", crt ? crt->managed_oom_kill_last : UINT64_MAX);
++}
++
+ static int append_process(sd_bus_message *reply, const char *p, PidRef *pid, Set *pids) {
+         _cleanup_free_ char *buf = NULL, *cmdline = NULL;
+         int r;
+@@ -1715,6 +1751,8 @@ const sd_bus_vtable bus_unit_cgroup_vtable[] = {
+         SD_BUS_PROPERTY("IOReadOperations", "t", property_get_io_counter, 0, 0),
+         SD_BUS_PROPERTY("IOWriteBytes", "t", property_get_io_counter, 0, 0),
+         SD_BUS_PROPERTY("IOWriteOperations", "t", property_get_io_counter, 0, 0),
++        SD_BUS_PROPERTY("OOMKills", "t", property_get_oom_kills, 0, 0),
++        SD_BUS_PROPERTY("ManagedOOMKills", "t", property_get_managed_oom_kills, 0, 0),
+ 
+         SD_BUS_METHOD_WITH_ARGS("GetProcesses",
+                                 SD_BUS_NO_ARGS,
+diff --git a/src/core/varlink-cgroup.c b/src/core/varlink-cgroup.c
+index 88d13f3c45b1e..7e23d4a0f7adf 100644
+--- a/src/core/varlink-cgroup.c
++++ b/src/core/varlink-cgroup.c
+@@ -615,5 +615,9 @@ int unit_cgroup_runtime_build_json(sd_json_variant **ret, const char *name, void
+                         JSON_BUILD_PAIR_CALLBACK_NON_NULL("IOReadBytes", get_io_counter_build_json, u),
+                         JSON_BUILD_PAIR_CALLBACK_NON_NULL("IOReadOperations", get_io_counter_build_json, u),
+                         JSON_BUILD_PAIR_CALLBACK_NON_NULL("IOWriteBytes", get_io_counter_build_json, u),
+-                        JSON_BUILD_PAIR_CALLBACK_NON_NULL("IOWriteOperations", get_io_counter_build_json, u));
++                        JSON_BUILD_PAIR_CALLBACK_NON_NULL("IOWriteOperations", get_io_counter_build_json, u),
++
++                        /* OOM */
++                        SD_JSON_BUILD_PAIR_UNSIGNED("OOMKills", crt->oom_kill_last),
++                        SD_JSON_BUILD_PAIR_UNSIGNED("ManagedOOMKills", crt->managed_oom_kill_last));
+ }
+diff --git a/src/shared/varlink-io.systemd.Unit.c b/src/shared/varlink-io.systemd.Unit.c
+index 30d5d8cd5746c..32c72f0040cbf 100644
+--- a/src/shared/varlink-io.systemd.Unit.c
++++ b/src/shared/varlink-io.systemd.Unit.c
+@@ -455,7 +455,13 @@ static SD_VARLINK_DEFINE_STRUCT_TYPE(
+                 SD_VARLINK_FIELD_COMMENT("The total number of bytes written to block devices by the cgroup"),
+                 SD_VARLINK_DEFINE_FIELD(IOWriteBytes, SD_VARLINK_INT, SD_VARLINK_NULLABLE),
+                 SD_VARLINK_FIELD_COMMENT("The total number of write operations performed on block devices by the cgroup"),
+-                SD_VARLINK_DEFINE_FIELD(IOWriteOperations, SD_VARLINK_INT, SD_VARLINK_NULLABLE));
++                SD_VARLINK_DEFINE_FIELD(IOWriteOperations, SD_VARLINK_INT, SD_VARLINK_NULLABLE),
++
++                /* OOM */
++                SD_VARLINK_FIELD_COMMENT("The number of processes of this unit killed by the kernel OOM killer"),
++                SD_VARLINK_DEFINE_FIELD(OOMKills, SD_VARLINK_INT, SD_VARLINK_NULLABLE),
++                SD_VARLINK_FIELD_COMMENT("The number of processes of this unit killed by systemd-oomd"),
++                SD_VARLINK_DEFINE_FIELD(ManagedOOMKills, SD_VARLINK_INT, SD_VARLINK_NULLABLE));
+ 
+ static SD_VARLINK_DEFINE_STRUCT_TYPE(
+                 UnitRuntime,
+diff --git a/test/units/TEST-55-OOMD.sh b/test/units/TEST-55-OOMD.sh
+index 3ca8528f7f1a8..57c54cc5b3897 100755
+--- a/test/units/TEST-55-OOMD.sh
++++ b/test/units/TEST-55-OOMD.sh
+@@ -125,6 +125,8 @@ test_basic() {
+     if systemctl "$@" status TEST-55-OOMD-testbloat.service; then exit 42; fi
+     if ! systemctl "$@" status TEST-55-OOMD-testchill.service; then exit 24; fi
+ 
++    assert_eq "$(systemctl "$@" show TEST-55-OOMD-testbloat.service -P ManagedOOMKills)" "1"
++
+     systemctl "$@" kill --signal=KILL TEST-55-OOMD-testbloat.service || :
+     systemctl "$@" stop TEST-55-OOMD-testbloat.service
+     systemctl "$@" stop TEST-55-OOMD-testchill.service
+
+From b59fd192dbfa5e300bd78d10d37b0ea6be40f127 Mon Sep 17 00:00:00 2001
+From: Daan De Meyer <daan.j.demeyer@gmail.com>
+Date: Thu, 18 Sep 2025 10:18:17 +0200
+Subject: [PATCH 3/3] test: Add tests for systemd's kernel oom kill handling
+
+---
+ test/units/TEST-55-OOMD.sh | 44 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+
+diff --git a/test/units/TEST-55-OOMD.sh b/test/units/TEST-55-OOMD.sh
+index 57c54cc5b3897..8659971e3f9d5 100755
+--- a/test/units/TEST-55-OOMD.sh
++++ b/test/units/TEST-55-OOMD.sh
+@@ -300,6 +300,50 @@ testcase_reload() {
+     assert_in 'Default Memory Pressure Duration: 2s' "$(oomctl)"
+ }
+ 
++testcase_kernel_oom() {
++    cat >/tmp/script.sh <<"EOF"
++#!/bin/bash
++choom --adjust '+1000' -- bash -c 'echo f >/proc/sysrq-trigger && exec sleep infinity'
++choom --adjust '+1000' -p $$
++echo f >/proc/sysrq-trigger
++exec sleep infinity
++EOF
++    chmod +x /tmp/script.sh
++
++    (! systemd-run --wait --unit oom-kill -p OOMPolicy=continue /tmp/script.sh)
++    # With OOMPolicy=continue, we shouldn't get the oom-kill result.
++    assert_eq "$(systemctl show oom-kill -P Result)" "signal"
++    # Check that OOMKills reports 2 individual processes killed.
++    assert_eq "$(systemctl show oom-kill -P OOMKills)" "2"
++    systemctl reset-failed
++
++    (! systemd-run --wait --unit oom-kill -p OOMPolicy=kill /tmp/script.sh)
++    # Check that a regular kernel oom kill with OOMPolicy=kill results in the oom-kill result.
++    assert_eq "$(systemctl show oom-kill -P Result)" "oom-kill"
++    # Check that OOMKills reports 1 oom group kill instead of the number of processes that were killed.
++    assert_eq "$(systemctl show oom-kill -P OOMKills)" "1"
++    systemctl reset-failed
++
++    cat >/tmp/script.sh <<"EOF"
++#!/bin/bash
++echo '+memory' >/sys/fs/cgroup/system.slice/oom-kill.service/cgroup.subtree_control
++mkdir /sys/fs/cgroup/system.slice/oom-kill.service/sub
++echo 1 >/sys/fs/cgroup/system.slice/oom-kill.service/sub/memory.oom.group
++echo $$ >/sys/fs/cgroup/system.slice/oom-kill.service/sub/cgroup.procs
++choom --adjust '+1000' -p $$
++echo f >/proc/sysrq-trigger
++exec sleep infinity
++EOF
++    chmod +x /tmp/script.sh
++
++    (! systemd-run --wait --unit oom-kill -p OOMPolicy=kill -p Delegate=yes -p DelegateSubgroup=init.scope /tmp/script.sh)
++    # Test that an oom-kill in a delegated unit in a subcgroup with memory.oom.group=1 also results in the
++    # oom-kill exit status.
++    assert_eq "$(systemctl show oom-kill -P Result)" "oom-kill"
++    assert_eq "$(systemctl show oom-kill -P OOMKills)" "1"
++    systemctl reset-failed
++}
++
+ run_testcases
+ 
+ systemd-analyze log-level info
