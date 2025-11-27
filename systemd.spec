@@ -155,7 +155,7 @@ Patch:          0001-Revert-units-drop-runlevel-0-6-.target.patch
 Patch:          https://github.com/systemd/systemd/pull/38769.patch
 
 # A patch to make https://github.com/systemd/systemd/issues/38817 more easy to reproduce and visible
-Patch:          https://github.com/systemd/systemd/pull/38884.patch
+Patch:          https://github.com/systemd/systemd/pull/39932.patch
 
 # Backport OOMKills & ManagedOOMKills dbus/varlink fields
 # original PR: https://github.com/systemd/systemd/pull/38906
