@@ -160,6 +160,10 @@ Patch:          https://github.com/systemd/systemd/pull/39932.patch
 # Backport OOMKills & ManagedOOMKills dbus/varlink fields
 # original PR: https://github.com/systemd/systemd/pull/38906
 Patch:          https://github.com/systemd/systemd/pull/39933.patch
+
+# This mount option will count HugeTLB memory usage towards the cgroup’s overall memory usage for the memory controller.
+# original PR: https://github.com/systemd/systemd/pull/39486
+Patch:          https://github.com/systemd/systemd/pull/39934.patch
 %endif
 
 # Meta specific backports
