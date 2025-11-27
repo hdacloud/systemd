@@ -164,6 +164,10 @@ Patch:          https://github.com/systemd/systemd/pull/39933.patch
 # This mount option will count HugeTLB memory usage towards the cgroup’s overall memory usage for the memory controller.
 # original PR: https://github.com/systemd/systemd/pull/39486
 Patch:          https://github.com/systemd/systemd/pull/39934.patch
+
+# network: clear existing routes if Gateway= is empty in [Network]
+# original PR: https://github.com/systemd/systemd/pull/39801
+Patch:          https://github.com/systemd/systemd/pull/39801.patch
 %endif
 
 # Meta specific backports
