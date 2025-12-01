@@ -7,7 +7,6 @@ known_files = '''
 %ghost %config(noreplace) /etc/crypttab
 %ghost %attr(0444,root,root) /etc/udev/hwdb.bin
 /etc/inittab
-/usr/lib/systemd/purge-nobody-user
 # This directory is owned by openssh-server, but we don't want to introduce
 # a dependency. So let's copy the config and co-own the directory.
 %dir %attr(0700,root,root) /etc/ssh/sshd_config.d
@@ -57,12 +56,14 @@ def files(root):
 
 outputs = {suffix: open(f'.file-list-{suffix}', 'w')
            for suffix in (
+                   'shared',
                    'libs',
                    'udev',
                    'ukify',
                    'boot',
                    'pam',
                    'rpm-macros',
+                   'sysusers',
                    'devel',
                    'container',
                    'networkd',
@@ -120,13 +121,15 @@ for file in files(buildroot):
         o = outputs['rpm-macros']
     elif '/usr/lib/systemd/tests' in n:
         o = outputs['tests']
-    elif 'ukify' in n:
+    elif 'ukify' in n and '/man/' not in n:
         o = outputs['ukify']
-    elif re.search(r'/libsystemd-(shared|core)-.*\.so$', n):
+    elif re.search(r'/libsystemd-core-.*\.so$', n):
         o = outputs['main']
+    elif re.search(r'/libsystemd-shared-.*\.so$', n):
+        o = outputs['shared']
     elif re.search(r'/libcryptsetup-token-systemd-.*\.so$', n):
         o = outputs['udev']
-    elif re.search(r'/lib.*\.pc|/man3/|/usr/include|\.so$', n):
+    elif re.search(r'/lib.*\.pc$|/man3/|/usr/include|\.so$', n):
         o = outputs['devel']
     elif re.search(r'''journal-(remote|gateway|upload)|
                        systemd-remote\.conf|
@@ -135,12 +138,31 @@ for file in files(buildroot):
     ''', n, re.X):
         o = outputs['remote']
 
+    # Just the binary, the dir, and the man page.
+    elif re.search(r'''systemd-sysusers$|
+                       sysusers\.d$|
+                       man/.*sysusers\.d\.5|
+                       man/.*systemd-sysusers\.8
+    ''', n, re.X):
+        o = outputs['sysusers']
+
     elif re.search(r'''mymachines|
                        machinectl|
+                       mount.ddi|
+                       importctl|
+                       portablectl|
                        systemd-nspawn|
+                       systemd\.nspawn|
                        systemd-vmspawn|
-                       import-pubring.gpg|
-                       systemd-(machined|import|pull)|
+                       systemd-dissect|
+                       import-pubring|
+                       systemd-machined|
+                       systemd-import|
+                       systemd-export|
+                       systemd-pull|
+                       systemd-mountfsd|
+                       systemd-mountwork|
+                       systemd-nsresource|
                        /machine.slice|
                        /machines.target|
                        var-lib-machines.mount|
@@ -178,6 +200,7 @@ for file in files(buildroot):
 
     elif re.search(r'''udev(?!\.pc)|
                        hwdb|
+                       ac-power|
                        bootctl|
                        boot-update|
                        bless-boot|
@@ -211,7 +234,8 @@ for file in files(buildroot):
                        integritytab|
                        remount-fs|
                        /initrd|
-                       systemd-pcr|
+                       systemd[.-]pcr|
+                       /pcrlock\.d|
                        systemd-measure|
                        /boot$|
                        /kernel/|
@@ -221,6 +245,7 @@ for file in files(buildroot):
                        sysctl|
                        coredump|
                        homed|home1|
+                       sysupdate|updatctl|
                        oomd|
                        portabled|portable1
     ''', n, re.X):     # coredumpctl, homectl, portablectl are included in the main package because
@@ -246,13 +271,13 @@ for file in files(buildroot):
 
     if n in known_files:
         prefix = known_files[n].split()[:-1]
-    elif file.is_dir() and not file.is_symlink():
+    elif file.is_dir(follow_symlinks=False):
         prefix = ['%dir']
     elif 'README' in n:
         prefix = ['%doc']
     elif n.startswith('/etc'):
         prefix = ['%config(noreplace)']
-        if file.stat().st_size == 0:
+        if not file.is_symlink() and file.stat().st_size == 0:
             prefix += ['%ghost']
     else:
         prefix = []
