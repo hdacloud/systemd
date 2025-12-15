@@ -68,7 +68,7 @@ Url:            https://systemd.io
 # But don't do that on OBS, otherwise the version subst fails, and will be
 # like 257-123-gabcd257.1 instead of 257-123-gabcd
 %if %{without obs}
-Version:        %{?version_override}%{!?version_override:258.2}
+Version:        %{?version_override}%{!?version_override:258.3}
 %else
 Version:        %{?version_override}%{!?version_override:%(cat meson.version)}
 %endif
@@ -164,10 +164,6 @@ Patch:          https://github.com/systemd/systemd/pull/39933.patch
 # This mount option will count HugeTLB memory usage towards the cgroup’s overall memory usage for the memory controller.
 # original PR: https://github.com/systemd/systemd/pull/39486
 Patch:          https://github.com/systemd/systemd/pull/39934.patch
-
-# network: clear existing routes if Gateway= is empty in [Network]
-# original PR: https://github.com/systemd/systemd/pull/39801
-Patch:          https://github.com/systemd/systemd/pull/39801.patch
 %endif
 
 # Meta specific backports
