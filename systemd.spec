@@ -163,7 +163,7 @@ Patch:          https://github.com/systemd/systemd/pull/39933.patch
 
 # This mount option will count HugeTLB memory usage towards the cgroup’s overall memory usage for the memory controller.
 # original PR: https://github.com/systemd/systemd/pull/39486
-Patch:          https://github.com/systemd/systemd/pull/39934.patch
+Patch:          https://github.com/systemd/systemd/pull/40088.patch
 %endif
 
 # Meta specific backports

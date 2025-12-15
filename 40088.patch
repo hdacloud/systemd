@@ -1,9 +1,11 @@
-From 8708b18504d66bf98c797679a587d5453e6ed644 Mon Sep 17 00:00:00 2001
+From 1d2492e774aa87764065b0af019fa036a57dc67d Mon Sep 17 00:00:00 2001
 From: Daan De Meyer <daan.j.demeyer@gmail.com>
 Date: Wed, 29 Oct 2025 13:38:38 +0100
 Subject: [PATCH 1/3] mount-setup: Reformat table
 
 Preparation for the next commit.
+
+(cherry picked from commit c46344d5976beb6b60e8ba7691d9b60a945e0562)
 ---
  src/shared/mount-setup.c | 147 ++++++++++++++++++++++++++++++---------
  1 file changed, 116 insertions(+), 31 deletions(-)
@@ -182,12 +184,13 @@ index 564ab038ec17a..b252909daec23 100644
  
  /* The first three entries we might need before SELinux is up. The
 
-From eef483fb3da96af61a1f5378ab5e9f74ab215416 Mon Sep 17 00:00:00 2001
+From a69f4fc5f7f23f83735521595a0bd41d5ec9c196 Mon Sep 17 00:00:00 2001
 From: Daan De Meyer <daan.j.demeyer@gmail.com>
 Date: Wed, 29 Oct 2025 16:28:40 +0100
 Subject: [PATCH 2/3] mount-setup: Add optional function which provides extra
  mount options
 
+(cherry picked from commit 5ce388aec839f97b15f972953de5e7e962c9042c)
 ---
  src/shared/mount-setup.c | 104 +++++++++++++++++++++++++--------------
  1 file changed, 67 insertions(+), 37 deletions(-)
@@ -371,7 +374,7 @@ index b252909daec23..6e4038b32e185 100644
          log_debug("Mounting %s to %s of type %s with options %s.",
                    p->what,
 
-From 436d889435f7d5a8659e783181084c23a62149dd Mon Sep 17 00:00:00 2001
+From 41d837d00f3c8829e9fa63e15f68c40f6d216bf6 Mon Sep 17 00:00:00 2001
 From: Daan De Meyer <daan.j.demeyer@gmail.com>
 Date: Wed, 29 Oct 2025 16:30:07 +0100
 Subject: [PATCH 3/3] mount-setup: Add memory_hugetlb_accounting to cgroupfs
@@ -385,42 +388,12 @@ overall memory usage for the memory controller.
 
 See https://lore.kernel.org/all/20231006184629.155543-4-nphamcs@gmail.com/T/#u
 for the patch introducing the new mount option.
----
- NEWS                     | 5 +++++
- README                   | 3 ++-
- src/shared/mount-setup.c | 2 +-
- 3 files changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/NEWS b/NEWS
-index b772da0c4f511..2887b78ff4ed6 100644
---- a/NEWS
-+++ b/NEWS
-@@ -4,6 +4,11 @@ CHANGES WITH 258:
- 
-         Incompatible changes:
- 
-+        * The cgroup2 file system is now mounted with the
-+          "memory_hugetlb_accounting" mount option, supported since kernel 6.6.
-+          This means that HugeTLB memory usage is now counted towards the
-+          cgroup’s overall memory usage for the memory controller.
-+
-         * Support for cgroup v1 ('legacy' and 'hybrid' hierarchies) has been
-           removed. cgroup v2 ('unified' hierarchy) will always be mounted
-           during system bootup and systemd-nspawn container initialization.
-diff --git a/README b/README
-index eea3a55fbb8d1..328e8613e62d5 100644
---- a/README
-+++ b/README
-@@ -68,7 +68,8 @@ REQUIREMENTS:
-                      ≥ 6.3 for MFD_EXEC/MFD_NOEXEC_SEAL and tmpfs noswap option
-                      ≥ 6.5 for name_to_handle_at() AT_HANDLE_FID, SO_PEERPIDFD/SO_PASSPIDFD,
-                                and MOVE_MOUNT_BENEATH
--                     ≥ 6.6 for quota support on tmpfs
-+                     ≥ 6.6 for quota support on tmpfs and cgroup2fs memory_hugetlb_accounting
-+                           option
-                      ≥ 6.9 for pidfs
-                      ≥ 6.10 for fcntl(F_DUPFD_QUERY), unprivileged linkat(AT_EMPTY_PATH),
-                             and block device 'partscan' sysfs attribute
+(cherry picked from commit 886c078702380686e036b05c54f182305d89182c)
+---
+ src/shared/mount-setup.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
 diff --git a/src/shared/mount-setup.c b/src/shared/mount-setup.c
 index 6e4038b32e185..10983e28af61e 100644
 --- a/src/shared/mount-setup.c
