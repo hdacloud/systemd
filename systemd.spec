@@ -152,6 +152,11 @@ Patch:          0001-Revert-units-drop-runlevel-0-6-.target.patch
 # userdb: create userdb root directory with correct label
 # We can drop this after SELinux policy is updated to handle the transition.
 Patch:          https://github.com/systemd/systemd/pull/38769.patch
+
+# https://github.com/systemd/systemd/pull/40124
+Patch:          0001-ssh-generator-split-out-common-helper-function.patch
+Patch:          0002-ssh-generator-split-out-one-more-helper-function.patch
+Patch:          0003-ssh-generator-suppress-error-message-for-vsock-EADDR.patch
 %endif
 
 %ifarch %{ix86} x86_64 aarch64 riscv64

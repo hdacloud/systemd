@@ -1,0 +1,39 @@
+From 5f97faffa0b5d16be17d2f3f571fcf8312fe4aa9 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Zbigniew=20J=C4=99drzejewski-Szmek?= <zbyszek@in.waw.pl>
+Date: Tue, 18 Nov 2025 11:37:59 +0100
+Subject: [PATCH 3/3] ssh-generator: suppress error message for vsock
+ EADDRNOTAVAIL
+
+In logs in the Fedora OpenQA CI:
+Nov 17 22:20:06 fedora systemd-ssh-generator[4117]: Failed to query local AF_VSOCK CID: Cannot assign requested address
+Nov 17 22:20:06 fedora (generato[4088]: /usr/lib/systemd/system-generators/systemd-ssh-generator failed with exit status 1.
+Nov 17 22:20:06 fedora systemd[1]: sshd-vsock.socket: Unit configuration changed while unit was running, and no socket file descriptors are open. Unit not functional until restarted.
+
+AF_VSOCK is not configured there and systemd-ssh-generator should just exit
+quietly. vsock_get_local_cid() already does some logging at debug level, so we
+don't need to.
+
+There is also a second bug, we report modifications to the unit have just
+created. I think we have an issue open for this somewhere, but cannot find it.
+
+(cherry picked from commit 8c3acba63b40cd0ebcb9863804e598744eda0b80)
+---
+ src/ssh-generator/ssh-util.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/src/ssh-generator/ssh-util.c b/src/ssh-generator/ssh-util.c
+index d414713486..48cb662b71 100644
+--- a/src/ssh-generator/ssh-util.c
++++ b/src/ssh-generator/ssh-util.c
+@@ -27,8 +27,9 @@ int vsock_get_local_cid_or_warn(unsigned *ret) {
+         int r;
+ 
+         r = vsock_get_local_cid(ret);
+-        if (ERRNO_IS_NEG_DEVICE_ABSENT(r)) {
+-                log_debug_errno(r, "/dev/vsock is not available (even though AF_VSOCK is), ignoring: %m");
++        if (ERRNO_IS_NEG_DEVICE_ABSENT(r) || r == -EADDRNOTAVAIL) {
++                if (ERRNO_IS_NEG_DEVICE_ABSENT(r))
++                        log_debug_errno(r, "/dev/vsock is not available (even though AF_VSOCK is), ignoring: %m");
+                 if (ret)
+                         *ret = 0;  /* bogus value */
+                 return 0;
