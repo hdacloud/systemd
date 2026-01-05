@@ -157,6 +157,8 @@ Patch:          https://github.com/systemd/systemd/pull/38769.patch
 Patch:          0001-ssh-generator-split-out-common-helper-function.patch
 Patch:          0002-ssh-generator-split-out-one-more-helper-function.patch
 Patch:          0003-ssh-generator-suppress-error-message-for-vsock-EADDR.patch
+# userdb: omit empty parameters field in JSON messages
+Patch:          https://github.com/systemd/systemd/pull/38922.patch
 %endif
 
 %ifarch %{ix86} x86_64 aarch64 riscv64
