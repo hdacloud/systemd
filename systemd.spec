@@ -164,6 +164,10 @@ Patch:          https://github.com/systemd/systemd/pull/39933.patch
 # This mount option will count HugeTLB memory usage towards the cgroup’s overall memory usage for the memory controller.
 # original PR: https://github.com/systemd/systemd/pull/39486
 Patch:          https://github.com/systemd/systemd/pull/40088.patch
+
+# core: Add UserNamespacePath=
+# original PR: https://github.com/systemd/systemd/pull/39359
+Patch:          https://github.com/systemd/systemd/pull/40291.patch
 %endif
 
 # Meta specific backports
