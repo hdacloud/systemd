@@ -167,7 +167,7 @@ Patch:          https://github.com/systemd/systemd/pull/40088.patch
 
 # core: Add UserNamespacePath=
 # original PR: https://github.com/systemd/systemd/pull/39359
-Patch:          https://github.com/systemd/systemd/pull/40291.patch
+Patch:          https://github.com/systemd/systemd/pull/40299.patch
 %endif
 
 # Meta specific backports

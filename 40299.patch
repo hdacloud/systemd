@@ -1,12 +1,15 @@
-From 5911d67c5890412633ca55853cc6917094829633 Mon Sep 17 00:00:00 2001
-From: Ivan Kruglov <mail@ikruglov.com>
-Date: Tue, 6 Jan 2026 02:55:19 -0800
-Subject: [PATCH] core: Add UserNamespacePath= (backport to 258.3 for
- hyperscale)
+From 8ce6c6e6e39b98f9be0291fe4c07605bf5abae9c Mon Sep 17 00:00:00 2001
+From: Quentin Deslandes <qde@naccy.de>
+Date: Fri, 17 Oct 2025 15:37:02 +0200
+Subject: [PATCH] core: Add UserNamespacePath=
 
+This allows a service to reuse the user namespace created for an
+existing service, similarly to NetworkNamespacePath=. The configuration
+is the initial user namespace (e.g. ID mapping) is preserved.
+
+(cherry picked from commit 79dd24cf14adc809620479d45a7b469cf3e82892)
+(original PR: https://github.com/systemd/systemd/pull/39359)
 ---
- man/org.freedesktop.systemd1.xml              | 24 ++++++
- man/systemd.exec.xml                          | 14 ++++
  src/core/dbus-execute.c                       |  4 +
  src/core/exec-invoke.c                        | 29 ++++++-
  src/core/execute-serialize.c                  | 20 +++++
@@ -19,146 +22,9 @@ Subject: [PATCH] core: Add UserNamespacePath= (backport to 258.3 for
  src/shared/bus-unit-util.c                    |  1 +
  .../fuzz-unit-file/directives-all.service     |  1 +
  .../units/TEST-07-PID1.user-namespace-path.sh | 58 ++++++++++++++
- 14 files changed, 238 insertions(+), 5 deletions(-)
+ 12 files changed, 200 insertions(+), 5 deletions(-)
  create mode 100755 test/units/TEST-07-PID1.user-namespace-path.sh
 
-diff --git a/man/org.freedesktop.systemd1.xml b/man/org.freedesktop.systemd1.xml
-index ed227127489be..ee072559bc41b 100644
---- a/man/org.freedesktop.systemd1.xml
-+++ b/man/org.freedesktop.systemd1.xml
-@@ -3392,6 +3392,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
-       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
-       readonly b MemoryKSM = ...;
-       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
-+      readonly s UserNamespacePath = '...';
-+      @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
-       readonly s NetworkNamespacePath = '...';
-       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
-       readonly s IPCNamespacePath = '...';
-@@ -4003,6 +4005,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
- 
-     <!--property MemoryKSM is not documented!-->
- 
-+    <!--property UserNamespacePath is not documented!-->
-+
-     <!--property NetworkNamespacePath is not documented!-->
- 
-     <!--property IPCNamespacePath is not documented!-->
-@@ -4739,6 +4743,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
- 
-     <variablelist class="dbus-property" generated="True" extra-ref="MemoryKSM"/>
- 
-+    <variablelist class="dbus-property" generated="True" extra-ref="UserNamespacePath"/>
-+
-     <variablelist class="dbus-property" generated="True" extra-ref="NetworkNamespacePath"/>
- 
-     <variablelist class="dbus-property" generated="True" extra-ref="IPCNamespacePath"/>
-@@ -5631,6 +5637,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
-       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
-       readonly b MemoryKSM = ...;
-       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
-+      readonly s UserNamespacePath = '...';
-+      @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
-       readonly s NetworkNamespacePath = '...';
-       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
-       readonly s IPCNamespacePath = '...';
-@@ -6262,6 +6270,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
- 
-     <!--property MemoryKSM is not documented!-->
- 
-+    <!--property UserNamespacePath is not documented!-->
-+
-     <!--property NetworkNamespacePath is not documented!-->
- 
-     <!--property IPCNamespacePath is not documented!-->
-@@ -6978,6 +6988,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
- 
-     <variablelist class="dbus-property" generated="True" extra-ref="MemoryKSM"/>
- 
-+    <variablelist class="dbus-property" generated="True" extra-ref="UserNamespacePath"/>
-+
-     <variablelist class="dbus-property" generated="True" extra-ref="NetworkNamespacePath"/>
- 
-     <variablelist class="dbus-property" generated="True" extra-ref="IPCNamespacePath"/>
-@@ -7694,6 +7706,8 @@ node /org/freedesktop/systemd1/unit/home_2emount {
-       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
-       readonly b MemoryKSM = ...;
-       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
-+      readonly s UserNamespacePath = '...';
-+      @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
-       readonly s NetworkNamespacePath = '...';
-       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
-       readonly s IPCNamespacePath = '...';
-@@ -8247,6 +8261,8 @@ node /org/freedesktop/systemd1/unit/home_2emount {
- 
-     <!--property MemoryKSM is not documented!-->
- 
-+    <!--property UserNamespacePath is not documented!-->
-+
-     <!--property NetworkNamespacePath is not documented!-->
- 
-     <!--property IPCNamespacePath is not documented!-->
-@@ -8871,6 +8887,8 @@ node /org/freedesktop/systemd1/unit/home_2emount {
- 
-     <variablelist class="dbus-property" generated="True" extra-ref="MemoryKSM"/>
- 
-+    <variablelist class="dbus-property" generated="True" extra-ref="UserNamespacePath"/>
-+
-     <variablelist class="dbus-property" generated="True" extra-ref="NetworkNamespacePath"/>
- 
-     <variablelist class="dbus-property" generated="True" extra-ref="IPCNamespacePath"/>
-@@ -9720,6 +9738,8 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
-       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
-       readonly b MemoryKSM = ...;
-       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
-+      readonly s UserNamespacePath = '...';
-+      @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
-       readonly s NetworkNamespacePath = '...';
-       @org.freedesktop.DBus.Property.EmitsChangedSignal("const")
-       readonly s IPCNamespacePath = '...';
-@@ -10255,6 +10275,8 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
- 
-     <!--property MemoryKSM is not documented!-->
- 
-+    <!--property UserNamespacePath is not documented!-->
-+
-     <!--property NetworkNamespacePath is not documented!-->
- 
-     <!--property IPCNamespacePath is not documented!-->
-@@ -10861,6 +10883,8 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
- 
-     <variablelist class="dbus-property" generated="True" extra-ref="MemoryKSM"/>
- 
-+    <variablelist class="dbus-property" generated="True" extra-ref="UserNamespacePath"/>
-+
-     <variablelist class="dbus-property" generated="True" extra-ref="NetworkNamespacePath"/>
- 
-     <variablelist class="dbus-property" generated="True" extra-ref="IPCNamespacePath"/>
-diff --git a/man/systemd.exec.xml b/man/systemd.exec.xml
-index 812260587f33b..61755c94d16c2 100644
---- a/man/systemd.exec.xml
-+++ b/man/systemd.exec.xml
-@@ -2026,6 +2026,20 @@ BindReadOnlyPaths=/var/lib/systemd</programlisting>
-         <xi:include href="system-or-user-ns.xml" xpointer="singular"/></listitem>
-       </varlistentry>
- 
-+      <varlistentry>
-+        <term><varname>UserNamespacePath=</varname></term>
-+
-+        <listitem><para>Takes an absolute file system path referring to a Linux user namespace
-+        pseudo-file (i.e. a file like <filename>/proc/$PID/ns/user</filename> or a bind mount or symlink to
-+        one). When set the invoked processes are added to the user namespace referenced by that path. The
-+        path has to point to a valid namespace file at the moment the processes are forked off. If this
-+        option is used <varname>PrivateUsers=</varname> has no effect.</para>
-+
-+        <para>This option is only available for system services.</para>
-+
-+        <xi:include href="version-info.xml" xpointer="v259"/></listitem>
-+      </varlistentry>
-+
-       <varlistentry>
-         <term><varname>NetworkNamespacePath=</varname></term>
- 
 diff --git a/src/core/dbus-execute.c b/src/core/dbus-execute.c
 index 0157665c4a4fa..34c41ad6a224b 100644
 --- a/src/core/dbus-execute.c
