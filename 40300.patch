@@ -1,0 +1,451 @@
+From 6fe92dc7fd6b282f765a1a98eb47838df7a98b34 Mon Sep 17 00:00:00 2001
+From: Usama Arif <usamaarif642@gmail.com>
+Date: Mon, 15 Sep 2025 13:33:28 +0100
+Subject: [PATCH 1/2] core: introduce MemoryTHP= unit file setting
+
+Transparent Hugepages (THP) is a Linux kernel feature that manages
+memory using larger pages (2MB on x86, compared to the default 4KB).
+The main goal is to improve memory management efficiency and system
+performance, especially for memory-intensive applications.
+However, it can cause drawbacks in some scenarios, such as memory
+regression and latency spikes. THP policy is governed for the entire
+system via /sys/kernel/mm/transparent_hugepage/enabled.
+However, it can be overridden for individual workloads via prctl(2)
+call.
+MemoryTHP= is used to disable THPs at exec-invoke to stop
+providing THPs for workloads where the drawbacks outweigh the advantages.
+When set to "disable", MemoryTHP= disables THPs completely for the
+process, irrespecitive of global THP controls.
+When set to "madvise", MemoryTHP= disables THPs for the process except
+when specifically madvised by the process with MADV_HUGEPAGE or MADV_COLLAPSE.
+
+(cherry picked from commit 32614b9aab5a5c9b5be22b635fefdbccef90adc3)
+(original PR https://github.com/systemd/systemd/pull/39085)
+---
+ src/core/dbus-execute.c               |  6 +++++
+ src/core/exec-invoke.c                | 36 +++++++++++++++++++++++++++
+ src/core/execute-serialize.c          |  8 ++++++
+ src/core/execute.c                    |  6 +++--
+ src/core/execute.h                    |  1 +
+ src/core/load-fragment-gperf.gperf.in |  1 +
+ src/core/load-fragment.c              |  1 +
+ src/core/load-fragment.h              |  1 +
+ src/core/namespace.c                  |  9 +++++++
+ src/core/namespace.h                  | 21 ++++++++++++++++
+ src/shared/bus-unit-util.c            |  1 +
+ src/shared/exit-status.c              |  1 +
+ src/shared/exit-status.h              |  1 +
+ 13 files changed, 91 insertions(+), 2 deletions(-)
+
+diff --git a/src/core/dbus-execute.c b/src/core/dbus-execute.c
+index 0157665c4a4fa..2ee65dec19d58 100644
+--- a/src/core/dbus-execute.c
++++ b/src/core/dbus-execute.c
+@@ -58,6 +58,7 @@ static BUS_DEFINE_PROPERTY_GET_ENUM(property_get_private_bpf, private_bpf, Priva
+ static BUS_DEFINE_PROPERTY_GET_ENUM(property_get_protect_home, protect_home, ProtectHome);
+ static BUS_DEFINE_PROPERTY_GET_ENUM(property_get_protect_system, protect_system, ProtectSystem);
+ static BUS_DEFINE_PROPERTY_GET_ENUM(property_get_personality, personality, unsigned long);
++static BUS_DEFINE_PROPERTY_GET_ENUM(property_get_memory_thp, memory_thp, MemoryTHP);
+ static BUS_DEFINE_PROPERTY_GET(property_get_ioprio, "i", ExecContext, exec_context_get_effective_ioprio);
+ static BUS_DEFINE_PROPERTY_GET(property_get_mount_apivfs, "b", ExecContext, exec_context_get_effective_mount_apivfs);
+ static BUS_DEFINE_PROPERTY_GET(property_get_bind_log_sockets, "b", ExecContext, exec_context_get_effective_bind_log_sockets);
+@@ -1412,6 +1413,7 @@ const sd_bus_vtable bus_exec_vtable[] = {
+         SD_BUS_PROPERTY("RootImagePolicy", "s", property_get_image_policy, offsetof(ExecContext, root_image_policy), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("MountImagePolicy", "s", property_get_image_policy, offsetof(ExecContext, mount_image_policy), SD_BUS_VTABLE_PROPERTY_CONST),
+         SD_BUS_PROPERTY("ExtensionImagePolicy", "s", property_get_image_policy, offsetof(ExecContext, extension_image_policy), SD_BUS_VTABLE_PROPERTY_CONST),
++        SD_BUS_PROPERTY("MemoryTHP", "s", property_get_memory_thp, offsetof(ExecContext, memory_thp), SD_BUS_VTABLE_PROPERTY_CONST),
+ 
+         /* Obsolete/redundant properties: */
+         SD_BUS_PROPERTY("Capabilities", "s", property_get_empty_string, 0, SD_BUS_VTABLE_PROPERTY_CONST|SD_BUS_VTABLE_HIDDEN),
+@@ -1844,6 +1846,7 @@ static BUS_DEFINE_SET_TRANSIENT_PARSE(keyring_mode, ExecKeyringMode, exec_keyrin
+ static BUS_DEFINE_SET_TRANSIENT_PARSE(protect_proc, ProtectProc, protect_proc_from_string);
+ static BUS_DEFINE_SET_TRANSIENT_PARSE(proc_subset, ProcSubset, proc_subset_from_string);
+ static BUS_DEFINE_SET_TRANSIENT_PARSE(private_bpf, PrivateBPF, private_bpf_from_string);
++static BUS_DEFINE_SET_TRANSIENT_PARSE(memory_thp, MemoryTHP, memory_thp_from_string);
+ static BUS_DEFINE_SET_TRANSIENT_PARSE_PTR(bpf_delegate_commands, uint64_t, bpf_delegate_commands_from_string);
+ static BUS_DEFINE_SET_TRANSIENT_PARSE_PTR(bpf_delegate_maps, uint64_t, bpf_delegate_maps_from_string);
+ static BUS_DEFINE_SET_TRANSIENT_PARSE_PTR(bpf_delegate_programs, uint64_t, bpf_delegate_programs_from_string);
+@@ -2347,6 +2350,9 @@ int bus_exec_context_set_transient_property(
+         if (streq(name, "MemoryKSM"))
+                 return bus_set_transient_tristate(u, name, &c->memory_ksm, message, flags, error);
+ 
++        if (streq(name, "MemoryTHP"))
++                return bus_set_transient_memory_thp(u, name, &c->memory_thp, message, flags, error);
++
+         if (streq(name, "UtmpIdentifier"))
+                 return bus_set_transient_string(u, name, &c->utmp_id, message, flags, error);
+ 
+diff --git a/src/core/exec-invoke.c b/src/core/exec-invoke.c
+index 2fcbf8ad24ee5..c3c8c84cbe43c 100644
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -4846,6 +4846,32 @@ static int exec_fd_mark_hot(
+         return 1;
+ }
+ 
++static int set_memory_thp(MemoryTHP thp) {
++        switch (thp) {
++
++        case MEMORY_THP_INHERIT:
++                return 0;
++
++        case MEMORY_THP_DISABLE:
++                if (prctl(PR_SET_THP_DISABLE, 1, 0, 0, 0) < 0)
++                        return errno == EINVAL ? -EOPNOTSUPP : -errno;
++                return 0;
++
++        case MEMORY_THP_MADVISE:
++                if (prctl(PR_SET_THP_DISABLE, 1, PR_THP_DISABLE_EXCEPT_ADVISED, 0, 0) < 0)
++                        return errno == EINVAL ? -EOPNOTSUPP : -errno;
++                return 0;
++
++        case MEMORY_THP_SYSTEM:
++                if (prctl(PR_SET_THP_DISABLE, 0, 0, 0, 0) < 0)
++                        return errno == EINVAL ? -EOPNOTSUPP : -errno;
++                return 0;
++
++        default:
++                assert_not_reached();
++        }
++}
++
+ static int send_handoff_timestamp(
+                 const ExecContext *c,
+                 ExecParameters *p,
+@@ -5508,6 +5534,16 @@ int exec_invoke(
+                         }
+                 }
+ 
++        r = set_memory_thp(context->memory_thp);
++        if (r == -EOPNOTSUPP)
++                log_debug_errno(r, "Setting MemoryTHP=%s is not supported, ignoring: %m",
++                                memory_thp_to_string(context->memory_thp));
++        else if (r < 0) {
++                *exit_status = EXIT_MEMORY_THP;
++                return log_error_errno(r, "Failed to set MemoryTHP=%s: %m",
++                                       memory_thp_to_string(context->memory_thp));
++        }
++
+ #if ENABLE_UTMP
+         if (context->utmp_id) {
+                 _cleanup_free_ char *username_alloc = NULL;
+diff --git a/src/core/execute-serialize.c b/src/core/execute-serialize.c
+index e5a97f59aa100..e40a3530af285 100644
+--- a/src/core/execute-serialize.c
++++ b/src/core/execute-serialize.c
+@@ -1701,6 +1701,10 @@ static int exec_context_serialize(const ExecContext *c, FILE *f) {
+         if (r < 0)
+                 return r;
+ 
++        r = serialize_item(f, "exec-context-memory-thp", memory_thp_to_string(c->memory_thp));
++        if (r < 0)
++                return r;
++
+         r = serialize_item(f, "exec-context-private-tmp", private_tmp_to_string(c->private_tmp));
+         if (r < 0)
+                 return r;
+@@ -2650,6 +2654,10 @@ static int exec_context_deserialize(ExecContext *c, FILE *f) {
+                         r = safe_atoi(val, &c->memory_ksm);
+                         if (r < 0)
+                                 return r;
++                } else if ((val = startswith(l, "exec-context-memory-thp="))) {
++                        c->memory_thp = memory_thp_from_string(val);
++                        if (c->memory_thp < 0)
++                                return c->memory_thp;
+                 } else if ((val = startswith(l, "exec-context-private-tmp="))) {
+                         c->private_tmp = private_tmp_from_string(val);
+                         if (c->private_tmp < 0)
+diff --git a/src/core/execute.c b/src/core/execute.c
+index c384e9dd638b8..403f8fb793003 100644
+--- a/src/core/execute.c
++++ b/src/core/execute.c
+@@ -1114,7 +1114,8 @@ void exec_context_dump(const ExecContext *c, FILE* f, const char *prefix) {
+                 "%sProtectHostname: %s%s%s\n"
+                 "%sProtectProc: %s\n"
+                 "%sProcSubset: %s\n"
+-                "%sPrivateBPF: %s\n",
++                "%sPrivateBPF: %s\n"
++                "%sMemoryTHP: %s\n",
+                 prefix, c->umask,
+                 prefix, empty_to_root(c->working_directory),
+                 prefix, empty_to_root(c->root_directory),
+@@ -1142,7 +1143,8 @@ void exec_context_dump(const ExecContext *c, FILE* f, const char *prefix) {
+                 prefix, protect_hostname_to_string(c->protect_hostname), c->private_hostname ? ":" : "", strempty(c->private_hostname),
+                 prefix, protect_proc_to_string(c->protect_proc),
+                 prefix, proc_subset_to_string(c->proc_subset),
+-                prefix, private_bpf_to_string(c->private_bpf));
++                prefix, private_bpf_to_string(c->private_bpf),
++                prefix, memory_thp_to_string(c->memory_thp));
+ 
+         if (c->private_bpf == PRIVATE_BPF_YES) {
+                 _cleanup_free_ char
+diff --git a/src/core/execute.h b/src/core/execute.h
+index 2e30374830ae4..e0278a6e0e7fb 100644
+--- a/src/core/execute.h
++++ b/src/core/execute.h
+@@ -307,6 +307,7 @@ typedef struct ExecContext {
+         int mount_apivfs;
+         int bind_log_sockets;
+         int memory_ksm;
++        MemoryTHP memory_thp;
+         PrivateTmp private_tmp;
+         PrivateTmp private_var_tmp; /* This is not an independent parameter, but calculated from other
+                                      * parameters in unit_patch_contexts(). */
+diff --git a/src/core/load-fragment-gperf.gperf.in b/src/core/load-fragment-gperf.gperf.in
+index 1977e882b51bf..321c0e2257858 100644
+--- a/src/core/load-fragment-gperf.gperf.in
++++ b/src/core/load-fragment-gperf.gperf.in
+@@ -194,6 +194,7 @@
+ {% endif %}
+ {{type}}.ProtectHostname,                     config_parse_protect_hostname,                      0,                                  offsetof({{type}}, exec_context)
+ {{type}}.MemoryKSM,                           config_parse_tristate,                              0,                                  offsetof({{type}}, exec_context.memory_ksm)
++{{type}}.MemoryTHP,                           config_parse_memory_thp,                            0,                                  offsetof({{type}}, exec_context.memory_thp)
+ {%- endmacro -%}
+ 
+ {%- macro KILL_CONTEXT_CONFIG_ITEMS(type) -%}
+diff --git a/src/core/load-fragment.c b/src/core/load-fragment.c
+index 9fcb99b1d6cd9..67f87d1ac534c 100644
+--- a/src/core/load-fragment.c
++++ b/src/core/load-fragment.c
+@@ -165,6 +165,7 @@ DEFINE_CONFIG_PARSE_PTR(config_parse_bpf_delegate_commands, bpf_delegate_command
+ DEFINE_CONFIG_PARSE_PTR(config_parse_bpf_delegate_maps, bpf_delegate_maps_from_string, uint64_t);
+ DEFINE_CONFIG_PARSE_PTR(config_parse_bpf_delegate_programs, bpf_delegate_programs_from_string, uint64_t);
+ DEFINE_CONFIG_PARSE_PTR(config_parse_bpf_delegate_attachments, bpf_delegate_attachments_from_string, uint64_t);
++DEFINE_CONFIG_PARSE_ENUM(config_parse_memory_thp, memory_thp, MemoryTHP);
+ 
+ bool contains_instance_specifier_superset(const char *s) {
+         const char *p, *q;
+diff --git a/src/core/load-fragment.h b/src/core/load-fragment.h
+index ccbe7198ea241..9a4d264f61af9 100644
+--- a/src/core/load-fragment.h
++++ b/src/core/load-fragment.h
+@@ -167,6 +167,7 @@ CONFIG_PARSER_PROTOTYPE(config_parse_memory_pressure_watch);
+ CONFIG_PARSER_PROTOTYPE(config_parse_cgroup_nft_set);
+ CONFIG_PARSER_PROTOTYPE(config_parse_mount_node);
+ CONFIG_PARSER_PROTOTYPE(config_parse_concurrency_max);
++CONFIG_PARSER_PROTOTYPE(config_parse_memory_thp);
+ 
+ /* gperf prototypes */
+ const struct ConfigPerfItem* load_fragment_gperf_lookup(const char *key, GPERF_LEN_TYPE length);
+diff --git a/src/core/namespace.c b/src/core/namespace.c
+index 2e3b2a4177bfe..14fd27e9e65ec 100644
+--- a/src/core/namespace.c
++++ b/src/core/namespace.c
+@@ -4016,6 +4016,15 @@ DEFINE_STRING_TABLE_LOOKUP(bpf_delegate_map_type, uint64_t);
+ DEFINE_STRING_TABLE_LOOKUP(bpf_delegate_prog_type, uint64_t);
+ DEFINE_STRING_TABLE_LOOKUP(bpf_delegate_attach_type, uint64_t);
+ 
++static const char* const memory_thp_table[_MEMORY_THP_MAX] = {
++        [MEMORY_THP_INHERIT] = "inherit",
++        [MEMORY_THP_DISABLE] = "disable",
++        [MEMORY_THP_MADVISE] = "madvise",
++        [MEMORY_THP_SYSTEM]  = "system",
++};
++
++DEFINE_STRING_TABLE_LOOKUP(memory_thp, MemoryTHP);
++
+ char* bpf_delegate_to_string(uint64_t u, const char * (*parser)(uint64_t) _const_ ) {
+         assert(parser);
+ 
+diff --git a/src/core/namespace.h b/src/core/namespace.h
+index 4e9d87e266fda..418ad4b406fb5 100644
+--- a/src/core/namespace.h
++++ b/src/core/namespace.h
+@@ -91,6 +91,24 @@ typedef enum PrivatePIDs {
+         _PRIVATE_PIDS_INVALID = -EINVAL,
+ } PrivatePIDs;
+ 
++typedef enum MemoryTHP {
++        /*
++         * Inherit default from process that starts systemd, i.e. do not make
++         * any PR_SET_THP_DISABLE call.
++         */
++        MEMORY_THP_INHERIT,
++        MEMORY_THP_DISABLE, /* Disable THPs completely for the prcess */
++        MEMORY_THP_MADVISE, /* Disable THPs for the process except when madvised */
++        /*
++         * Use system default THP setting. this can be used when the process that
++         * starts systemd has already disabled THPs via PR_SET_THP_DISABLE, and we
++         * want to restore the system default THP setting at process invokation time.
++         */
++        MEMORY_THP_SYSTEM,
++        _MEMORY_THP_MAX,
++        _MEMORY_THP_INVALID = -EINVAL,
++} MemoryTHP;
++
+ typedef struct BindMount {
+         char *source;
+         char *destination;
+@@ -241,6 +259,9 @@ PrivateBPF private_bpf_from_string(const char *s) _pure_;
+ const char* bpf_delegate_cmd_to_string(uint64_t u) _const_;
+ uint64_t bpf_delegate_cmd_from_string(const char *s) _pure_;
+ 
++const char* memory_thp_to_string(MemoryTHP i) _const_;
++MemoryTHP memory_thp_from_string(const char *s) _pure_;
++
+ const char* bpf_delegate_map_type_to_string(uint64_t u) _const_;
+ uint64_t bpf_delegate_map_type_from_string(const char *s) _pure_;
+ 
+diff --git a/src/shared/bus-unit-util.c b/src/shared/bus-unit-util.c
+index 1d213b0ee73f4..46958575d938e 100644
+--- a/src/shared/bus-unit-util.c
++++ b/src/shared/bus-unit-util.c
+@@ -2492,6 +2492,7 @@ static const BusProperty execute_properties[] = {
+         { "LogRateLimitBurst",                     bus_append_safe_atou                          },
+         { "TTYRows",                               bus_append_safe_atou                          },
+         { "TTYColumns",                            bus_append_safe_atou                          },
++        { "MemoryTHP",                             bus_append_string                             },
+         { "MountFlags",                            bus_append_mount_propagation_flag_from_string },
+         { "Environment",                           bus_append_strv_cunescape                     },
+         { "UnsetEnvironment",                      bus_append_strv_cunescape                     },
+diff --git a/src/shared/exit-status.c b/src/shared/exit-status.c
+index d7567dc026f89..b40664d204ce2 100644
+--- a/src/shared/exit-status.c
++++ b/src/shared/exit-status.c
+@@ -71,6 +71,7 @@ const ExitStatusMapping exit_status_mappings[256] = {
+         [EXIT_CREDENTIALS] =             { "CREDENTIALS",             EXIT_STATUS_SYSTEMD },
+         [EXIT_BPF] =                     { "BPF",                     EXIT_STATUS_SYSTEMD },
+         [EXIT_KSM] =                     { "KSM",                     EXIT_STATUS_SYSTEMD },
++        [EXIT_MEMORY_THP] =              { "MEMORY_THP",              EXIT_STATUS_SYSTEMD },
+ 
+         [EXIT_EXCEPTION] =               { "EXCEPTION",               EXIT_STATUS_SYSTEMD },
+ 
+diff --git a/src/shared/exit-status.h b/src/shared/exit-status.h
+index e9a122e31dc18..3572c3deef7bd 100644
+--- a/src/shared/exit-status.h
++++ b/src/shared/exit-status.h
+@@ -70,6 +70,7 @@ enum {
+         EXIT_CREDENTIALS,
+         EXIT_BPF,
+         EXIT_KSM,
++        EXIT_MEMORY_THP,
+ 
+         EXIT_EXCEPTION = 255,  /* Whenever we want to propagate an abnormal/signal exit, in line with bash */
+ };
+
+From 528592cca883496404664a1498f099d3b3c785a6 Mon Sep 17 00:00:00 2001
+From: Usama Arif <usamaarif642@gmail.com>
+Date: Sun, 21 Sep 2025 20:59:38 +0100
+Subject: [PATCH 2/2] src/test: add unittest for MemoryTHP=
+
+This checks if the prctl is set correctly when the property name
+is passed to systemd-run.
+
+(cherry picked from commit 4d16530b83ce9921904d560675a9571fc351fe96)
+---
+ src/test/meson.build                   |  5 +++
+ src/test/test-thp.c                    | 56 ++++++++++++++++++++++++++
+ test/units/TEST-07-PID1.thp-disable.sh | 25 ++++++++++++
+ 3 files changed, 86 insertions(+)
+ create mode 100644 src/test/test-thp.c
+ create mode 100755 test/units/TEST-07-PID1.thp-disable.sh
+
+diff --git a/src/test/meson.build b/src/test/meson.build
+index cfd15d118b403..e80b2a6e4e3dc 100644
+--- a/src/test/meson.build
++++ b/src/test/meson.build
+@@ -519,6 +519,11 @@ executables += [
+                 'conditions' : ['BPF_FRAMEWORK'],
+                 'type' : 'manual',
+         },
++        core_test_template + {
++                'sources' : files('test-thp.c'),
++                'dependencies' : common_test_dependencies,
++                'type' : 'manual',
++        },
+         core_test_template + {
+                 'sources' : files('test-cgroup-cpu.c'),
+         },
+diff --git a/src/test/test-thp.c b/src/test/test-thp.c
+new file mode 100644
+index 0000000000000..047bd26e8944e
+--- /dev/null
++++ b/src/test/test-thp.c
+@@ -0,0 +1,56 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++
++#include <sys/prctl.h>
++
++#include "tests.h"
++
++#define PR_THP_DISABLE_NOT_SET 0
++#define PR_THP_DISABLE 1
++
++static const char *arg_mode = NULL;
++
++static int intro(void) {
++        int r;
++
++        r = prctl(PR_GET_THP_DISABLE, 0, 0, 0, 0);
++        if (streq_ptr(arg_mode, "no-disable")) {
++                /* Test case: THPs should not be disabled */
++                if (r != PR_THP_DISABLE_NOT_SET) {
++                        log_error("THPs disabled for the process r = %d: %m", r);
++                        return EXIT_FAILURE;
++                }
++        } else if (streq_ptr(arg_mode, "disable")) {
++                /* Test case: THPs should be completely disabled */
++                if (r == PR_THP_DISABLE_NOT_SET)
++                        return log_tests_skipped("Disabling THPs completely for the process not supported");
++
++                if (r != PR_THP_DISABLE) {
++                        log_error("THPs not completely disabled for the process r = %d: %m", r);
++                        return EXIT_FAILURE;
++                }
++        } else if (streq_ptr(arg_mode, "madvise")) {
++                /* Test case: THPs should be only enabled on a madvise basis */
++                if (r == PR_THP_DISABLE_NOT_SET)
++                        return log_tests_skipped("Disabling THPs except for madvise not supported");
++
++                if (r != (PR_THP_DISABLE | PR_THP_DISABLE_EXCEPT_ADVISED)) {
++                        log_error("THPs (except madvise) not completely disabled for the process r = %d: %m", r);
++                        return EXIT_FAILURE;
++                }
++        } else {
++                log_error("Invalid mode: %s (expected: no-disable, disable, or madvise)", strna(arg_mode));
++                return EXIT_FAILURE;
++        }
++
++        return EXIT_SUCCESS;
++}
++
++int main(int argc, char *argv[]) {
++        if (argc != 2) {
++                log_error("Invalid number of args passed to the test %d", argc);
++                return EXIT_FAILURE;
++        }
++        arg_mode = argv[1];
++        test_setup_logging(LOG_DEBUG);
++        return intro();
++}
+diff --git a/test/units/TEST-07-PID1.thp-disable.sh b/test/units/TEST-07-PID1.thp-disable.sh
+new file mode 100755
+index 0000000000000..06626ad091832
+--- /dev/null
++++ b/test/units/TEST-07-PID1.thp-disable.sh
+@@ -0,0 +1,25 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: LGPL-2.1-or-later
++set -eux
++set -o pipefail
++
++systemd-run --wait \
++        /usr/lib/systemd/tests/unit-tests/manual/test-thp no-disable
++
++systemd-run --wait \
++        -p MemoryTHP=disable \
++        /usr/lib/systemd/tests/unit-tests/manual/test-thp disable
++
++# The following test will always return 77 if at compile time the kernel version
++# is less than 6.18. If it happens don't let the whole test fail
++set +e
++
++systemd-run --wait \
++        -p MemoryTHP=madvise \
++        /usr/lib/systemd/tests/unit-tests/manual/test-thp madvise
++
++if [ $? -eq 77 ]; then
++        exit 0
++fi
++
++set -e

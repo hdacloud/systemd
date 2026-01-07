@@ -168,6 +168,10 @@ Patch:          https://github.com/systemd/systemd/pull/40088.patch
 # core: Add UserNamespacePath=
 # original PR: https://github.com/systemd/systemd/pull/39359
 Patch:          https://github.com/systemd/systemd/pull/40299.patch
+
+# Add support for disabling THPs
+# original PR: https://github.com/systemd/systemd/pull/39085
+Patch:          https://github.com/systemd/systemd/pull/40300.patch
 %endif
 
 # Meta specific backports
