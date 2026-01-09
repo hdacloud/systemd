@@ -16,6 +16,10 @@ variables:
     description: "If 'true', unpacks built src.rpm into https://gitlab.com/CentOS/Hyperscale/rpms-unpacked/systemd. Setting to 'false' disables this. 'manual' creates a step in CI which one can manually run."
     options: ["true", "false", "manual"]
     value: "true"
+  DO_AUTORELEASE:
+    description: "If 'true', CI runs an extra step to potentially increment release_override and upload new tarbal to lookaside cache. No-op if no such action is necessary. This setting works only when SOURCE=spec and DO_PUBLISH=release. Useful setting to 'false' when doing a bugfix for an old release (eg: 257.10 when there is already 258)"
+    options: ["true", "false"]
+    value: "true"
 
 stages:
   - prepare
@@ -97,7 +101,7 @@ mn:autorelease:
     # mn:autorelease job works in a special way
     # 1. ./releng.py autorelease produces no changes to commit, the execution continues as normal
     # 2. if there are changes to commit, the job creates a commit and pushes it in a special way
-    #    using '-o ci.variable="FOO=BAR"'. The DO_AUTORELEASE_CI variable triggers another
+    #    using '-o ci.variable="FOO=BAR"'. The DO_AUTORELEASE=true variable triggers another
     #    pipeline whiche uses commited changes to actually perform a build.
 
     # autorelease logic
@@ -121,7 +125,7 @@ mn:autorelease:
         -o ci.variable="DO_PUBLISH=$DO_PUBLISH"
         -o ci.variable="DO_TEST=$DO_TEST"
         -o ci.variable="DO_UNPACK=$DO_UNPACK"
-        -o ci.variable="DO_AUTORELEASE_CI=true"' # magical variable to trigger only mn:setup in forked pipeline
+        -o ci.variable="DO_AUTORELEASE=false"' # magical variable to trigger only mn:setup in forked pipeline
 
     # notify child pipeline to do nothing.
     - echo 'SKIP_ALL=true' > autorelease.env
@@ -134,7 +138,7 @@ mn:autorelease:
     reports:
       dotenv: autorelease.env
   rules:
-    - if: $CI_PIPELINE_SOURCE == 'web' && $SOURCE == 'spec' && $DO_PUBLISH == 'release' && $DO_AUTORELEASE_CI == null
+    - if: $CI_PIPELINE_SOURCE == 'web' && $SOURCE == 'spec' && $DO_PUBLISH == 'release' && $DO_AUTORELEASE == 'true'
 
 mn:setup:
   stage: setup
@@ -153,5 +157,5 @@ mn:setup:
   interruptible: true # cancel child pipelines when parent cancelled
   rules:
     - if: $CI_PIPELINE_SOURCE == 'web' # run only for pipelines started via gitlab web-interface (usually a release)
-    - if: $DO_AUTORELEASE_CI == 'true' # special condition set in mn:autorelease job
+    - if: $CI_PIPELINE_SOURCE == 'parent_pipeline' && $DO_AUTORELEASE == 'false' # special condition set in mn:autorelease job
   extends: .matrix2
