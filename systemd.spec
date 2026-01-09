@@ -50,7 +50,7 @@ Version:        %{?version_override}%{!?version_override:257.10}
 %else
 Version:        %{?version_override}%{!?version_override:%(cat meson.version)}
 %endif
-Release:        %{?release_override}%{!?release_override:1.2}%{?dist}
+Release:        %{?release_override}%{!?release_override:1.3}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -348,6 +348,9 @@ Provides:       /usr/sbin/runlevel
 Provides:       /usr/sbin/shutdown
 Provides:       /usr/sbin/telinit
 %endif
+
+# provide downgrade path from 258+ which introduces and pulls in systemd-shared
+Provides:       %{name}-shared = %{version}-%{release}
 
 # Recommends to replace normal Requires deps for stuff that is dlopen()ed
 Recommends:     libxkbcommon.so.0%{?elf_suffix}
