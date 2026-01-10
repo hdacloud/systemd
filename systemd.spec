@@ -50,7 +50,7 @@ Version:        %{?version_override}%{!?version_override:257.10}
 %else
 Version:        %{?version_override}%{!?version_override:%(cat meson.version)}
 %endif
-Release:        %{?release_override}%{!?release_override:1.3}%{?dist}
+Release:        %{?release_override}%{!?release_override:1.4}%{?dist}
 
 %global stable %(c="%version"; [ "$c" = "${c#*.*}" ]; echo $?)
 
@@ -331,8 +331,8 @@ Obsoletes:      timedatex < 0.6-3
 Provides:       timedatex = 0.6-3
 Conflicts:      %{name}-standalone-tmpfiles
 Provides:       %{name}-tmpfiles = %{version}-%{release}
-Conflicts:      %{name}-standalone-sysusers
-Provides:       %{name}-sysusers = %{version}-%{release}
+
+Requires:       %{name}-sysusers = %{version}-%{release}
 Conflicts:      %{name}-standalone-shutdown
 Provides:       %{name}-shutdown = %{version}-%{release}
 
@@ -349,8 +349,9 @@ Provides:       /usr/sbin/shutdown
 Provides:       /usr/sbin/telinit
 %endif
 
-# provide downgrade path from 258+ which introduces and pulls in systemd-shared
-Provides:       %{name}-shared = %{version}-%{release}
+# pull in stub to provide downgrade path from 258+
+Requires:       %{name}-shared = %{version}-%{release}
+Requires:       %{name}-sysusers = %{version}-%{release}
 
 # Recommends to replace normal Requires deps for stuff that is dlopen()ed
 Recommends:     libxkbcommon.so.0%{?elf_suffix}
@@ -758,6 +759,23 @@ RemovePathPostfixes: .standalone
 Standalone systemd-shutdown binary with no dependencies on the systemd-shared
 library or other libraries from systemd-libs. This package conflicts with the
 main systemd package and is meant for use in exitrds.
+
+# stub packages for allowing downgrading from 258, which introduces
+# systemd-shared and systemd-sysusers
+%package shared
+Summary:        Stub package for downgrading from v258
+
+%description shared
+Stub package for downgrading from systemd 258.
+
+%package sysusers
+Summary:        Stub package for downgrading from v258
+Requires:       %{name}-shared = %{version}-%{release}
+Conflicts:      %{name}-standalone-sysusers
+
+%description sysusers
+Stub package for downgrading from systemd 258.
+
 
 %prep
 %if %{defined branch}
@@ -1458,6 +1476,13 @@ fi
 %files standalone-sysusers -f .file-list-standalone-sysusers
 
 %files standalone-shutdown -f .file-list-standalone-shutdown
+
+# stub packages
+%files shared
+%license LICENSES/MIT.txt
+
+%files sysusers
+%license LICENSE/MIT.txt
 
 %clean
 rm -rf $RPM_BUILD_ROOT
