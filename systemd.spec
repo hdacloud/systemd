@@ -154,6 +154,10 @@ Patch:          0001-Revert-units-drop-runlevel-0-6-.target.patch
 # We can drop this after SELinux policy is updated to handle the transition.
 Patch:          38769.patch
 
+# Fix systemctl cat fails on a conf file pointing to /dev/null (https://github.com/systemd/systemd/issues/40313)
+# original PR: https://github.com/systemd/systemd/pull/40290
+Patch:          https://github.com/systemd/systemd/pull/40374.patch
+
 # A patch to make https://github.com/systemd/systemd/issues/38817 more easy to reproduce and visible
 Patch:          https://github.com/systemd/systemd/pull/39932.patch
 

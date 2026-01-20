@@ -1,0 +1,809 @@
+From 2465b157b03b4479f015ed22f1a24f37e7d1d83a Mon Sep 17 00:00:00 2001
+From: Lennart Poettering <lennart@poettering.net>
+Date: Mon, 27 Oct 2025 12:22:02 +0100
+Subject: [PATCH 1/7] conf-files: optionally truncate suffix from discovered
+ files
+
+(cherry picked from commit d2d1fc59b4e7eae5eeb1e50c6ad42e8d5969daa2)
+---
+ src/basic/conf-files.c | 47 +++++++++++++++++++++++++++++++++++-------
+ src/basic/conf-files.h | 13 ++++++------
+ 2 files changed, 46 insertions(+), 14 deletions(-)
+
+diff --git a/src/basic/conf-files.c b/src/basic/conf-files.c
+index c00325f2e4443..77affe269cd2d 100644
+--- a/src/basic/conf-files.c
++++ b/src/basic/conf-files.c
+@@ -416,7 +416,13 @@ static int dump_files(Hashmap *fh, const char *root, ConfFile ***ret_files, size
+         return 0;
+ }
+ 
+-static int copy_and_sort_files_from_hashmap(Hashmap *fh, const char *root, ConfFilesFlags flags, char ***ret) {
++static int copy_and_sort_files_from_hashmap(
++                Hashmap *fh,
++                const char *suffix,
++                const char *root,
++                ConfFilesFlags flags,
++                char ***ret) {
++
+         _cleanup_strv_free_ char **results = NULL;
+         _cleanup_free_ ConfFile **files = NULL;
+         size_t n_files = 0, n_results = 0;
+@@ -432,19 +438,44 @@ static int copy_and_sort_files_from_hashmap(Hashmap *fh, const char *root, ConfF
+ 
+         FOREACH_ARRAY(i, files, n_files) {
+                 ConfFile *c = *i;
++                const char *add = NULL;
+ 
+                 if (FLAGS_SET(flags, CONF_FILES_BASENAME))
+-                        r = strv_extend_with_size(&results, &n_results, c->name);
++                        add = c->name;
+                 else if (root) {
+-                        char *p;
++                        _cleanup_free_ char *p = NULL;
+ 
+                         r = chaseat_prefix_root(c->result, root, &p);
+                         if (r < 0)
+                                 return log_debug_errno(r, "Failed to prefix '%s' with root '%s': %m", c->result, root);
+ 
+-                        r = strv_consume_with_size(&results, &n_results, TAKE_PTR(p));
++                        if (FLAGS_SET(flags, CONF_FILES_TRUNCATE_SUFFIX) && suffix) {
++                                char *e = endswith(p, suffix);
++                                if (!e)
++                                        continue;
++
++                                *e = 0;
++                        }
++
++                        if (strv_consume_with_size(&results, &n_results, TAKE_PTR(p)) < 0)
++                                return log_oom_debug();
++
++                        continue;
++                } else
++                        add = c->result;
++
++                if (FLAGS_SET(flags, CONF_FILES_TRUNCATE_SUFFIX)) {
++                        const char *e = endswith(add, suffix);
++                        if (!e)
++                                continue;
++
++                        _cleanup_free_ char *n = strndup(add, e - add);
++                        if (!n)
++                                return log_oom_debug();
++
++                        r = strv_consume_with_size(&results, &n_results, TAKE_PTR(n));
+                 } else
+-                        r = strv_extend_with_size(&results, &n_results, c->result);
++                        r = strv_extend_with_size(&results, &n_results, add);
+                 if (r < 0)
+                         return log_oom_debug();
+         }
+@@ -566,7 +597,7 @@ int conf_files_list_strv(
+         if (r < 0)
+                 return r;
+ 
+-        return copy_and_sort_files_from_hashmap(fh, empty_to_root(root_abs), flags, ret);
++        return copy_and_sort_files_from_hashmap(fh, suffix, empty_to_root(root_abs), flags, ret);
+ }
+ 
+ int conf_files_list_strv_full(
+@@ -619,7 +650,7 @@ int conf_files_list_strv_at(
+         if (r < 0)
+                 return r;
+ 
+-        return copy_and_sort_files_from_hashmap(fh, /* root = */ NULL, flags, ret);
++        return copy_and_sort_files_from_hashmap(fh, suffix, /* root = */ NULL, flags, ret);
+ }
+ 
+ int conf_files_list_strv_at_full(
+@@ -747,7 +778,7 @@ int conf_files_list_with_replacement(
+                         return log_debug_errno(r, "Failed to prefix '%s' with root '%s': %m", c->result, empty_to_root(root_abs));
+         }
+ 
+-        r = copy_and_sort_files_from_hashmap(fh, empty_to_root(root_abs), flags, ret_files);
++        r = copy_and_sort_files_from_hashmap(fh, ".conf", empty_to_root(root_abs), flags, ret_files);
+         if (r < 0)
+                 return r;
+ 
+diff --git a/src/basic/conf-files.h b/src/basic/conf-files.h
+index c5cad2084ce56..a4a3e7774daf5 100644
+--- a/src/basic/conf-files.h
++++ b/src/basic/conf-files.h
+@@ -6,13 +6,14 @@
+ #include "forward.h"
+ 
+ typedef enum ConfFilesFlags {
+-        CONF_FILES_EXECUTABLE               = 1 << 0,
+-        CONF_FILES_REGULAR                  = 1 << 1,
+-        CONF_FILES_DIRECTORY                = 1 << 2,
+-        CONF_FILES_BASENAME                 = 1 << 3,
+-        CONF_FILES_FILTER_MASKED_BY_SYMLINK = 1 << 4,
+-        CONF_FILES_FILTER_MASKED_BY_EMPTY   = 1 << 5,
++        CONF_FILES_EXECUTABLE               = 1 << 0, /* inode must be marked executable */
++        CONF_FILES_REGULAR                  = 1 << 1, /* inode must be regular file */
++        CONF_FILES_DIRECTORY                = 1 << 2, /* inode must be directory */
++        CONF_FILES_BASENAME                 = 1 << 3, /* only return basename of file, not full path */
++        CONF_FILES_FILTER_MASKED_BY_SYMLINK = 1 << 4, /* implement /dev/null symlink based masking */
++        CONF_FILES_FILTER_MASKED_BY_EMPTY   = 1 << 5, /* implement masking by empty file */
+         CONF_FILES_FILTER_MASKED            = CONF_FILES_FILTER_MASKED_BY_SYMLINK | CONF_FILES_FILTER_MASKED_BY_EMPTY,
++        CONF_FILES_TRUNCATE_SUFFIX          = 1 << 6, /* truncate specified suffix from return filename or path */
+ } ConfFilesFlags;
+ 
+ typedef struct ConfFile {
+
+From 458b5369e1404e05fd347831408bc2ca5e6df0f6 Mon Sep 17 00:00:00 2001
+From: Alexis-Emmanuel Haeringer <1693983+4lex11s@users.noreply.github.com>
+Date: Thu, 11 Dec 2025 22:36:23 +0100
+Subject: [PATCH 2/7] conf-files: include the expected suffix in the
+ 'unexpected suffix' debug message.
+
+(cherry picked from commit 595d88cdc86afdf40127282d711c5985c85fed9b)
+---
+ src/basic/conf-files.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/basic/conf-files.c b/src/basic/conf-files.c
+index 77affe269cd2d..7e1ff4f90b0c2 100644
+--- a/src/basic/conf-files.c
++++ b/src/basic/conf-files.c
+@@ -239,7 +239,7 @@ static int files_add(
+ 
+                 /* Does this match the suffix? */
+                 if (suffix && !endswith(de->d_name, suffix)) {
+-                        log_debug("Skipping file '%s/%s' with unexpected suffix.", root, skip_leading_slash(original_path));
++                        log_debug("Skipping file '%s/%s', suffix is not '%s'.", root, skip_leading_slash(original_path), suffix);
+                         continue;
+                 }
+ 
+
+From 0584b6630ed12652a968b332aee85686770c392d Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Tue, 13 Jan 2026 14:39:28 +0900
+Subject: [PATCH 3/7] conf-files: split out several helper functions from
+ files_add()
+
+No functional change, preparation for later commit.
+
+(cherry picked from commit 4a8e0ea4ec80fc5b9ce93ee8d114b205ceda4759)
+---
+ src/basic/conf-files.c | 248 +++++++++++++++++++++++++----------------
+ 1 file changed, 155 insertions(+), 93 deletions(-)
+
+diff --git a/src/basic/conf-files.c b/src/basic/conf-files.c
+index 7e1ff4f90b0c2..612c2ccad95f1 100644
+--- a/src/basic/conf-files.c
++++ b/src/basic/conf-files.c
+@@ -112,6 +112,146 @@ static int conf_file_prefix_root(ConfFile *c, const char *root) {
+         return 0;
+ }
+ 
++static bool conf_files_need_stat(ConfFilesFlags flags) {
++        return (flags & (CONF_FILES_FILTER_MASKED | CONF_FILES_REGULAR | CONF_FILES_DIRECTORY | CONF_FILES_EXECUTABLE)) != 0;
++}
++
++static ChaseFlags conf_files_chase_flags(ConfFilesFlags flags) {
++        ChaseFlags chase_flags = CHASE_AT_RESOLVE_IN_ROOT;
++
++        if (!conf_files_need_stat(flags) || FLAGS_SET(flags, CONF_FILES_FILTER_MASKED_BY_SYMLINK))
++                /* Even if no verification is requested, let's unconditionally call chaseat(),
++                 * to drop unsafe symlinks. */
++                chase_flags |= CHASE_NONEXISTENT;
++
++        return chase_flags;
++}
++
++static int conf_file_chase_and_verify(
++                int rfd,
++                const char *root,          /* for logging, can be NULL */
++                const char *original_path, /* for logging */
++                const char *path,
++                const char *name,
++                Set **masked,              /* optional */
++                ConfFilesFlags flags,
++                char **ret_path,
++                int *ret_fd,
++                struct stat *ret_stat) {
++
++        _cleanup_free_ char *resolved_path = NULL;
++        _cleanup_close_ int fd = -EBADF;
++        struct stat st = {};
++        int r;
++
++        assert(rfd >= 0 || rfd == AT_FDCWD);
++        assert(original_path);
++        assert(path);
++        assert(name);
++
++        root = empty_to_root(root);
++
++        r = chaseat(rfd, path, conf_files_chase_flags(flags), &resolved_path, &fd);
++        if (r < 0)
++                return log_debug_errno(r, "Failed to chase '%s%s': %m",
++                                       root, skip_leading_slash(original_path));
++        if (r == 0) {
++                if (FLAGS_SET(flags, CONF_FILES_FILTER_MASKED_BY_SYMLINK)) {
++                        /* If the path points to /dev/null in a image or so, then the device node may not exist. */
++                        if (path_equal(skip_leading_slash(resolved_path), "dev/null")) {
++                                if (masked) {
++                                        /* Mark this one as masked */
++                                        r = set_put_strdup(masked, name);
++                                        if (r < 0)
++                                                return log_oom_debug();
++                                }
++
++                                return log_debug_errno(SYNTHETIC_ERRNO(ERFKILL),
++                                                       "File '%s%s' is a mask (symlink to /dev/null).",
++                                                       root, skip_leading_slash(original_path));
++                        }
++                }
++
++                if (conf_files_need_stat(flags))
++                        /* If we need to have stat, skip the entry. */
++                        return log_debug_errno(SYNTHETIC_ERRNO(ENOENT), "Failed to chase '%s%s': %m",
++                                               root, skip_leading_slash(original_path));
++        }
++
++        /* Even if we do not need stat, let's take stat now. The caller may use the info later. */
++        if (fd >= 0 && fstat(fd, &st) < 0)
++                return log_debug_errno(errno, "Failed to stat '%s%s': %m",
++                                       root, skip_leading_slash(original_path));
++
++        /* Is this a masking entry? */
++        if (FLAGS_SET(flags, CONF_FILES_FILTER_MASKED_BY_SYMLINK) && stat_may_be_dev_null(&st)) {
++                if (masked) {
++                        /* Mark this one as masked */
++                        r = set_put_strdup(masked, name);
++                        if (r < 0)
++                                return log_oom_debug();
++                }
++
++                return log_debug_errno(SYNTHETIC_ERRNO(ERFKILL),
++                                       "File '%s%s' is a mask (symlink to /dev/null).",
++                                       root, skip_leading_slash(original_path));
++        }
++
++        if (FLAGS_SET(flags, CONF_FILES_FILTER_MASKED_BY_EMPTY) && stat_is_empty(&st)) {
++                if (masked) {
++                        /* Mark this one as masked */
++                        r = set_put_strdup(masked, name);
++                        if (r < 0)
++                                return log_oom_debug();
++                }
++
++                return log_debug_errno(SYNTHETIC_ERRNO(ERFKILL),
++                                       "File '%s%s' is a mask (an empty file).",
++                                       root, skip_leading_slash(original_path));
++        }
++
++        if (FLAGS_SET(flags, CONF_FILES_REGULAR|CONF_FILES_DIRECTORY)) {
++                if (!S_ISREG(st.st_mode) && !S_ISDIR(st.st_mode))
++                        return log_debug_errno(SYNTHETIC_ERRNO(EBADFD),
++                                               "File '%s%s' is neither a regular file or directory.",
++                                               root, skip_leading_slash(original_path));
++        } else {
++                /* Is this node a regular file? */
++                if (FLAGS_SET(flags, CONF_FILES_REGULAR)) {
++                        r = stat_verify_regular(&st);
++                        if (r < 0)
++                                return log_debug_errno(r, "File '%s%s' is not a regular file: %m",
++                                                       root, skip_leading_slash(original_path));
++                }
++
++                /* Is this node a directory? */
++                if (FLAGS_SET(flags, CONF_FILES_DIRECTORY)) {
++                        r = stat_verify_directory(&st);
++                        if (r < 0)
++                                return log_debug_errno(r, "File '%s%s' is not a directory: %m",
++                                                       root, skip_leading_slash(original_path));
++                }
++        }
++
++        /* Does this node have the executable bit set?
++         * As requested: check if the file is marked executable. Note that we don't check access(X_OK) here,
++         * as we care about whether the file is marked executable at all, and not whether it is executable
++         * for us, because if so, such errors are stuff we should log about. */
++        if (FLAGS_SET(flags, CONF_FILES_EXECUTABLE) && (st.st_mode & 0111) == 0)
++                return log_debug_errno(SYNTHETIC_ERRNO(ENOEXEC),
++                                       "File '%s%s' is not marked executable.",
++                                       root, skip_leading_slash(original_path));
++
++        if (ret_path)
++                *ret_path = TAKE_PTR(resolved_path);
++        if (ret_fd)
++                *ret_fd = TAKE_FD(fd);
++        if (ret_stat)
++                *ret_stat = st;
++
++        return 0;
++}
++
+ int conf_file_new_at(const char *path, int rfd, ChaseFlags chase_flags, ConfFile **ret) {
+         int r;
+ 
+@@ -261,100 +401,22 @@ static int files_add(
+ 
+                 _cleanup_free_ char *resolved_path = NULL;
+                 _cleanup_close_ int fd = -EBADF;
+-                bool need_stat = (flags & (CONF_FILES_FILTER_MASKED | CONF_FILES_REGULAR | CONF_FILES_DIRECTORY | CONF_FILES_EXECUTABLE)) != 0;
+-                ChaseFlags chase_flags = CHASE_AT_RESOLVE_IN_ROOT;
+-
+-                if (!need_stat || FLAGS_SET(flags, CONF_FILES_FILTER_MASKED_BY_SYMLINK))
+-                        /* Even if no verification is requested, let's unconditionally call chaseat(),
+-                         * to drop unsafe symlinks. */
+-                        chase_flags |= CHASE_NONEXISTENT;
+-
+-                r = chaseat(rfd, p, chase_flags, &resolved_path, &fd);
+-                if (r < 0) {
+-                        log_debug_errno(r, "Failed to chase '%s/%s', ignoring: %m",
+-                                        root, skip_leading_slash(original_path));
+-                        continue;
+-                }
+-                if (r == 0) {
+-                        if (FLAGS_SET(flags, CONF_FILES_FILTER_MASKED_BY_SYMLINK)) {
+-
+-                                /* If the path points to /dev/null in a image or so, then the device node may not exist. */
+-                                if (path_equal(skip_leading_slash(resolved_path), "dev/null")) {
+-                                        /* Mark this one as masked */
+-                                        r = set_put_strdup(masked, de->d_name);
+-                                        if (r < 0)
+-                                                return log_oom_debug();
+-
+-                                        log_debug("File '%s/%s' is a mask (symlink to /dev/null).",
+-                                                  root, skip_leading_slash(original_path));
+-                                        continue;
+-                                }
+-                        }
+-
+-                        if (need_stat) {
+-                                /* If we need to have stat, skip the entry. */
+-                                log_debug_errno(SYNTHETIC_ERRNO(ENOENT), "Failed to chase '%s/%s', ignoring.",
+-                                                root, skip_leading_slash(original_path));
+-                                continue;
+-                        }
+-                }
+-
+-                /* Even if we do not need stat, let's take stat now. The caller may use the info later. */
+-                struct stat st = {};
+-                if (fd >= 0 && fstat(fd, &st) < 0) {
+-                        log_debug_errno(errno, "Failed to stat '%s/%s', ignoring: %m",
+-                                        root, skip_leading_slash(original_path));
+-                        continue;
+-                }
+-
+-                /* Is this a masking entry? */
+-                if (FLAGS_SET(flags, CONF_FILES_FILTER_MASKED_BY_SYMLINK) && stat_may_be_dev_null(&st)) {
+-                        /* Mark this one as masked */
+-                        r = set_put_strdup(masked, de->d_name);
+-                        if (r < 0)
+-                                return log_oom_debug();
+-
+-                        log_debug("File '%s/%s' is a mask (symlink to /dev/null).", root, skip_leading_slash(original_path));
+-                        continue;
+-                }
+-
+-                if (FLAGS_SET(flags, CONF_FILES_FILTER_MASKED_BY_EMPTY) && stat_is_empty(&st)) {
+-                        /* Mark this one as masked */
+-                        r = set_put_strdup(masked, de->d_name);
+-                        if (r < 0)
+-                                return log_oom_debug();
+-
+-                        log_debug("File '%s/%s' is a mask (an empty file).", root, skip_leading_slash(original_path));
+-                        continue;
+-                }
+-
+-                if (FLAGS_SET(flags, CONF_FILES_REGULAR|CONF_FILES_DIRECTORY)) {
+-                        if (!S_ISREG(st.st_mode) && !S_ISDIR(st.st_mode)) {
+-                                log_debug("Ignoring '%s/%s', as it is neither a regular file or directory.", root, skip_leading_slash(original_path));
+-                                continue;
+-                        }
+-                } else {
+-                        /* Is this node a regular file? */
+-                        if (FLAGS_SET(flags, CONF_FILES_REGULAR) && !S_ISREG(st.st_mode)) {
+-                                log_debug("Ignoring '%s/%s', as it is not a regular file.", root, skip_leading_slash(original_path));
+-                                continue;
+-                        }
+-
+-                        /* Is this node a directory? */
+-                        if (FLAGS_SET(flags, CONF_FILES_DIRECTORY) && !S_ISDIR(st.st_mode)) {
+-                                log_debug("Ignoring '%s/%s', as it is not a directory.", root, skip_leading_slash(original_path));
+-                                continue;
+-                        }
+-                }
+-
+-                /* Does this node have the executable bit set?
+-                 * As requested: check if the file is marked executable. Note that we don't check access(X_OK)
+-                 * here, as we care about whether the file is marked executable at all, and not whether it is
+-                 * executable for us, because if so, such errors are stuff we should log about. */
+-                if (FLAGS_SET(flags, CONF_FILES_EXECUTABLE) && (st.st_mode & 0111) == 0) {
+-                        log_debug("Ignoring '%s/%s', as it is not marked executable.", root, skip_leading_slash(original_path));
++                struct stat st;
++                r = conf_file_chase_and_verify(
++                                rfd,
++                                root,
++                                original_path,
++                                p,
++                                de->d_name,
++                                masked,
++                                flags,
++                                &resolved_path,
++                                &fd,
++                                &st);
++                if (r == -ENOMEM)
++                        return r;
++                if (r < 0)
+                         continue;
+-                }
+ 
+                 _cleanup_(conf_file_freep) ConfFile *c = new(ConfFile, 1);
+                 if (!c)
+
+From e1b317830123fdd4d4db745d3d8c835f8b3d38bc Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Tue, 13 Jan 2026 16:48:42 +0900
+Subject: [PATCH 4/7] conf-files: use empty_to_root()
+
+No functional change. For consistency with conf_file_chase_and_verify().
+
+(cherry picked from commit 0c109deda17aeca2468b2a268a46e22ac78e55e7)
+---
+ src/basic/conf-files.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
+
+diff --git a/src/basic/conf-files.c b/src/basic/conf-files.c
+index 612c2ccad95f1..417aafa30c729 100644
+--- a/src/basic/conf-files.c
++++ b/src/basic/conf-files.c
+@@ -368,9 +368,9 @@ static int files_add(
+         assert(files);
+         assert(masked);
+ 
+-        root = strempty(root);
++        root = empty_to_root(root);
+ 
+-        FOREACH_DIRENT(de, dir, return log_debug_errno(errno, "Failed to read directory '%s/%s': %m",
++        FOREACH_DIRENT(de, dir, return log_debug_errno(errno, "Failed to read directory '%s%s': %m",
+                                                        root, skip_leading_slash(original_dirpath))) {
+ 
+                 _cleanup_free_ char *original_path = path_join(original_dirpath, de->d_name);
+@@ -379,19 +379,19 @@ static int files_add(
+ 
+                 /* Does this match the suffix? */
+                 if (suffix && !endswith(de->d_name, suffix)) {
+-                        log_debug("Skipping file '%s/%s', suffix is not '%s'.", root, skip_leading_slash(original_path), suffix);
++                        log_debug("Skipping file '%s%s', suffix is not '%s'.", root, skip_leading_slash(original_path), suffix);
+                         continue;
+                 }
+ 
+                 /* Has this file already been found in an earlier directory? */
+                 if (hashmap_contains(*files, de->d_name)) {
+-                        log_debug("Skipping overridden file '%s/%s'.", root, skip_leading_slash(original_path));
++                        log_debug("Skipping overridden file '%s%s'.", root, skip_leading_slash(original_path));
+                         continue;
+                 }
+ 
+                 /* Has this been masked in an earlier directory? */
+                 if ((flags & CONF_FILES_FILTER_MASKED) != 0 && set_contains(*masked, de->d_name)) {
+-                        log_debug("File '%s/%s' is masked by previous entry.", root, skip_leading_slash(original_path));
++                        log_debug("File '%s%s' is masked by previous entry.", root, skip_leading_slash(original_path));
+                         continue;
+                 }
+ 
+@@ -595,6 +595,8 @@ static int conf_files_list_impl(
+         assert(rfd >= 0 || rfd == AT_FDCWD);
+         assert(ret);
+ 
++        root = empty_to_root(root);
++
+         if (replacement) {
+                 r = conf_file_new_at(replacement, rfd, CHASE_NONEXISTENT, &c);
+                 if (r < 0)
+@@ -608,7 +610,8 @@ static int conf_files_list_impl(
+                 r = chase_and_opendirat(rfd, *p, CHASE_AT_RESOLVE_IN_ROOT, &path, &dir);
+                 if (r < 0) {
+                         if (r != -ENOENT)
+-                                log_debug_errno(r, "Failed to chase and open directory '%s/%s', ignoring: %m", strempty(root), skip_leading_slash(*p));
++                                log_debug_errno(r, "Failed to chase and open directory '%s%s', ignoring: %m",
++                                                root, skip_leading_slash(*p));
+                         continue;
+                 }
+ 
+
+From ceed8c87dd9702b219b2a5f5987fbccaa8d64b79 Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Tue, 13 Jan 2026 15:26:41 +0900
+Subject: [PATCH 5/7] conf-files: make conf_file_new() take ConfFilesFlags
+ rather than ChaseFlags
+
+No functional change, preparation for later commit.
+
+(cherry picked from commit 5d0dc9915ca6b1f0b5ed5f37b2d080ae1981a489)
+---
+ src/basic/conf-files.c     | 32 ++++++++++++++++++--------------
+ src/basic/conf-files.h     |  4 ++--
+ src/shared/pretty-print.c  |  5 ++---
+ src/udev/fuzz-udev-rules.c |  3 +--
+ src/udev/udevadm-util.c    |  5 ++---
+ 5 files changed, 25 insertions(+), 24 deletions(-)
+
+diff --git a/src/basic/conf-files.c b/src/basic/conf-files.c
+index 417aafa30c729..5b4fdfa93c7a9 100644
+--- a/src/basic/conf-files.c
++++ b/src/basic/conf-files.c
+@@ -252,7 +252,7 @@ static int conf_file_chase_and_verify(
+         return 0;
+ }
+ 
+-int conf_file_new_at(const char *path, int rfd, ChaseFlags chase_flags, ConfFile **ret) {
++int conf_file_new_at(const char *path, int rfd, ConfFilesFlags flags, ConfFile **ret) {
+         int r;
+ 
+         assert(path);
+@@ -285,10 +285,8 @@ int conf_file_new_at(const char *path, int rfd, ChaseFlags chase_flags, ConfFile
+                 return log_debug_errno(r, "Failed to extract directory from '%s': %m", path);
+         if (r >= 0) {
+                 r = chaseat(rfd, dirpath,
+-                            CHASE_AT_RESOLVE_IN_ROOT |
+-                            CHASE_MUST_BE_DIRECTORY |
+-                            (FLAGS_SET(chase_flags, CHASE_NONEXISTENT) ? CHASE_NONEXISTENT : 0),
+-                            &resolved_dirpath, /* ret_fd = */ NULL);
++                            CHASE_MUST_BE_DIRECTORY | conf_files_chase_flags(flags),
++                            &resolved_dirpath, /* ret_fd= */ NULL);
+                 if (r < 0)
+                         return log_debug_errno(r, "Failed to chase '%s%s': %m", empty_to_root(root), skip_leading_slash(dirpath));
+         }
+@@ -297,22 +295,28 @@ int conf_file_new_at(const char *path, int rfd, ChaseFlags chase_flags, ConfFile
+         if (!c->result)
+                 return log_oom_debug();
+ 
+-        r = chaseat(rfd, c->result, CHASE_AT_RESOLVE_IN_ROOT | chase_flags, &c->resolved_path, &c->fd);
++        r = conf_file_chase_and_verify(
++                        rfd,
++                        root,
++                        c->original_path,
++                        c->result,
++                        c->name,
++                        /* masked= */ NULL,
++                        flags,
++                        &c->resolved_path,
++                        &c->fd,
++                        &c->st);
+         if (r < 0)
+-                return log_debug_errno(r, "Failed to chase '%s%s': %m", empty_to_root(root), skip_leading_slash(c->original_path));
+-
+-        if (c->fd >= 0 && fstat(c->fd, &c->st) < 0)
+-                return log_debug_errno(r, "Failed to stat '%s%s': %m", empty_to_root(root), skip_leading_slash(c->resolved_path));
++                return r;
+ 
+         *ret = TAKE_PTR(c);
+         return 0;
+ }
+ 
+-int conf_file_new(const char *path, const char *root, ChaseFlags chase_flags, ConfFile **ret) {
++int conf_file_new(const char *path, const char *root, ConfFilesFlags flags, ConfFile **ret) {
+         int r;
+ 
+         assert(path);
+-        assert((chase_flags & (CHASE_PREFIX_ROOT | CHASE_STEP)) == 0);
+         assert(ret);
+ 
+         _cleanup_free_ char *root_abs = NULL;
+@@ -331,7 +335,7 @@ int conf_file_new(const char *path, const char *root, ChaseFlags chase_flags, Co
+         }
+ 
+         _cleanup_(conf_file_freep) ConfFile *c = NULL;
+-        r = conf_file_new_at(path, rfd, chase_flags, &c);
++        r = conf_file_new_at(path, rfd, flags, &c);
+         if (r < 0)
+                 return r;
+ 
+@@ -598,7 +602,7 @@ static int conf_files_list_impl(
+         root = empty_to_root(root);
+ 
+         if (replacement) {
+-                r = conf_file_new_at(replacement, rfd, CHASE_NONEXISTENT, &c);
++                r = conf_file_new_at(replacement, rfd, /* flags= */ 0, &c);
+                 if (r < 0)
+                         return r;
+         }
+diff --git a/src/basic/conf-files.h b/src/basic/conf-files.h
+index a4a3e7774daf5..6739e63484828 100644
+--- a/src/basic/conf-files.h
++++ b/src/basic/conf-files.h
+@@ -29,8 +29,8 @@ ConfFile* conf_file_free(ConfFile *c);
+ DEFINE_TRIVIAL_CLEANUP_FUNC(ConfFile*, conf_file_free);
+ void conf_file_free_many(ConfFile **array, size_t n);
+ 
+-int conf_file_new_at(const char *path, int rfd, ChaseFlags chase_flags, ConfFile **ret);
+-int conf_file_new(const char *path, const char *root, ChaseFlags chase_flags, ConfFile **ret);
++int conf_file_new_at(const char *path, int rfd, ConfFilesFlags flags, ConfFile **ret);
++int conf_file_new(const char *path, const char *root, ConfFilesFlags flags, ConfFile **ret);
+ 
+ int conf_files_list(char ***ret, const char *suffix, const char *root, ConfFilesFlags flags, const char *dir);
+ int conf_files_list_at(char ***ret, const char *suffix, int rfd, ConfFilesFlags flags, const char *dir);
+diff --git a/src/shared/pretty-print.c b/src/shared/pretty-print.c
+index c7e77fd8e201d..885adb260a2f5 100644
+--- a/src/shared/pretty-print.c
++++ b/src/shared/pretty-print.c
+@@ -6,7 +6,6 @@
+ #include <unistd.h>
+ 
+ #include "alloc-util.h"
+-#include "chase.h"
+ #include "color-util.h"
+ #include "conf-files.h"
+ #include "constants.h"
+@@ -326,7 +325,7 @@ static int cat_file_by_path(const char *p, bool *newline, CatFlags flags) {
+ 
+         assert(p);
+ 
+-        r = conf_file_new(p, /* root = */ NULL, CHASE_MUST_BE_REGULAR, &c);
++        r = conf_file_new(p, /* root= */ NULL, CONF_FILES_REGULAR, &c);
+         if (r < 0)
+                 return log_error_errno(r, "Failed to chase '%s': %m", p);
+ 
+@@ -459,7 +458,7 @@ int conf_files_cat(const char *root, const char *name, CatFlags flags) {
+                         if (!p)
+                                 return log_oom();
+ 
+-                        if (conf_file_new(p, root, CHASE_MUST_BE_REGULAR, &c) >= 0)
++                        if (conf_file_new(p, root, CONF_FILES_REGULAR, &c) >= 0)
+                                 break;
+                 }
+ 
+diff --git a/src/udev/fuzz-udev-rules.c b/src/udev/fuzz-udev-rules.c
+index 34567471e8740..5a46f2e256ff0 100644
+--- a/src/udev/fuzz-udev-rules.c
++++ b/src/udev/fuzz-udev-rules.c
+@@ -2,7 +2,6 @@
+ 
+ #include <stdio.h>
+ 
+-#include "chase.h"
+ #include "conf-files.h"
+ #include "fd-util.h"
+ #include "fuzz.h"
+@@ -29,7 +28,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+         assert_se(rules = udev_rules_new(RESOLVE_NAME_EARLY));
+ 
+         _cleanup_(conf_file_freep) ConfFile *c = NULL;
+-        ASSERT_OK(conf_file_new(filename, /* root = */ NULL, CHASE_MUST_BE_REGULAR, &c));
++        ASSERT_OK(conf_file_new(filename, /* root= */ NULL, CONF_FILES_REGULAR, &c));
+ 
+         r = udev_rules_parse_file(rules, c, /* extra_checks = */ false, /* ret = */ NULL);
+         log_info_errno(r, "Parsing %s: %m", filename);
+diff --git a/src/udev/udevadm-util.c b/src/udev/udevadm-util.c
+index 5c6663b16e1d5..355227119dfea 100644
+--- a/src/udev/udevadm-util.c
++++ b/src/udev/udevadm-util.c
+@@ -7,7 +7,6 @@
+ #include "alloc-util.h"
+ #include "bus-error.h"
+ #include "bus-util.h"
+-#include "chase.h"
+ #include "conf-files.h"
+ #include "constants.h"
+ #include "device-private.h"
+@@ -250,7 +249,7 @@ static int search_rules_file_in_conf_dirs(const char *s, const char *root, ConfF
+                         return log_oom();
+ 
+                 _cleanup_(conf_file_freep) ConfFile *c = NULL;
+-                r = conf_file_new(path, root, CHASE_MUST_BE_REGULAR, &c);
++                r = conf_file_new(path, root, CONF_FILES_REGULAR, &c);
+                 if (r == -ENOENT)
+                         continue;
+                 if (r < 0)
+@@ -280,7 +279,7 @@ static int search_rules_file(const char *s, const char *root, ConfFile ***files,
+ 
+         /* If not found, or if it is a path, then chase it. */
+         _cleanup_(conf_file_freep) ConfFile *c = NULL;
+-        r = conf_file_new(s, root, CHASE_MUST_BE_REGULAR, &c);
++        r = conf_file_new(s, root, CONF_FILES_REGULAR, &c);
+         if (r >= 0) {
+                 if (!GREEDY_REALLOC_APPEND(*files, *n_files, &c, 1))
+                         return log_oom();
+
+From 17d23d9ba49042ef5bc485c20320fcd0cef4b560 Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Tue, 13 Jan 2026 15:39:39 +0900
+Subject: [PATCH 6/7] pretty-print: do not fail when cat_files() tries to show
+ a masked file
+
+Before 661b5bfd216e383ac7836261eea9671875e6709b, cat_files() does not
+check if a file is regular. If the file is a symlink to /dev/null, then
+cat_files() simply shows an empty contents for the file.
+With the offending commit, as the CHASE_MUST_BE_REGULAR flag is set,
+hence when we found a masked file, the function fails.
+
+Fixes #40313.
+Fixes regression caused by 661b5bfd216e383ac7836261eea9671875e6709b.
+
+Co-authored-by: gvenugo3 <gvenugo3@asu.edu>
+(cherry picked from commit f2125229234e798272f0c05ec99ec15e48d10fc0)
+---
+ src/shared/pretty-print.c | 18 ++++++++++++++++--
+ 1 file changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/src/shared/pretty-print.c b/src/shared/pretty-print.c
+index 885adb260a2f5..2f25977f8c7ae 100644
+--- a/src/shared/pretty-print.c
++++ b/src/shared/pretty-print.c
+@@ -325,7 +325,20 @@ static int cat_file_by_path(const char *p, bool *newline, CatFlags flags) {
+ 
+         assert(p);
+ 
+-        r = conf_file_new(p, /* root= */ NULL, CONF_FILES_REGULAR, &c);
++        r = conf_file_new(p, /* root= */ NULL, CONF_FILES_REGULAR | CONF_FILES_FILTER_MASKED, &c);
++        if (r == -ERFKILL) { /* masked */
++                if (newline) {
++                        if (*newline)
++                                putc('\n', stdout);
++                        *newline = true;
++                }
++
++                printf("%s# %s is a mask.%s\n",
++                       ansi_highlight_magenta(),
++                       p,
++                       ansi_normal());
++                return 0;
++        }
+         if (r < 0)
+                 return log_error_errno(r, "Failed to chase '%s': %m", p);
+ 
+@@ -458,7 +471,8 @@ int conf_files_cat(const char *root, const char *name, CatFlags flags) {
+                         if (!p)
+                                 return log_oom();
+ 
+-                        if (conf_file_new(p, root, CONF_FILES_REGULAR, &c) >= 0)
++                        r = conf_file_new(p, root, CONF_FILES_REGULAR | CONF_FILES_FILTER_MASKED, &c);
++                        if (r >= 0 || r == -ERFKILL) /* Found a regular file or masked file */
+                                 break;
+                 }
+ 
+
+From 3599c791533f51691a479e04199176699b416609 Mon Sep 17 00:00:00 2001
+From: gvenugo3 <gvenugo3@asu.edu>
+Date: Sat, 10 Jan 2026 19:46:18 +0000
+Subject: [PATCH 7/7] test: add test case for masked files in cat_files()
+
+Add a test case to verify that cat_files() correctly handles symlinks
+to /dev/null (masked configuration files) and returns success (0)
+instead of failing.
+
+This test complements the fix for issue #40313.
+
+Co-authored-by: Yu Watanabe <watanabe.yu+github@gmail.com>
+(cherry picked from commit 01efa01dd28b9c47c1f5fe84c684d9d13192ec96)
+---
+ src/test/test-pretty-print.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/src/test/test-pretty-print.c b/src/test/test-pretty-print.c
+index 71d8799cbfdb0..073930df09d37 100644
+--- a/src/test/test-pretty-print.c
++++ b/src/test/test-pretty-print.c
+@@ -4,8 +4,11 @@
+ #include <unistd.h>
+ 
+ #include "alloc-util.h"
++#include "path-util.h"
+ #include "pretty-print.h"
++#include "rm-rf.h"
+ #include "tests.h"
++#include "tmpfile-util.h"
+ 
+ #define CYLON_WIDTH 6
+ 
+@@ -53,6 +56,13 @@ TEST(cat_files) {
+ 
+         if (access("/etc/fstab", R_OK) >= 0)
+                 assert_se(cat_files("/etc/fstab", STRV_MAKE("/etc/fstab", "/etc/fstab"), 0) == 0);
++
++        /* Test masked file (symlink to /dev/null) - should succeed with exit code 0 */
++        _cleanup_(rm_rf_physical_and_freep) char *tmp = NULL;
++        ASSERT_OK(mkdtemp_malloc("/tmp/test-cat-files-XXXXXX", &tmp));
++        _cleanup_free_ char *masked_file = ASSERT_NOT_NULL(path_join(tmp, "masked.conf"));
++        ASSERT_OK_ERRNO(symlink("/dev/null", masked_file));
++        ASSERT_OK(cat_files(masked_file, /* dropins= */ NULL, /* flags= */ 0));
+ }
+ 
+ TEST(red_green_cross_check_mark) {
