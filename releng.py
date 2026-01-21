@@ -5,6 +5,7 @@ import logging
 import subprocess
 import sys
 from datetime import datetime
+from functools import cmp_to_key
 from pathlib import Path
 from typing import Any, NoReturn, Optional, Sequence, Iterator
 from types import FrameType
@@ -310,38 +311,83 @@ def updated_sources_checksum_and_upload(args: argparse.Namespace, systemd_spec: 
         f.write("autorelease: Updated tarball checksum\n")
 
 
-def get_latest_cbs_systemd_version_for(args: argparse.Namespace, release: str, repo: str) -> str:
-    build_tag = get_build_tag_for(release, repo, "release")
+def get_latest_n_cbs_builds(args: argparse.Namespace, build_tag: str, latest_n: int) -> list[str]:
+    # $ cbs list-tagged --quiet --latest-n=10 hyperscale9-packages-facebook-release systemd
+    #  systemd-257.10-1.1.hs+fb.el9_z            hyperscale9-packages-facebook-release  hyperscalebot
+    #  systemd-257.10-1.2.hs+fb.el9_z            hyperscale9-packages-facebook-release  hyperscalebot
+    #  systemd-257.10-1.3.hs+fb.el9_z            hyperscale9-packages-facebook-release  hyperscalebot
+    #  systemd-257.10-1.5.hs+fb.el9_z            hyperscale9-packages-facebook-release  hyperscalebot
+    #  systemd-257.9-1.3.hs+fb.el9_z             hyperscale9-packages-facebook-release  hyperscalebot
+    #  systemd-258.2-1.2.hs+fb.el9_z             hyperscale9-packages-facebook-release  hyperscalebot
+    #  systemd-258.3-1.2.hs+fb.el9_z             hyperscale9-packages-facebook-release  hyperscalebot
+    #  systemd-258.3-1.3.hs+fb.el9_z             hyperscale9-packages-facebook-release  hyperscalebot
+    #  systemd-258.3-1.4.hs+fb.el9_z             hyperscale9-packages-facebook-release  hyperscalebot
+    #  systemd-258.3-1.5.hs+fb.el9_z             hyperscale9-packages-facebook-release  hyperscalebot
 
-    logging.info(f"Quering CBS for latest-build of {build_tag}")
-    line = run(
+    output = run(
         [
             "cbs",
             *(["--cert", args.cert] if args.cert else []),
-            "latest-build",
+            "list-tagged",
             "--quiet",
+            f"--latest-n={latest_n}",
             build_tag,
             "systemd",
         ],
         stdout=subprocess.PIPE,
-    ).stdout.strip()
+    ).stdout
 
-    if not line.startswith("systemd-"):
-        logging.info("No latest-build in {build_tag}")
+    result = []
+    for line in output.splitlines():
+        if line.startswith("systemd-"):
+            build = line.split()[0]
+            result.append(build)
+
+    return result
+
+
+def compare_systemd_versions(ver1: str, ver2: str) -> int:
+    # returns -1 if a < b, 0 if a == b, 1 if a > b
+
+    result = run(["systemd-analyze", "compare-versions", ver1, ver2], check=False)
+    if result.returncode == 0:
+        return 0
+    if result.returncode == 11:  # the version of the right is smaller
+        return 1
+    if result.returncode == 12:  # the version of the left is smaller
+        return -1
+
+    die(f"Unexpected return code from systemd-analyze: {result.returncode}")
+
+
+def get_latest_cbs_systemd_version_for(args: argparse.Namespace, release: str, repo: str, systemd_major_version: str) -> str:
+    build_tag = get_build_tag_for(release, repo, "release")
+    rpm_suffix = get_rpm_suffix_for(release, repo)
+
+    logging.info(f"Quering CBS for latest builds of {build_tag} ({systemd_major_version})")
+    builds = get_latest_n_cbs_builds(args, build_tag, 10)
+    logging.debug(f"Discovered builds: {builds}")
+    builds = [b.removesuffix("." + rpm_suffix) for b in builds if b.startswith(systemd_major_version)]
+    logging.debug(f"Filtered builds: {builds}")
+
+    if not builds:
+        logging.info(f"No latest builds in {build_tag} for {systemd_major_version}")
         return None
 
-    latest_build_version = line.split()[0].strip()
-    rpm_suffix = get_rpm_suffix_for(release, repo)
-    cbs_systemd_version = latest_build_version.removesuffix("." + rpm_suffix)  # remove .hs+fb.el10 from 257.3-1.5.hs+fb.el10
-    if not cbs_systemd_version:
-        die("Failed to get latest systemd build from CBS")
+    builds = sorted(builds, key=cmp_to_key(compare_systemd_versions))
+    logging.debug(f"Sorted builds: {builds}")
 
-    logging.info(f"Latest build is {cbs_systemd_version}")
-    return cbs_systemd_version
+    latest_systemd_version = builds[-1]
+    logging.info(f"Latest build is {latest_systemd_version}")
+    return latest_systemd_version
 
 
 def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spec: Path, git_commit_message_file: Path) -> None:
     # Verify and potentially update release_override in systemd.spec.
+
+    systemd_major_version = rpmspec_query(args, systemd_spec, "%{name}-%{version}")
+    if not systemd_major_version:
+        die("Failed to get systemd major version from systemd.spec")
 
     systemd_version = rpmspec_query(args, systemd_spec, "%{name}-%{version}-%{release}")
     if not systemd_version:
@@ -356,7 +402,7 @@ def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spe
             # Some of them can have none, or very old versions.
 
             logging.info("")
-            cbs_systemd_version = get_latest_cbs_systemd_version_for(args, release, repo)
+            cbs_systemd_version = get_latest_cbs_systemd_version_for(args, release, repo, systemd_major_version)
             if not cbs_systemd_version:
                 continue
 
