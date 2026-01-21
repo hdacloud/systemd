@@ -330,7 +330,7 @@ def get_latest_n_cbs_builds(args: argparse.Namespace, build_tag: str, latest_n: 
             *(["--cert", args.cert] if args.cert else []),
             "list-tagged",
             "--quiet",
-            f"--latest-n={latest_n}",
+            *([f"--latest-n={latest_n}"] if latest_n >= 0 else []),
             build_tag,
             "systemd",
         ],
@@ -669,51 +669,12 @@ def do_unpublish(args: argparse.Namespace) -> None:
     validate_release_repo(args.release, args.repo)
     build_tag = get_build_tag(args)
 
-    output = run(
-        [
-            "cbs",
-            *(["--cert", args.cert] if args.cert else []),
-            "list-tagged",
-            "--quiet",
-            f"--latest-n={args.latest_n}",
-            build_tag,
-            "systemd",
-        ],
-        stdout=subprocess.PIPE,
-    ).stdout
-
-    latest_builds = set()
-
-    # $ cbs list-tagged --quiet --latest-n=1 hyperscale9s-packages-main-testing systemd
-    # systemd-258~rc4-20250911010943.hs.el9     hyperscale9s-packages-main-testing  hyperscalebot
-    for line in output.splitlines():
-        if not line.startswith("systemd-"):
-            continue
-
-        build = line.split()[0]
-        latest_builds.add(build)
-
+    latest_builds = set(get_latest_n_cbs_builds(args, build_tag, args.latest_n))
     logging.info(f"Found {len(latest_builds)} build(s)")
     logging.info(f"{latest_builds}")
 
-    output = run(
-        [
-            "cbs",
-            *(["--cert", args.cert] if args.cert else []),
-            "list-tagged",
-            "--quiet",
-            build_tag,
-            "systemd",
-        ],
-        stdout=subprocess.PIPE,
-    ).stdout
-
     max_untagging = args.max + 1
-    for line in output.splitlines():
-        if not line.startswith("systemd-"):
-            continue
-
-        build = line.split()[0]
+    for build in get_latest_n_cbs_builds(args, build_tag, 0):
         if build not in latest_builds:
             max_untagging -= 1
             if max_untagging <= 0:
