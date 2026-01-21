@@ -409,8 +409,8 @@ def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spe
             if not max_cbs_systemd_version:
                 max_cbs_systemd_version = cbs_systemd_version
             else:
-                vercmp_result = run(["systemd-analyze", "compare-versions", cbs_systemd_version, max_cbs_systemd_version], check=False)
-                if vercmp_result.returncode == 11:  # the version of the right is smaller
+                vercmp_result = compare_systemd_versions(cbs_systemd_version, max_cbs_systemd_version)
+                if vercmp_result == 1:  # the version of the right is smaller
                     max_cbs_systemd_version = cbs_systemd_version
 
     logging.info("")
@@ -421,10 +421,10 @@ def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spe
     # We can bump the version if systemd_version in spec is matching max one from CBS.
     # We cannot bump version is CBS is ahead of systemd_version in spec. This may lead to conflicts.
     # If systemd_version in spec is instead ahead of maximal CBS version, there is no need to bump the version.
-    vercmp_result = run(["systemd-analyze", "compare-versions", systemd_version, max_cbs_systemd_version], check=False)
-    if vercmp_result.returncode == 12:  # the version of the left is smaller
+    vercmp_result = compare_systemd_versions(systemd_version, max_cbs_systemd_version)
+    if vercmp_result == -1:  # the version of the left is smaller
         die(f"version is not bumped: systemd version in the spec ({systemd_version}) is smaller than max one in CBS ({max_cbs_systemd_version})")
-    if vercmp_result.returncode == 11:  # the version of the right is smaller
+    if vercmp_result == 1:  # the version of the right is smaller
         logging.info(f"systemd version in systemd.spec '{systemd_version}' is higher than one in CBS '{cbs_systemd_version}'")
         logging.info("No need for autoincrement of release_override! Continue as usual!")
         return
@@ -442,8 +442,8 @@ def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spe
     logging.info(f"New systemd release: {incremented_systemd_release}")
 
     logging.info("Verifing that new systemd_release is higher than old one")
-    vercmp_result = run(["systemd-analyze", "compare-versions", incremented_systemd_release, ">", systemd_release], check=False)
-    if vercmp_result.returncode != 0:
+    vercmp_result = compare_systemd_versions(incremented_systemd_release, systemd_release)
+    if vercmp_result.returncode != 1:  # the version of the right is smaller
         die(f"Failed to confirm that: {incremented_systemd_release} > {systemd_release}")
 
     logging.info("Verification is correct!")
