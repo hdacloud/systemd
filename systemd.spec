@@ -546,8 +546,11 @@ Conflicts:      systemd-standalone-repart
 Provides:       systemd-repart = %{version}-%{release}
 
 # Newer versions of those are required to support X11 keycode remapping
+# These packages are too old in EL9 and gone in EL10
+%if 0
 Conflicts:      xorg-x11-drv-evdev < 2.11.0
 Conflicts:      xorg-x11-drv-libinput < 1.5.0
+%endif
 
 %if "%{_sbindir}" == "%{_bindir}"
 # Compat symlinks for Requires in other packages.
