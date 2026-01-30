@@ -443,7 +443,7 @@ def update_spec_for_spec_autorelease_build(args: argparse.Namespace, systemd_spe
 
     logging.info("Verifing that new systemd_release is higher than old one")
     vercmp_result = compare_systemd_versions(incremented_systemd_release, systemd_release)
-    if vercmp_result.returncode != 1:  # the version of the right is smaller
+    if vercmp_result != 1:  # the version of the right is smaller
         die(f"Failed to confirm that: {incremented_systemd_release} > {systemd_release}")
 
     logging.info("Verification is correct!")
