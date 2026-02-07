@@ -68,7 +68,7 @@ Url:            https://systemd.io
 # But don't do that on OBS, otherwise the version subst fails, and will be
 # like 257-123-gabcd257.1 instead of 257-123-gabcd
 %if %{without obs}
-Version:        %{?version_override}%{!?version_override:258.3}
+Version:        %{?version_override}%{!?version_override:258.4}
 %else
 Version:        %{?version_override}%{!?version_override:%(cat meson.version)}
 %endif
@@ -153,10 +153,6 @@ Patch:          0001-Revert-units-drop-runlevel-0-6-.target.patch
 # We can drop this after SELinux policy is updated to handle the transition.
 Patch:          https://github.com/systemd/systemd/pull/38769.patch
 
-# https://github.com/systemd/systemd/pull/40124
-Patch:          0001-ssh-generator-split-out-common-helper-function.patch
-Patch:          0002-ssh-generator-split-out-one-more-helper-function.patch
-Patch:          0003-ssh-generator-suppress-error-message-for-vsock-EADDR.patch
 # userdb: omit empty parameters field in JSON messages
 Patch:          https://github.com/systemd/systemd/pull/38922.patch
 %endif
