@@ -1,0 +1,964 @@
+From ce4f578615b21ecbd74085563bac8dbab515048e Mon Sep 17 00:00:00 2001
+From: Luiz Amaral <email@luiz.eng.br>
+Date: Tue, 23 Dec 2025 20:02:15 +0100
+Subject: [PATCH] Add support for binding a unit to a network iface
+
+---
+ man/org.freedesktop.systemd1.xml          |  36 ++++++
+ man/supported-controllers.xml             |   3 +-
+ man/systemd.resource-control.xml          |  27 ++++
+ src/basic/cgroup-util.c                   |   1 +
+ src/basic/cgroup-util.h                   |   4 +-
+ src/core/bpf-bind-iface.c                 | 146 ++++++++++++++++++++++
+ src/core/bpf-bind-iface.h                 |   9 ++
+ src/core/bpf/bind-iface/bind-iface-skel.h |  17 +++
+ src/core/bpf/bind-iface/bind-iface.bpf.c  |  19 +++
+ src/core/bpf/bind-iface/meson.build       |  23 ++++
+ src/core/cgroup.c                         |  44 ++++++-
+ src/core/cgroup.h                         |   8 ++
+ src/core/dbus-cgroup.c                    |  26 ++++
+ src/core/execute-serialize.c              |   8 ++
+ src/core/load-fragment-gperf.gperf.in     |   1 +
+ src/core/load-fragment.c                  |  41 ++++++
+ src/core/load-fragment.h                  |   1 +
+ src/core/meson.build                      |   5 +-
+ src/shared/bus-unit-util.c                |   1 +
+ src/test/test-cgroup-mask.c               |   2 +-
+ test/units/TEST-07-PID1.exec-context.sh   |  17 +++
+ tools/dbus_ignorelist                     |   6 +
+ 22 files changed, 440 insertions(+), 5 deletions(-)
+ create mode 100644 src/core/bpf-bind-iface.c
+ create mode 100644 src/core/bpf-bind-iface.h
+ create mode 100644 src/core/bpf/bind-iface/bind-iface-skel.h
+ create mode 100644 src/core/bpf/bind-iface/bind-iface.bpf.c
+ create mode 100644 src/core/bpf/bind-iface/meson.build
+
+diff --git a/man/org.freedesktop.systemd1.xml b/man/org.freedesktop.systemd1.xml
+index 272e7b7120cd..ecc2912c434d 100644
+--- a/man/org.freedesktop.systemd1.xml
++++ b/man/org.freedesktop.systemd1.xml
+@@ -3010,6 +3010,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly (bas) RestrictNetworkInterfaces = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly s BindNetworkInterface = '...';
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly s MemoryPressureWatch = '...';
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t MemoryPressureThresholdUSec = ...;
+@@ -3675,6 +3677,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+ 
+     <!--property RestrictNetworkInterfaces is not documented!-->
+ 
++    <!--property BindNetworkInterface is not documented!-->
++
+     <!--property MemoryPressureWatch is not documented!-->
+ 
+     <!--property MemoryPressureThresholdUSec is not documented!-->
+@@ -4357,6 +4361,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2eservice {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="RestrictNetworkInterfaces"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="BindNetworkInterface"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryPressureWatch"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryPressureThresholdUSec"/>
+@@ -5249,6 +5255,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly (bas) RestrictNetworkInterfaces = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly s BindNetworkInterface = '...';
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly s MemoryPressureWatch = '...';
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t MemoryPressureThresholdUSec = ...;
+@@ -5934,6 +5942,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
+ 
+     <!--property RestrictNetworkInterfaces is not documented!-->
+ 
++    <!--property BindNetworkInterface is not documented!-->
++
+     <!--property MemoryPressureWatch is not documented!-->
+ 
+     <!--property MemoryPressureThresholdUSec is not documented!-->
+@@ -6596,6 +6606,8 @@ node /org/freedesktop/systemd1/unit/avahi_2ddaemon_2esocket {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="RestrictNetworkInterfaces"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="BindNetworkInterface"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryPressureWatch"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryPressureThresholdUSec"/>
+@@ -7312,6 +7324,8 @@ node /org/freedesktop/systemd1/unit/home_2emount {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly (bas) RestrictNetworkInterfaces = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly s BindNetworkInterface = '...';
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly s MemoryPressureWatch = '...';
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t MemoryPressureThresholdUSec = ...;
+@@ -7919,6 +7933,8 @@ node /org/freedesktop/systemd1/unit/home_2emount {
+ 
+     <!--property RestrictNetworkInterfaces is not documented!-->
+ 
++    <!--property BindNetworkInterface is not documented!-->
++
+     <!--property MemoryPressureWatch is not documented!-->
+ 
+     <!--property MemoryPressureThresholdUSec is not documented!-->
+@@ -8489,6 +8505,8 @@ node /org/freedesktop/systemd1/unit/home_2emount {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="RestrictNetworkInterfaces"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="BindNetworkInterface"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryPressureWatch"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryPressureThresholdUSec"/>
+@@ -9338,6 +9356,8 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly (bas) RestrictNetworkInterfaces = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly s BindNetworkInterface = '...';
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly s MemoryPressureWatch = '...';
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t MemoryPressureThresholdUSec = ...;
+@@ -9927,6 +9947,8 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
+ 
+     <!--property RestrictNetworkInterfaces is not documented!-->
+ 
++    <!--property BindNetworkInterface is not documented!-->
++
+     <!--property MemoryPressureWatch is not documented!-->
+ 
+     <!--property MemoryPressureThresholdUSec is not documented!-->
+@@ -10479,6 +10501,8 @@ node /org/freedesktop/systemd1/unit/dev_2dsda3_2eswap {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="RestrictNetworkInterfaces"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="BindNetworkInterface"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryPressureWatch"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryPressureThresholdUSec"/>
+@@ -11181,6 +11205,8 @@ node /org/freedesktop/systemd1/unit/system_2eslice {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly (bas) RestrictNetworkInterfaces = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly s BindNetworkInterface = '...';
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly s MemoryPressureWatch = '...';
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t MemoryPressureThresholdUSec = ...;
+@@ -11358,6 +11384,8 @@ node /org/freedesktop/systemd1/unit/system_2eslice {
+ 
+     <!--property RestrictNetworkInterfaces is not documented!-->
+ 
++    <!--property BindNetworkInterface is not documented!-->
++
+     <!--property MemoryPressureWatch is not documented!-->
+ 
+     <!--property MemoryPressureThresholdUSec is not documented!-->
+@@ -11546,6 +11574,8 @@ node /org/freedesktop/systemd1/unit/system_2eslice {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="RestrictNetworkInterfaces"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="BindNetworkInterface"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryPressureWatch"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryPressureThresholdUSec"/>
+@@ -11757,6 +11787,8 @@ node /org/freedesktop/systemd1/unit/session_2d1_2escope {
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly (bas) RestrictNetworkInterfaces = ...;
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
++      readonly s BindNetworkInterface = '...';
++      @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly s MemoryPressureWatch = '...';
+       @org.freedesktop.DBus.Property.EmitsChangedSignal("false")
+       readonly t MemoryPressureThresholdUSec = ...;
+@@ -11948,6 +11980,8 @@ node /org/freedesktop/systemd1/unit/session_2d1_2escope {
+ 
+     <!--property RestrictNetworkInterfaces is not documented!-->
+ 
++    <!--property BindNetworkInterface is not documented!-->
++
+     <!--property MemoryPressureWatch is not documented!-->
+ 
+     <!--property MemoryPressureThresholdUSec is not documented!-->
+@@ -12160,6 +12194,8 @@ node /org/freedesktop/systemd1/unit/session_2d1_2escope {
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="RestrictNetworkInterfaces"/>
+ 
++    <variablelist class="dbus-property" generated="True" extra-ref="BindNetworkInterface"/>
++
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryPressureWatch"/>
+ 
+     <variablelist class="dbus-property" generated="True" extra-ref="MemoryPressureThresholdUSec"/>
+diff --git a/man/supported-controllers.xml b/man/supported-controllers.xml
+index ebac084eced9..62f1597ae8b7 100644
+--- a/man/supported-controllers.xml
++++ b/man/supported-controllers.xml
+@@ -11,6 +11,7 @@
+   <para id="controllers-text">The following controller names may be specified: <option>cpu</option>,
+   <option>cpuset</option>, <option>io</option>, <option>memory</option>, <option>pids</option>,
+   <option>bpf-firewall</option>, <option>bpf-devices</option>, <option>bpf-foreign</option>,
+-  <option>bpf-socket-bind</option>, and <option>bpf-restrict-network-interfaces</option>.</para>
++  <option>bpf-socket-bind</option>, <option>bpf-restrict-network-interfaces</option>, and
++  <option>bpf-bind-network-interface</option>.</para>
+ 
+ </refsect1>
+diff --git a/man/systemd.resource-control.xml b/man/systemd.resource-control.xml
+index afab3771c5fe..71f9a45983a3 100644
+--- a/man/systemd.resource-control.xml
++++ b/man/systemd.resource-control.xml
+@@ -1023,6 +1023,33 @@ RestrictNetworkInterfaces=~eth1</programlisting>
+         </listitem>
+       </varlistentry>
+ 
++      <varlistentry>
++        <term><varname>BindNetworkInterface=</varname></term>
++
++        <listitem>
++          <para>Takes the name of a network interface. This option causes every socket created by processes of this
++          unit to be bound to the specified network interface.
++          </para>
++
++          <para>It is specially useful to confine a process to a VRF, when the program does not offer native support
++          for it. It is equivalent to running the program using <constant>ip vrf exec</constant>.
++          </para>
++
++          <para>In systems using <filename>nss-resolve</filename>, the interface used for DNS resolution can be chosen
++          by using the <varname>SYSTEMD_NSS_RESOLVE_IFINDEX</varname> environment variable.</para>
++
++          <para>The feature is implemented with <constant>cgroup/sock_create</constant> cgroup-bpf hooks.</para>
++
++          <para>Example:<programlisting>[Service]
++BindNetworkInterface=vrf-mgmt
++</programlisting></para>
++
++          <xi:include href="cgroup-sandboxing.xml" xpointer="singular"/>
++
++          <xi:include href="version-info.xml" xpointer="v260"/>
++        </listitem>
++      </varlistentry>
++
+       <varlistentry>
+         <term><varname>NFTSet=</varname><replaceable>family</replaceable>:<replaceable>table</replaceable>:<replaceable>set</replaceable></term>
+         <listitem>
+diff --git a/src/basic/cgroup-util.c b/src/basic/cgroup-util.c
+index 0508b8961024..ec99c887c50d 100644
+--- a/src/basic/cgroup-util.c
++++ b/src/basic/cgroup-util.c
+@@ -2083,6 +2083,7 @@ static const char *const cgroup_controller_table[_CGROUP_CONTROLLER_MAX] = {
+         [CGROUP_CONTROLLER_BPF_FOREIGN]                     = "bpf-foreign",
+         [CGROUP_CONTROLLER_BPF_SOCKET_BIND]                 = "bpf-socket-bind",
+         [CGROUP_CONTROLLER_BPF_RESTRICT_NETWORK_INTERFACES] = "bpf-restrict-network-interfaces",
++        [CGROUP_CONTROLLER_BPF_BIND_NETWORK_INTERFACE]      = "bpf-bind-network-interface",
+ };
+ 
+ DEFINE_STRING_TABLE_LOOKUP(cgroup_controller, CGroupController);
+diff --git a/src/basic/cgroup-util.h b/src/basic/cgroup-util.h
+index 81424418e085..35456f712efd 100644
+--- a/src/basic/cgroup-util.h
++++ b/src/basic/cgroup-util.h
+@@ -25,6 +25,7 @@ typedef enum CGroupController {
+         CGROUP_CONTROLLER_BPF_FOREIGN,
+         CGROUP_CONTROLLER_BPF_SOCKET_BIND,
+         CGROUP_CONTROLLER_BPF_RESTRICT_NETWORK_INTERFACES,
++        CGROUP_CONTROLLER_BPF_BIND_NETWORK_INTERFACE,
+         /* The BPF hook implementing RestrictFileSystems= is not defined here.
+          * It's applied as late as possible in exec_invoke() so we don't block
+          * our own unit setup code. */
+@@ -50,6 +51,7 @@ typedef enum CGroupMask {
+         CGROUP_MASK_BPF_FOREIGN = CGROUP_CONTROLLER_TO_MASK(CGROUP_CONTROLLER_BPF_FOREIGN),
+         CGROUP_MASK_BPF_SOCKET_BIND = CGROUP_CONTROLLER_TO_MASK(CGROUP_CONTROLLER_BPF_SOCKET_BIND),
+         CGROUP_MASK_BPF_RESTRICT_NETWORK_INTERFACES = CGROUP_CONTROLLER_TO_MASK(CGROUP_CONTROLLER_BPF_RESTRICT_NETWORK_INTERFACES),
++        CGROUP_MASK_BPF_BIND_NETWORK_INTERFACE = CGROUP_CONTROLLER_TO_MASK(CGROUP_CONTROLLER_BPF_BIND_NETWORK_INTERFACE),
+ 
+         /* All real cgroup v1 controllers */
+         CGROUP_MASK_V1 = CGROUP_MASK_CPU|CGROUP_MASK_CPUACCT|CGROUP_MASK_BLKIO|CGROUP_MASK_MEMORY|CGROUP_MASK_DEVICES|CGROUP_MASK_PIDS,
+@@ -61,7 +63,7 @@ typedef enum CGroupMask {
+         CGROUP_MASK_DELEGATE = CGROUP_MASK_V2,
+ 
+         /* All cgroup v2 BPF pseudo-controllers */
+-        CGROUP_MASK_BPF = CGROUP_MASK_BPF_FIREWALL|CGROUP_MASK_BPF_DEVICES|CGROUP_MASK_BPF_FOREIGN|CGROUP_MASK_BPF_SOCKET_BIND|CGROUP_MASK_BPF_RESTRICT_NETWORK_INTERFACES,
++        CGROUP_MASK_BPF = CGROUP_MASK_BPF_FIREWALL|CGROUP_MASK_BPF_DEVICES|CGROUP_MASK_BPF_FOREIGN|CGROUP_MASK_BPF_SOCKET_BIND|CGROUP_MASK_BPF_RESTRICT_NETWORK_INTERFACES|CGROUP_MASK_BPF_BIND_NETWORK_INTERFACE,
+ 
+         _CGROUP_MASK_ALL = CGROUP_CONTROLLER_TO_MASK(_CGROUP_CONTROLLER_MAX) - 1,
+ } CGroupMask;
+diff --git a/src/core/bpf-bind-iface.c b/src/core/bpf-bind-iface.c
+new file mode 100644
+index 000000000000..ea439d307ba1
+--- /dev/null
++++ b/src/core/bpf-bind-iface.c
+@@ -0,0 +1,146 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++
++#include "sd-netlink.h"
++
++#include "alloc-util.h"
++#include "bpf-bind-iface.h"
++#include "cgroup.h"
++#include "fd-util.h"
++#include "netlink-util.h"
++#include "string-util.h"
++#include "unit.h"
++
++#if BPF_FRAMEWORK
++/* libbpf, clang, llvm and bpftool compile time dependencies are satisfied */
++#include "bpf-dlopen.h"
++#include "bpf-link.h"
++#include "bpf/bind-iface/bind-iface-skel.h"
++
++static struct bind_iface_bpf *bind_iface_bpf_free(struct bind_iface_bpf *obj) {
++        bind_iface_bpf__destroy(obj);
++        return NULL;
++}
++
++DEFINE_TRIVIAL_CLEANUP_FUNC(struct bind_iface_bpf *, bind_iface_bpf_free);
++
++int bpf_bind_network_interface_supported(void) {
++        _cleanup_(bind_iface_bpf_freep) struct bind_iface_bpf *obj = NULL;
++        static int supported = -1;
++        int r;
++
++        if (supported >= 0)
++                return supported;
++
++        if (dlopen_bpf_full(LOG_WARNING) < 0)
++                return (supported = false);
++
++        obj = bind_iface_bpf__open();
++        if (!obj) {
++                log_debug_errno(errno, "bind-interface: Failed to open BPF object: %m");
++                return (supported = false);
++        }
++
++        r = bind_iface_bpf__load(obj);
++        if (r != 0) {
++                log_debug_errno(r, "bind-interface: Failed to load BPF object: %m");
++                return (supported = false);
++        }
++
++        return (supported = bpf_can_link_program(obj->progs.sd_bind_interface));
++}
++
++int bpf_bind_network_interface_install(Unit *u) {
++        _cleanup_(bpf_link_freep) struct bpf_link *link = NULL;
++        _cleanup_(bind_iface_bpf_freep) struct bind_iface_bpf *obj = NULL;
++        _cleanup_(sd_netlink_unrefp) sd_netlink *rtnl = NULL;
++        _cleanup_free_ char *cgroup_path = NULL;
++        _cleanup_close_ int cgroup_fd = -EBADF;
++        CGroupContext *cc;
++        CGroupRuntime *crt;
++        int r, ifindex;
++
++        assert(u);
++
++        cc = unit_get_cgroup_context(u);
++        if (!cc)
++                return 0;
++
++        crt = unit_get_cgroup_runtime(u);
++        if (!crt)
++                return 0;
++
++        if (isempty(cc->bind_network_interface))
++                return 0;
++
++        r = cg_get_path(crt->cgroup_path, /* suffix = */ NULL, &cgroup_path);
++        if (r < 0)
++                return log_unit_error_errno(u, r, "bind-interface: Failed to get cgroup path: %m");
++
++        ifindex = rtnl_resolve_interface(&rtnl, cc->bind_network_interface);
++        if (ifindex < 0) {
++                log_unit_warning_errno(u, ifindex,
++                                       "bind-interface: Couldn't find index of network interface '%s', ignoring: %m",
++                                       cc->bind_network_interface);
++                return 0;
++        }
++        log_unit_debug(u, "bind-interface: Found index %d for network interface '%s'", ifindex, cc->bind_network_interface);
++
++        /* Open the BPF skeleton */
++        obj = bind_iface_bpf__open();
++        if (!obj)
++                return log_unit_error_errno(u, errno, "bind-interface: Failed to open BPF object: %m");
++
++        /* Set the VRF interface index in rodata before loading */
++        obj->rodata->ifindex = ifindex;
++
++        /* Load the BPF program */
++        r = bind_iface_bpf__load(obj);
++        if (r != 0)
++                return log_unit_error_errno(u, r, "bind-interface: Failed to load BPF object: %m");
++
++        /* Open the cgroup directory */
++        cgroup_fd = open(cgroup_path, O_PATH | O_CLOEXEC | O_DIRECTORY, 0);
++        if (cgroup_fd < 0)
++                return log_unit_error_errno(u, errno, "bind-interface: Failed to open cgroup directory '%s': %m", cgroup_path);
++
++        /* Attach the BPF program to the cgroup */
++        link = sym_bpf_program__attach_cgroup(obj->progs.sd_bind_interface, cgroup_fd);
++        r = bpf_get_error_translated(link);
++        if (r != 0)
++                return log_unit_error_errno(u, r, "bind-interface: Failed to create cgroup link: %m");
++
++        /* Store the link in CGroupRuntime */
++        crt->bpf_bind_network_interface_link = TAKE_PTR(link);
++
++        log_unit_debug(u, "bind-interface: Successfully installed VRF binding for interface '%s' (ifindex=%d)",
++                       cc->bind_network_interface, ifindex);
++
++        return 0;
++}
++
++int bpf_bind_network_interface_serialize(Unit *u, FILE *f, FDSet *fds) {
++        CGroupRuntime *crt;
++
++        assert(u);
++
++        crt = unit_get_cgroup_runtime(u);
++        if (!crt)
++                return 0;
++
++        return bpf_serialize_link(f, fds, "bind-interface-fd", crt->bpf_bind_network_interface_link);
++}
++
++#else /* ! BPF_FRAMEWORK */
++int bpf_bind_network_interface_supported(void) {
++        return 0;
++}
++
++int bpf_bind_network_interface_install(Unit *u) {
++        return log_unit_debug_errno(u, SYNTHETIC_ERRNO(EOPNOTSUPP),
++                                    "bind-interface: Failed to install; BPF framework is not supported");
++}
++
++int bpf_bind_network_interface_serialize(Unit *u, FILE *f, FDSet *fds) {
++        return 0;
++}
++#endif
+diff --git a/src/core/bpf-bind-iface.h b/src/core/bpf-bind-iface.h
+new file mode 100644
+index 000000000000..53f5ebb332d5
+--- /dev/null
++++ b/src/core/bpf-bind-iface.h
+@@ -0,0 +1,9 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#pragma once
++
++#include "core-forward.h"
++
++int bpf_bind_network_interface_supported(void);
++int bpf_bind_network_interface_install(Unit *u);
++
++int bpf_bind_network_interface_serialize(Unit *u, FILE *f, FDSet *fds);
+diff --git a/src/core/bpf/bind-iface/bind-iface-skel.h b/src/core/bpf/bind-iface/bind-iface-skel.h
+new file mode 100644
+index 000000000000..2ec63ca887dd
+--- /dev/null
++++ b/src/core/bpf/bind-iface/bind-iface-skel.h
+@@ -0,0 +1,17 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#pragma once
++
++/* The SPDX header above is actually correct in claiming this was
++ * LGPL-2.1-or-later, because it is. Since the kernel doesn't consider that
++ * compatible with GPL we will claim this to be GPL however, which should be
++ * fine given that LGPL-2.1-or-later downgrades to GPL if needed.
++ */
++
++#include "bpf-dlopen.h"                                         /* IWYU pragma: keep */
++
++/* libbpf is used via dlopen(), so rename symbols */
++#define bpf_object__open_skeleton sym_bpf_object__open_skeleton
++#define bpf_object__load_skeleton sym_bpf_object__load_skeleton
++#define bpf_object__destroy_skeleton sym_bpf_object__destroy_skeleton
++
++#include "bpf/bind-iface/bind-iface.skel.h"                     /* IWYU pragma: export */
+diff --git a/src/core/bpf/bind-iface/bind-iface.bpf.c b/src/core/bpf/bind-iface/bind-iface.bpf.c
+new file mode 100644
+index 000000000000..fa89829764ab
+--- /dev/null
++++ b/src/core/bpf/bind-iface/bind-iface.bpf.c
+@@ -0,0 +1,19 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++
++/* <linux/bpf.h> must precede <bpf/bpf_helpers.h> due to integer types
++ * in bpf helpers signatures.
++ */
++#include <linux/bpf.h>
++#include <bpf/bpf_helpers.h>
++
++/* VRF interface index to bind sockets to, set from userspace */
++const volatile __u32 ifindex = 0;
++
++SEC("cgroup/sock_create")
++int sd_bind_interface(struct bpf_sock *ctx) {
++        /* Bind the socket to the VRF interface */
++        ctx->bound_dev_if = ifindex;
++        return 1;
++}
++
++static const char _license[] SEC("license") = "LGPL-2.1-or-later";
+diff --git a/src/core/bpf/bind-iface/meson.build b/src/core/bpf/bind-iface/meson.build
+new file mode 100644
+index 000000000000..222cac16b08a
+--- /dev/null
++++ b/src/core/bpf/bind-iface/meson.build
+@@ -0,0 +1,23 @@
++# SPDX-License-Identifier: LGPL-2.1-or-later
++
++if conf.get('BPF_FRAMEWORK') != 1
++        subdir_done()
++endif
++
++bind_network_interface_bpf_o_unstripped = custom_target(
++        input : 'bind-iface.bpf.c',
++        output : 'bind-iface.bpf.unstripped.o',
++        command : bpf_o_unstripped_cmd)
++
++bind_network_interface_bpf_o = custom_target(
++        input : bind_network_interface_bpf_o_unstripped,
++        output : 'bind-iface.bpf.o',
++        command : bpf_o_cmd)
++
++bind_network_interface_skel_h = custom_target(
++        input : bind_network_interface_bpf_o,
++        output : 'bind-iface.skel.h',
++        command : skel_h_cmd,
++        capture : true)
++
++generated_sources += bind_network_interface_skel_h
+diff --git a/src/core/cgroup.c b/src/core/cgroup.c
+index 6c3ef00a4f63..c32ce61c2fb2 100644
+--- a/src/core/cgroup.c
++++ b/src/core/cgroup.c
+@@ -10,6 +10,7 @@
+ #include "af-list.h"
+ #include "alloc-util.h"
+ #include "blockdev-util.h"
++#include "bpf-bind-iface.h"
+ #include "bpf-devices.h"
+ #include "bpf-firewall.h"
+ #include "bpf-foreign.h"
+@@ -270,6 +271,8 @@ void cgroup_context_done(CGroupContext *c) {
+ 
+         c->restrict_network_interfaces = set_free(c->restrict_network_interfaces);
+ 
++        c->bind_network_interface = mfree(c->bind_network_interface);
++
+         cpu_set_done(&c->cpuset_cpus);
+         cpu_set_done(&c->startup_cpuset_cpus);
+         cpu_set_done(&c->cpuset_mems);
+@@ -570,6 +573,10 @@ void cgroup_context_dump(Unit *u, FILE* f, const char *prefix) {
+                 fprintf(f, "%sDelegateSubgroup: %s\n",
+                         prefix, c->delegate_subgroup);
+ 
++        if (!isempty(c->bind_network_interface))
++                fprintf(f, "%sBindNetworkInterface: %s\n",
++                        prefix, c->bind_network_interface);
++
+         if (c->memory_pressure_threshold_usec != USEC_INFINITY)
+                 fprintf(f, "%sMemoryPressureThresholdSec: %s\n",
+                         prefix, FORMAT_TIMESPAN(c->memory_pressure_threshold_usec, 1));
+@@ -1373,6 +1380,12 @@ static void cgroup_apply_restrict_network_interfaces(Unit *u) {
+         (void) bpf_restrict_ifaces_install(u);
+ }
+ 
++static void cgroup_apply_bind_network_interface(Unit *u) {
++        assert(u);
++
++        (void) bpf_bind_network_interface_install(u);
++}
++
+ static int cgroup_apply_devices(Unit *u) {
+         _cleanup_(bpf_program_freep) BPFProgram *prog = NULL;
+         CGroupContext *c;
+@@ -1619,7 +1632,10 @@ static void cgroup_context_apply(
+         if (apply_mask & CGROUP_MASK_BPF_RESTRICT_NETWORK_INTERFACES)
+                 cgroup_apply_restrict_network_interfaces(u);
+ 
+-        unit_modify_nft_set(u, /* add = */ true);
++        if (apply_mask & CGROUP_MASK_BPF_BIND_NETWORK_INTERFACE)
++                cgroup_apply_bind_network_interface(u);
++
++        unit_modify_nft_set(u, /* add= */ true);
+ }
+ 
+ static bool unit_get_needs_bpf_firewall(Unit *u) {
+@@ -1684,6 +1700,17 @@ static bool unit_get_needs_restrict_network_interfaces(Unit *u) {
+         return !set_isempty(c->restrict_network_interfaces);
+ }
+ 
++static bool unit_get_needs_bind_network_interface(Unit *u) {
++        CGroupContext *c;
++        assert(u);
++
++        c = unit_get_cgroup_context(u);
++        if (!c)
++                return false;
++
++        return !isempty(c->bind_network_interface);
++}
++
+ static CGroupMask unit_get_cgroup_mask(Unit *u) {
+         CGroupMask mask = 0;
+         CGroupContext *c;
+@@ -1736,6 +1763,9 @@ static CGroupMask unit_get_bpf_mask(Unit *u) {
+         if (unit_get_needs_restrict_network_interfaces(u))
+                 mask |= CGROUP_MASK_BPF_RESTRICT_NETWORK_INTERFACES;
+ 
++        if (unit_get_needs_bind_network_interface(u))
++                mask |= CGROUP_MASK_BPF_BIND_NETWORK_INTERFACE;
++
+         return mask;
+ }
+ 
+@@ -3240,6 +3270,13 @@ static int cg_bpf_mask_supported(CGroupMask *ret) {
+         if (r > 0)
+                 mask |= CGROUP_MASK_BPF_RESTRICT_NETWORK_INTERFACES;
+ 
++        /* BPF-based cgroup/sock_create hooks */
++        r = bpf_bind_network_interface_supported();
++        if (r < 0)
++                return r;
++        if (r > 0)
++                mask |= CGROUP_MASK_BPF_BIND_NETWORK_INTERFACE;
++
+         *ret = mask;
+         return 0;
+ }
+@@ -4190,7 +4227,10 @@ CGroupRuntime* cgroup_runtime_free(CGroupRuntime *crt) {
+ #if BPF_FRAMEWORK
+         bpf_link_free(crt->restrict_ifaces_ingress_bpf_link);
+         bpf_link_free(crt->restrict_ifaces_egress_bpf_link);
++
++        bpf_link_free(crt->bpf_bind_network_interface_link);
+ #endif
++
+         fdset_free(crt->initial_restrict_ifaces_link_fds);
+ 
+         bpf_firewall_close(crt);
+@@ -4314,6 +4354,8 @@ int cgroup_runtime_serialize(Unit *u, FILE *f, FDSet *fds) {
+ 
+         (void) bpf_restrict_ifaces_serialize(u, f, fds);
+ 
++        (void) bpf_bind_network_interface_serialize(u, f, fds);
++
+         return 0;
+ }
+ 
+diff --git a/src/core/cgroup.h b/src/core/cgroup.h
+index 55669b7e3a50..de091605d426 100644
+--- a/src/core/cgroup.h
++++ b/src/core/cgroup.h
+@@ -185,6 +185,8 @@ typedef struct CGroupContext {
+         LIST_HEAD(CGroupSocketBindItem, socket_bind_allow);
+         LIST_HEAD(CGroupSocketBindItem, socket_bind_deny);
+ 
++        char *bind_network_interface;
++
+         /* Common */
+         CGroupTasksMax tasks_max;
+ 
+@@ -332,6 +334,12 @@ typedef struct CGroupRuntime {
+         bool warned_clamping_cpu_quota_period:1;
+ 
+         int deserialized_cgroup_realized; /* tristate, for backwards compat */
++
++#if BPF_FRAMEWORK
++        /* BPF link to BPF programs attached to cgroup/sock_create hooks and
++         * responsible for binding created sockets to a given VRF interface. */
++        struct bpf_link *bpf_bind_network_interface_link;
++#endif
+ } CGroupRuntime;
+ 
+ uint64_t cgroup_context_cpu_weight(CGroupContext *c, ManagerState state);
+diff --git a/src/core/dbus-cgroup.c b/src/core/dbus-cgroup.c
+index dd4a6e8367ef..2c2e49c9ee51 100644
+--- a/src/core/dbus-cgroup.c
++++ b/src/core/dbus-cgroup.c
+@@ -430,6 +430,7 @@ const sd_bus_vtable bus_cgroup_vtable[] = {
+         SD_BUS_PROPERTY("SocketBindAllow", "a(iiqq)", property_get_socket_bind, offsetof(CGroupContext, socket_bind_allow), 0),
+         SD_BUS_PROPERTY("SocketBindDeny", "a(iiqq)", property_get_socket_bind, offsetof(CGroupContext, socket_bind_deny), 0),
+         SD_BUS_PROPERTY("RestrictNetworkInterfaces", "(bas)", property_get_restrict_network_interfaces, 0, 0),
++        SD_BUS_PROPERTY("BindNetworkInterface", "s", NULL, offsetof(CGroupContext, bind_network_interface), 0),
+         SD_BUS_PROPERTY("MemoryPressureWatch", "s", bus_property_get_cgroup_pressure_watch, offsetof(CGroupContext, memory_pressure_watch), 0),
+         SD_BUS_PROPERTY("MemoryPressureThresholdUSec", "t", bus_property_get_usec, offsetof(CGroupContext, memory_pressure_threshold_usec), 0),
+         SD_BUS_PROPERTY("NFTSet", "a(iiss)", property_get_cgroup_nft_set, 0, 0),
+@@ -1951,6 +1952,31 @@ int bus_cgroup_set_property(
+                 return 1;
+         }
+ 
++        if (streq(name, "BindNetworkInterface")) {
++                const char *s;
++
++                r = sd_bus_message_read(message, "s", &s);
++                if (r < 0)
++                        return r;
++
++                if (!ifname_valid_full(s, IFNAME_VALID_ALTERNATIVE))
++                        return sd_bus_error_setf(reterr_error, SD_BUS_ERROR_INVALID_ARGS, "Invalid interface name: %s", s);
++
++                if (!UNIT_WRITE_FLAGS_NOOP(flags)) {
++                        if (isempty(s))
++                                c->bind_network_interface = mfree(c->bind_network_interface);
++                        else {
++                                r = free_and_strdup_warn(&c->bind_network_interface, s);
++                                if (r < 0)
++                                        return r;
++                        }
++
++                        unit_write_settingf(u, flags, name, "BindNetworkInterface=%s", strempty(s));
++                }
++
++                return 1;
++        }
++
+         if (streq(name, "NFTSet")) {
+                 int source, nfproto;
+                 const char *table, *set;
+diff --git a/src/core/execute-serialize.c b/src/core/execute-serialize.c
+index dab8a47863f3..4b45d207dadb 100644
+--- a/src/core/execute-serialize.c
++++ b/src/core/execute-serialize.c
+@@ -428,6 +428,10 @@ static int exec_cgroup_context_serialize(const CGroupContext *c, FILE *f) {
+         if (r < 0)
+                 return r;
+ 
++        r = serialize_item(f, "exec-cgroup-context-bind-iface", c->bind_network_interface);
++        if (r < 0)
++                return r;
++
+         fputc('\n', f); /* End marker */
+ 
+         return 0;
+@@ -907,6 +911,10 @@ static int exec_cgroup_context_deserialize(CGroupContext *c, FILE *f) {
+                         if (r < 0)
+                                 return r;
+                         c->restrict_network_interfaces_is_allow_list = r;
++                } else if ((val = startswith(l, "exec-cgroup-context-bind-iface="))) {
++                        r = free_and_strdup(&c->bind_network_interface, val);
++                        if (r < 0)
++                                return r;
+                 } else
+                         log_warning("Failed to parse serialized line, ignoring: %s", l);
+         }
+diff --git a/src/core/load-fragment-gperf.gperf.in b/src/core/load-fragment-gperf.gperf.in
+index 1977e882b51b..1aaeb5a4f4b6 100644
+--- a/src/core/load-fragment-gperf.gperf.in
++++ b/src/core/load-fragment-gperf.gperf.in
+@@ -277,6 +277,7 @@
+ {{type}}.MemoryPressureWatch,                 config_parse_memory_pressure_watch,                 0,                                  offsetof({{type}}, cgroup_context.memory_pressure_watch)
+ {{type}}.NFTSet,                              config_parse_cgroup_nft_set,                        NFT_SET_PARSE_CGROUP,               offsetof({{type}}, cgroup_context)
+ {{type}}.CoredumpReceive,                     config_parse_bool,                                  0,                                  offsetof({{type}}, cgroup_context.coredump_receive)
++{{type}}.BindNetworkInterface,                config_parse_bind_network_interface,                0,                                  offsetof({{type}}, cgroup_context)
+ {%- endmacro -%}
+ 
+ %{
+diff --git a/src/core/load-fragment.c b/src/core/load-fragment.c
+index 9fcb99b1d6cd..7d267a7aeb59 100644
+--- a/src/core/load-fragment.c
++++ b/src/core/load-fragment.c
+@@ -6026,6 +6026,47 @@ int config_parse_concurrency_max(
+         return config_parse_unsigned(unit, filename, line, section, section_line, lvalue, ltype, rvalue, data, userdata);
+ }
+ 
++int config_parse_bind_network_interface(
++                const char *unit,
++                const char *filename,
++                unsigned line,
++                const char *section,
++                unsigned section_line,
++                const char *lvalue,
++                int ltype,
++                const char *rvalue,
++                void *data,
++                void *userdata) {
++
++        CGroupContext *c = ASSERT_PTR(data);
++
++        _cleanup_free_ char *k = NULL;
++        const Unit *u = ASSERT_PTR(userdata);
++        int r;
++
++        assert(filename);
++        assert(lvalue);
++        assert(rvalue);
++
++        if (isempty(rvalue)) {
++                c->bind_network_interface = mfree(c->bind_network_interface);
++                return 0;
++        }
++
++        r = unit_full_printf(u, rvalue, &k);
++        if (r < 0) {
++                log_syntax(unit, LOG_WARNING, filename, line, r, "Failed to resolve unit specifiers in %s, ignoring: %m", rvalue);
++                return 0;
++        }
++
++        if (!ifname_valid_full(k, IFNAME_VALID_ALTERNATIVE)) {
++                log_syntax(unit, LOG_WARNING, filename, line, 0, "Invalid interface name, ignoring: %s", k);
++                return 0;
++        }
++
++        return free_and_strdup_warn(&c->bind_network_interface, k);
++}
++
+ static int merge_by_names(Unit *u, Set *names, const char *id) {
+         char *k;
+         int r;
+diff --git a/src/core/load-fragment.h b/src/core/load-fragment.h
+index ccbe7198ea24..336ba250bfc2 100644
+--- a/src/core/load-fragment.h
++++ b/src/core/load-fragment.h
+@@ -167,6 +167,7 @@ CONFIG_PARSER_PROTOTYPE(config_parse_memory_pressure_watch);
+ CONFIG_PARSER_PROTOTYPE(config_parse_cgroup_nft_set);
+ CONFIG_PARSER_PROTOTYPE(config_parse_mount_node);
+ CONFIG_PARSER_PROTOTYPE(config_parse_concurrency_max);
++CONFIG_PARSER_PROTOTYPE(config_parse_bind_network_interface);
+ 
+ /* gperf prototypes */
+ const struct ConfigPerfItem* load_fragment_gperf_lookup(const char *key, GPERF_LEN_TYPE length);
+diff --git a/src/core/meson.build b/src/core/meson.build
+index 8bb0054c146a..04958c0b2e1e 100644
+--- a/src/core/meson.build
++++ b/src/core/meson.build
+@@ -9,6 +9,7 @@ libcore_sources = files(
+         'bpf-restrict-fs.c',
+         'bpf-restrict-ifaces.c',
+         'bpf-socket-bind.c',
++        'bpf-bind-iface.c',
+         'cgroup.c',
+         'dbus-automount.c',
+         'dbus-cgroup.c',
+@@ -73,12 +74,14 @@ libcore_sources = files(
+ subdir('bpf/socket-bind')
+ subdir('bpf/restrict-fs')
+ subdir('bpf/restrict-ifaces')
++subdir('bpf/bind-iface')
+ 
+ if conf.get('BPF_FRAMEWORK') == 1
+         libcore_sources += [
+                 socket_bind_skel_h,
+                 restrict_fs_skel_h,
+-                restrict_ifaces_skel_h]
++                restrict_ifaces_skel_h,
++                bind_network_interface_skel_h]
+ endif
+ 
+ sources += libcore_sources
+diff --git a/src/shared/bus-unit-util.c b/src/shared/bus-unit-util.c
+index 46dbffd7ccb6..f64a0aa91bd1 100644
+--- a/src/shared/bus-unit-util.c
++++ b/src/shared/bus-unit-util.c
+@@ -2556,6 +2556,7 @@ static const BusProperty execute_properties[] = {
+         { "StateDirectoryAccounting",              bus_append_parse_boolean                      },
+         { "CacheDirectoryAccounting",              bus_append_parse_boolean                      },
+         { "LogsDirectoryAccounting",               bus_append_parse_boolean                      },
++        { "BindNetworkInterface",                  bus_append_string                             },
+ 
+         { NULL, bus_try_append_resource_limit,     dump_resource_limits                          },
+         {}
+diff --git a/src/test/test-cgroup-mask.c b/src/test/test-cgroup-mask.c
+index 3dcb5fde8307..6b123f8761b4 100644
+--- a/src/test/test-cgroup-mask.c
++++ b/src/test/test-cgroup-mask.c
+@@ -130,7 +130,7 @@ static void test_cg_mask_to_string_one(CGroupMask mask, const char *t) {
+ 
+ TEST(cg_mask_to_string) {
+         test_cg_mask_to_string_one(0, NULL);
+-        test_cg_mask_to_string_one(_CGROUP_MASK_ALL, "cpu cpuacct cpuset io blkio memory devices pids bpf-firewall bpf-devices bpf-foreign bpf-socket-bind bpf-restrict-network-interfaces");
++        test_cg_mask_to_string_one(_CGROUP_MASK_ALL, "cpu cpuacct cpuset io blkio memory devices pids bpf-firewall bpf-devices bpf-foreign bpf-socket-bind bpf-restrict-network-interfaces bpf-bind-network-interface");
+         test_cg_mask_to_string_one(CGROUP_MASK_CPU, "cpu");
+         test_cg_mask_to_string_one(CGROUP_MASK_CPUACCT, "cpuacct");
+         test_cg_mask_to_string_one(CGROUP_MASK_CPUSET, "cpuset");
+diff --git a/test/units/TEST-07-PID1.exec-context.sh b/test/units/TEST-07-PID1.exec-context.sh
+index 2ec7f018e851..82ebaafeee7d 100755
+--- a/test/units/TEST-07-PID1.exec-context.sh
++++ b/test/units/TEST-07-PID1.exec-context.sh
+@@ -216,6 +216,23 @@ if ! systemd-detect-virt -cq; then
+             bash -xec 'timeout 1s ncat -6 -l ::1 1234; exit 1'
+         systemd-run --wait --pipe -p SuccessExitStatus=124 "${ARGUMENTS[@]}" \
+             bash -xec 'timeout 1s ncat -6 -l ::1 6666; exit 1'
++
++        # BindNetworkInterface*=
++        # Create a VRF interface to later bind to and check if the binding is working
++        ip link add vrf-test type vrf table 100
++        ip link set vrf-test up
++        ip address add 127.0.0.1/8 dev vrf-test
++
++        # Verify that a socket with BindNetworkInterface set is correctly bound to the interface
++        systemd-run --wait --pipe -p BindNetworkInterface=vrf-test \
++            bash -xec 'ncat -l 127.0.0.1 9999 & sleep 0.5; ss -tlnp | grep "127.0.0.1%vrf-test:9999" > /dev/null'
++
++        # Verify that a socket without BindNetworkInterface is not bound to any interface
++        systemd-run --wait --pipe \
++            bash -xec 'ncat -l 127.0.0.1 9998 & sleep 0.5; ss -tlnp | grep "127.0.0.1:9998" > /dev/null'
++
++        ip link del vrf-test
++
+     fi
+ 
+     losetup -d "$LODEV"
+diff --git a/tools/dbus_ignorelist b/tools/dbus_ignorelist
+index 0fc572d20405..de9694a2fd8e 100644
+--- a/tools/dbus_ignorelist
++++ b/tools/dbus_ignorelist
+@@ -751,6 +751,7 @@ org.freedesktop.systemd1.Mount.AmbientCapabilities
+ org.freedesktop.systemd1.Mount.AppArmorProfile
+ org.freedesktop.systemd1.Mount.AttachProcesses()
+ org.freedesktop.systemd1.Mount.BPFProgram
++org.freedesktop.systemd1.Mount.BindNetworkInterface
+ org.freedesktop.systemd1.Mount.BindPaths
+ org.freedesktop.systemd1.Mount.BindReadOnlyPaths
+ org.freedesktop.systemd1.Mount.BlockIOAccounting
+@@ -1018,6 +1019,7 @@ org.freedesktop.systemd1.Scope.AllowedCPUs
+ org.freedesktop.systemd1.Scope.AllowedMemoryNodes
+ org.freedesktop.systemd1.Scope.AttachProcesses()
+ org.freedesktop.systemd1.Scope.BPFProgram
++org.freedesktop.systemd1.Scope.BindNetworkInterface
+ org.freedesktop.systemd1.Scope.BlockIOAccounting
+ org.freedesktop.systemd1.Scope.BlockIODeviceWeight
+ org.freedesktop.systemd1.Scope.BlockIOReadBandwidth
+@@ -1107,6 +1109,7 @@ org.freedesktop.systemd1.Service.AppArmorProfile
+ org.freedesktop.systemd1.Service.AttachProcesses()
+ org.freedesktop.systemd1.Service.BPFProgram
+ org.freedesktop.systemd1.Service.BindMount()
++org.freedesktop.systemd1.Service.BindNetworkInterface
+ org.freedesktop.systemd1.Service.BindPaths
+ org.freedesktop.systemd1.Service.BindReadOnlyPaths
+ org.freedesktop.systemd1.Service.BlockIOAccounting
+@@ -1409,6 +1412,7 @@ org.freedesktop.systemd1.Slice.AllowedCPUs
+ org.freedesktop.systemd1.Slice.AllowedMemoryNodes
+ org.freedesktop.systemd1.Slice.AttachProcesses()
+ org.freedesktop.systemd1.Slice.BPFProgram
++org.freedesktop.systemd1.Slice.BindNetworkInterface
+ org.freedesktop.systemd1.Slice.BlockIOAccounting
+ org.freedesktop.systemd1.Slice.BlockIODeviceWeight
+ org.freedesktop.systemd1.Slice.BlockIOReadBandwidth
+@@ -1487,6 +1491,7 @@ org.freedesktop.systemd1.Socket.AttachProcesses()
+ org.freedesktop.systemd1.Socket.BPFProgram
+ org.freedesktop.systemd1.Socket.Backlog
+ org.freedesktop.systemd1.Socket.BindIPv6Only
++org.freedesktop.systemd1.Socket.BindNetworkInterface
+ org.freedesktop.systemd1.Socket.BindPaths
+ org.freedesktop.systemd1.Socket.BindReadOnlyPaths
+ org.freedesktop.systemd1.Socket.BindToDevice
+@@ -1786,6 +1791,7 @@ org.freedesktop.systemd1.Swap.AmbientCapabilities
+ org.freedesktop.systemd1.Swap.AppArmorProfile
+ org.freedesktop.systemd1.Swap.AttachProcesses()
+ org.freedesktop.systemd1.Swap.BPFProgram
++org.freedesktop.systemd1.Swap.BindNetworkInterface
+ org.freedesktop.systemd1.Swap.BindPaths
+ org.freedesktop.systemd1.Swap.BindReadOnlyPaths
+ org.freedesktop.systemd1.Swap.BlockIOAccounting
+-- 
+2.53.0
+

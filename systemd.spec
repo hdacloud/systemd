@@ -155,6 +155,9 @@ Patch:          https://github.com/systemd/systemd/pull/38769.patch
 
 # userdb: omit empty parameters field in JSON messages
 Patch:          https://github.com/systemd/systemd/pull/38922.patch
+
+# networkd: add support for binding a unit to a network iface
+Patch: https://github.com/systemd/systemd/pull/39975.patch
 %endif
 
 %ifarch %{ix86} x86_64 aarch64 riscv64
